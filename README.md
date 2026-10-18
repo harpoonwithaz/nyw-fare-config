@@ -49,6 +49,7 @@ These users need a simple and reliable way to update ticket prices, manage ticke
 ### Features and Sub-problems
 
 ### Epic 1
+We will be implementing a 'local' login. We will store usernames and passwords on a custom database first and then move on to integrate Google/GitHub login. (Harendeep can do this)
 
 ### Epic 2
 
