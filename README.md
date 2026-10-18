@@ -36,7 +36,13 @@ These spreadsheets are emailed to Caracal Technologies, where engineers manually
 
 ### What Problem We Solve
 
+The reliance on spreadsheets and manual process of updating the ferry ticket prices, availability, and customer warning messages is extremely time consuming.
+Our application aims to solve this problem by providing a centralized, user friendly interface where the employees can manage ticket configurations, review changes, and publish updates more efficiently and accurately.
+
 ### Target Audience
+
+The primary audience is NY waterway employees and operators who are the ones responsible for managing ferry ticket vending machines and their configurations.
+These users need a simple and reliable way to update ticket prices, manage ticket availability, configure customer warning messages, and review changes before publishing them.
 
 ## Project Scope
 
