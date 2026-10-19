@@ -66,7 +66,17 @@ The main goal is to provide NY Waterway employees with a secure, user-friendly a
 
 ### Epic 3
 
-### Epic 4
+### Epic 4 : Pre-Purchase Service Alerts and TVM Preview
+
+This part of the project is about what riders see on the ticket machine before they buy a ticket. From what we understand so far, Caracal's platform doesn't have a good way to store things like route alerts, out-of-service hours, or Spanish translations of messages. Because of that, it's hard for NY Waterway to let riders know about service changes right at the machine.
+
+Our plan is to store this information in our own application's database instead of relying on the platform. Staff would be able to write a notice for a route, mark when that route isn't running, and add both an English and a Spanish version of the message. When a configuration gets published, these notices would be sent along with the rest of the settings so they show up on the machine.
+
+We also want to handle routes that only run on weekdays. Riders may still want to buy a ticket on the weekend for their Monday trip, so we'd like to allow that while showing a short message explaining that the route isn't running today and the ticket is for the next weekday.
+
+Another issue is that the current prompts on the machine use generic "Dismiss" and "Confirm" buttons, which can be confusing. We'd like staff to be able to write clearer button labels that say what the button actually does.
+
+To tie all of this together, we're planning a simple preview of the ticket machine screen inside the app. As staff edit a message or a button label, or switch between English and Spanish, they'd be able to see roughly how it will look on the machine before anything is published. We expect the details of this epic to change as we learn more about the platform and talk with the client.
 
 ### Epic 5 : Configuration Review, Validation, and Publishing
 The main focus here is to allow NY Waterway employees to review and verify configuration changes before publishing them to the vending machines.

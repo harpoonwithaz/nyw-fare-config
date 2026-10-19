@@ -34,3 +34,22 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### macOS ###
+.DS_Store
+
+### Secrets / local config ###
+.env.*
+!.env.example
+application-local.properties
+
+### Logs ###
+*.log
+
+### AI tooling (local only) ###
+.claude/
+.claude-flow/
+.swarm/
+graphify-out/
+ruvector.db
+CLAUDE.md
