@@ -56,4 +56,19 @@ These users need a simple and reliable way to update ticket prices, manage ticke
 
 ### Epic 4
 
-### Epic 5
+### Epic 5 : Configuration Review, Validation, and Publishing
+The main focus here is to allow NY Waterway employees to review and verify configuration changes before publishing them to the vending machines.
+
+The main features would include:
+
+Configuration Comparison: Develop an interface which would display the proposed changes alongside the currently published configurations, allowing employees to fully identify the differences before publishing.
+
+Discrepency Detection: Validate the proposed configurations against the baseline dataset in order to identify any incorrect prices, ticket availability issues, and other inconsistencis.
+
+Configuration Publishing: Allow operators to publish verified configurations to the existing backend through the provided API.
+
+Change History: Provide operators with access to previous configuration changes and publication records to improve transparency and accountability.
+
+The main goal here is to reduce human error and ensure that only reviewed and validated configurations are being published to the vending machines.
+
+
