@@ -50,7 +50,17 @@ These users need a simple and reliable way to update ticket prices, manage ticke
 
 ### Features and Sub-problems
 
-### Epic 1
+### Epic 1 User Authentication thriugh a login page featuring both Local and Google sign in options
+
+The main focus of this epic is to provide NY Waterway employees with a secure and convenient way to access the system and to prevent unauthorized access. In this epic, we will:
+
+Develop a Local Login page which would allow employees to sign in using their registered email address or username and password, through a custom/local database.
+Then we will advance to develop a Google Login page which would allow employees to sign in using their authorized Google accounts to achieve a faster and easier login process.
+
+In both of these iterations, we will carefully and strictly verify user credentials and ensure that only authorized employees can access the system. In  case of unauthorized accounts, invalid credentials, missing fields, and authentication failures, etc we will also display appropriate error messages.
+
+We will also implement a logout button which logs the user out for improved security and also auto-logout after a set time.
+The main goal is to provide NY Waterway employees with a secure, user-friendly authentication experience through both local login and Google login, ensuring that only authorized users can access the system.
 
 ### Epic 2
 
