@@ -7,6 +7,8 @@
 **Authors:** [Athan L](https://github.com/wishadele), [Harendeep](https://github.com/harendeep29-eng), [Lakshya J](https://github.com/lakshyajoshipersonal-bit),
 [Oliver T](https://github.com/harpoonwithaz/), [Tejas D](https://github.com/tejas6433)
 
+**Application Link:** [nyw-fare-config](https://nyw-fare-config.onrender.com/)
+
 ## Abstract
 
 ### High Level Purpose
