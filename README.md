@@ -11,42 +11,38 @@
 
 ## Abstract
 
-### High Level Purpose
-
-An administrative web application designed to replace the fragile, manual configuration workflow currently used by Caracal Technologies and NY Waterway (NYW) to configure physical Ticket Vending Machines (TVMs) across ferry terminals.
-
-### Core Functionality
-
-Provides an interactive interface for client services staff and operators to update origin-destination fares, manage ticket availability and sales windows, author pre-purchase route alert banners, and publish vetted catalog configurations.
-
-### Architectural Overview
-
-A Java Spring Boot web application using ThymeLeaf as the templating engine with a PostgreSQL database for storing session based credentials and persistent storage.
+NY Waterway Fare Configuration Tool is an administrative web application designed to replace the fragile, manual configuration workflow currently used by Caracal Technologies and NY Waterway (NYW) to configure physical Ticket Vending Machines (TVMs) across ferry terminals.
+The application provides an interactive interface for client services staff and operators to update origin-destination fares, manage ticket availability and sales windows, author pre-purchase route alert banners, and publish vetted catalog configurations.
+The technical implementation will include a Java Spring Boot web application using ThymeLeaf as the templating engine with a PostgreSQL database for storing session based credentials and persistent storage.
 The application communicates via REST HTTP calls with Caracal Technologies’ Docker-packaged multi-tenant platform API and server.
 
-## Core Problem and How We Solve It
+## Core Problem & How We Solve It
 
 ### Background
 
 Caracal Technologies manufactures and operates TVMs for parking facilities, parks and recreation, and municipal/mass transit clients, including Edmonton and New York Waterway.
 New York Waterway operates commuter ferry services across multiple terminals with distinct route-based pricing and operating schedules.
 
-### Current workflow
+### Current workflow & Existing Systems
 
 NYW operational staff compile route updates, schedule changes, and rate adjustments into complex, two-dimensional Microsoft Excel spreadsheets.
 These spreadsheets are emailed to Caracal Technologies, where engineers manually translate spreadsheet rows into raw, deeply nested JSON configuration files.
+These spreadsheets provide no transactional integrity, no live synchronization with TVM fleet endpoints, no constraint checking, and require technical developers to execute updates.
+
+Existing commercial fleet configuration suites (e.g., SAP, custom automated fare collection platforms) are costly, proprietary, and incompatible with Caracal’s multi-tenant dimensional pricing architecture.
 
 ### What Problem We Solve
 
 The reliance on spreadsheets and manual process of updating the ferry ticket prices, availability, and customer warning messages is extremely time consuming.
 Our application aims to solve this problem by providing a centralized, user friendly interface where the employees can manage ticket configurations, review changes, and publish updates more efficiently and accurately.
+It will introduce localized persistence for pre-purchase passenger notices, and enforce strict front-end and server-side schema constraints (e.g., preventing negative dollar amounts or malformed schedules) at the point of entry.
 
 ### Target Audience
 
 The primary audience is NY waterway employees and operators who are the ones responsible for managing ferry ticket vending machines and their configurations.
 These users need a simple and reliable way to update ticket prices, manage ticket availability, configure customer warning messages, and review changes before publishing them.
 
-## Project Scope
+## Project Scope & 5 Core Epics
 
 ### Features and Sub-problems
 
@@ -62,7 +58,23 @@ In both of these iterations, we will carefully and strictly verify user credenti
 We will also implement a logout button which logs the user out for improved security and also auto-logout after a set time.
 The main goal is to provide NY Waterway employees with a secure, user-friendly authentication experience through both local login and Google login, ensuring that only authorized users can access the system.
 
-### Epic 2
+### Epic 2 : Interactive Origin-Destination Rate Grid & Fare Management
+
+This epic addresses the core daily task of NY Waterway fare managers by delivering an interactive rate table that mirrors the operator's mental model.
+It replaces the error-prone manual translation of spreadsheets into raw JSON configuration files by providing an intuitive, web-based rate management matrix for Caracal client services personnel and New York Waterway administrators.
+
+When an operator selects an origin terminal, the interface dynamically constructs a comprehensive interactive pricing grid displaying every valid route destination alongside all ticket products and their prevailing prices.
+Each row will represent an outbound destination, and columns represent the price catalog (e.g., ADULT_ONEWAY, CHILD_ONEWAY, FULL_10TRIP, FULL_MONTHLY, BIKE_ONEWAY).
+Each cell will clearly display its active pricing status in the standard U.S. currency format, and routes that are not currently offered or active at that station display distinctive visual badges (e.g., NOT_SOLD or N/A) rather than ambiguous blank fields, preventing confusion between un-configured fares and free fares.
+
+The operator can click directly into any price cell to enter edit mode. As values are adjusted, the interface visually highlights modified cells with a "pending draft" state (e.g., subtle yellow border or badge), giving the operator an immediate visual log of all uncommitted modifications on the active page.
+The operator can discard pending edits on a cell-by-cell basis or reset the entire grid back to the current platform state before executing a save.
+Once satisfied with the adjustments, the operator clicks "Save Rate Changes". A confirmation dialog presents a concise summary of all pending rate changes (specifying Origin, Destination, Product, Old Price, and New Price) before final submission.
+Upon confirmation, the application commits the changes through the backend and returns a real-time status alert confirming how many price rules were updated on the platform.
+
+Because the physical ticket vending machines rely on exact decimal pricing rules, this epic enforces multi-tiered client side (Browser) and server side (Spring Boot) data validation, handling Caracal platform architectural constraints.
+The module implements real-time client-side validation to reject blank entries, negative numbers, and currency values with more than two decimal places.
+On submission, the backend converts grid modifications into transactional payload rows and executes bulk price adjustments against the platform API, updating the live origin-destination rule sets immediately.
 
 ### Epic 3
 
@@ -109,4 +121,20 @@ Change History: Provide operators with access to previous configuration changes 
 
 The main goal here is to reduce human error and ensure that only reviewed and validated configurations are being published to the vending machines.
 
+## Technical Architecture & REST API Integration
 
+### Technology Stack
+
+**Backend:** Java 25 with Spring Boot (MVC, Spring Data JPA, Spring Security).
+
+**Frontend:** Thymeleaf server-side templates styled with Bootstrap / CSS, with vanilla JavaScript for dynamic matrix interactions.
+
+**Application Persistence:** PostgreSQL database hosted on Render (storing local user credentials, draft edits, alert banners, and operating hours).
+
+**Deployment Environment:** Containerized Maven Docker Image web service running on Render.
+
+### Rest API Integration
+
+The application will interact with Caracal’s Go-based microservice architecture via HTTP REST endpoints.
+The application will query both key GET and POST endpoints for fare fetching and updating.
+The development and testing will be executed against an isolated sandbox tenant deployed locally via Docker.
