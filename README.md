@@ -78,6 +78,22 @@ On submission, the backend converts grid modifications into transactional payloa
 
 ### Epic 3
 
+Epic 3 : Ticket Availability and Product Lifecycle Management
+
+This part of the project is about controlling which tickets riders can buy, where, and when. From what we understand so far, availability is currently buried in spreadsheets and nested JSON files, which makes simple changes slow and error-prone. Our goal is to let staff manage it directly in the app.
+
+The main features would include:
+
+Scoped Ticket Toggles: Staff can activate or deactivate ticket types (such as Adult, Child, or 10-Trip) at an individual terminal, route, or rate table, so a change in one place doesn’t affect the rest of the network.
+
+Temporal Availability Rules: We would model time-based conditions using the platform’s when-condition-create mechanism, including the monthly ticket purchase window (the 20th of the previous month to the 10th of the current month), weekday vs. weekend availability, and holiday schedules.
+
+Permanent Product Phase-Outs: Staff can mark a discontinued ticket type, such as Senior tickets, as NOT_SOLD across all rate tables in one action.
+
+Validation and Interface: A simple screen would show which ticket types are active for each terminal, route, and rate table. Conflicting rules, such as overlapping date windows, would be flagged with clear error messages before saving.
+
+The main goal is to give NY Waterway employees a reliable way to control what is sold, where, and when, while reducing manual work and errors. Changes made here would feed into the review and publishing flow in Epic 5. We expect the details of this epic to change as we learn more about the platform and talk with the client.
+
 ### Epic 4 : Pre-Purchase Service Alerts and TVM Preview
 
 This part of the project is about what riders see on the ticket machine before they buy a ticket. From what we understand so far, Caracal's platform doesn't have a good way to store things like route alerts, out-of-service hours, or Spanish translations of messages. Because of that, it's hard for NY Waterway to let riders know about service changes right at the machine.
