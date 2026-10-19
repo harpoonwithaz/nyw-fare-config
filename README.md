@@ -46,7 +46,7 @@ These users need a simple and reliable way to update ticket prices, manage ticke
 
 ### Features and Sub-problems
 
-### Epic 1 User Authentication thriugh a login page featuring both Local and Google sign in options
+### Epic 1 : Operator Authentication & Role-Based Access Control
 
 The main focus of this epic is to provide NY Waterway employees with a secure and convenient way to access the system and to prevent unauthorized access. In this epic, we will:
 
@@ -76,9 +76,7 @@ Because the physical ticket vending machines rely on exact decimal pricing rules
 The module implements real-time client-side validation to reject blank entries, negative numbers, and currency values with more than two decimal places.
 On submission, the backend converts grid modifications into transactional payload rows and executes bulk price adjustments against the platform API, updating the live origin-destination rule sets immediately.
 
-### Epic 3
-
-Epic 3 : Ticket Availability and Product Lifecycle Management
+### Epic 3 : Ticket Availability and Product Lifecycle Management
 
 This part of the project is about controlling which tickets riders can buy, where, and when. From what we understand so far, availability is currently buried in spreadsheets and nested JSON files, which makes simple changes slow and error-prone. Our goal is to let staff manage it directly in the app.
 
@@ -107,6 +105,7 @@ Another issue is that the current prompts on the machine use generic "Dismiss" a
 To tie all of this together, we're planning a simple preview of the ticket machine screen inside the app. As staff edit a message or a button label, or switch between English and Spanish, they'd be able to see roughly how it will look on the machine before anything is published. We expect the details of this epic to change as we learn more about the platform and talk with the client.
 
 ### Epic 5 : Configuration Review, Validation, and Publishing
+
 The main focus here is to allow NY Waterway employees to review and verify configuration changes before publishing them to the vending machines.
 
 The main features would include:

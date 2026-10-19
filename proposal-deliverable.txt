@@ -2,8 +2,8 @@ Group caracal technologies: NY Waterway Fare Configuration Tool
 GitHub: https://github.com/harpoonwithaz/nyw-fare-config
 Render: https://nyw-fare-config.onrender.com
 
-1. Athan: abl11@sfu.ca (computing), gigi.murin.fan (discord), wishadele (github)
-2. Harendeep: hsa279@sfu.ca (computing), hs09863 (discord), harendeep29-eng (github)
+1. Athan: abl11 (computing), gigi.murin.fan (Discord), wishadele (GitHub)
+2. Harendeep: hsa279 (computing), hs09863 (Discord), harendeep29-eng (GitHub)
 3. Lakshya Joshi: lja57 (computing), memeing24x7 (Discord), lakshyajoshipersonal-bit (GitHub)
 4. Oliver Tadaniewicz: ota17 (computing), harpoonz_ (Discord), harpoonwithaz (GitHub)
-5. Tejas Dutt: tda67(computing), thatcapguy1059 (Discord), tejas6433 (GitHub)
+5. Tejas Dutt: tda67 (computing), thatcapguy1059 (Discord), tejas6433 (GitHub)
