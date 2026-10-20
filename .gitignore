@@ -1,5 +1,5 @@
-# Environment variables
-.env
+# Assignment / Canvas Deliverable Related
+proposal.zip
 
 HELP.md
 target/
@@ -39,6 +39,7 @@ build/
 .DS_Store
 
 ### Secrets / local config ###
+.env
 .env.*
 !.env.example
 application-local.properties
