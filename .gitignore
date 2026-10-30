@@ -54,3 +54,4 @@ application-local.properties
 graphify-out/
 ruvector.db
 CLAUDE.md
+local.properties
