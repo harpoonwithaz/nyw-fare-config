@@ -57,31 +57,33 @@
                     style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
                     EX
                 </div>
-                <span class="fw-semibold text-truncate me-auto" style="max-width: 160px;">
-                    example@email.com
+                <span class="fw-semibold text-truncate me-auto" style="max-width: 160px;" th:text="${email}">
                 </span>
             </button>
 
             <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="userMenuButton">
                 <li>
-                    <h6 class="dropdown-header text-white">Role: ROLE_ADMIN</h6>
+                    <h6 class="dropdown-header text-white" th:text="|Role: ${role}|"></h6>
                 </li>
                 <li><a class="dropdown-item" href="#">Account Profile</a></li>
                 <li><a class="dropdown-item" href="#">Audit Log</a></li>
                 <li>
                     <hr class="dropdown-divider border-secondary">
                 </li>
-                <li><a class="dropdown-item text-danger" href="#">Sign out</a></li>
+                <li>
+                    <form th:action="@{/logout}" method="post" class="d-flex">
+                        <button type="submit" class="dropdown-item text-danger">Log out</button>
+                    </form>
+                </li>
             </ul>
         </div>
     </aside>
 
     <!-- Main viewport -->
     <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <h1>Fare matrix</h1>
-        <p>
-            
-        </p>
+        <h1 class="display-6 mb-0">
+            Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
+        </h1>
     </main>
 
     <!-- Bootstrap -->

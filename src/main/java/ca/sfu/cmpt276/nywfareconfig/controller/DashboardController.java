@@ -24,7 +24,7 @@ public class DashboardController {
         model.addAttribute("role", user.getRole());
         model.addAttribute("actor", actorService.currentActorHeader());
         model.addAttribute("isAdmin", user.getRole() == Role.CLIENT_SERVICES);
-        return "dashboard";
+        return "dashboard/home";
     }
 
     @GetMapping("/admin")
