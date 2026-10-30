@@ -84,6 +84,12 @@
         <h1 class="display-6 mb-0">
             Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
         </h1>
+        <div th:if="${isAdmin}">
+            <p>Your are an admin.</p>
+            <form th:action="@{/admin}" method="get">
+                <button type="submit" class="btn text-danger">Go to admin page</button>
+            </form>
+        </div>
     </main>
 
     <!-- Bootstrap -->
