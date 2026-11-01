@@ -1,6 +1,16 @@
 package ca.sfu.cmpt276.nywfareconfig.model;
 
 public enum Role {
-    CLIENT_SERVICES,
-    OPERATOR
+    OPERATOR("Operator"),
+    CLIENT_SERVICES("Client Services (Admin)");
+
+    private final String label;
+
+    Role(String label) {
+        this.label = label;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 }

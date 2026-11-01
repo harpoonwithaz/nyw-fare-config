@@ -10,20 +10,17 @@
 
 <body class="bg-light">
 
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container">
-            <span class="navbar-brand mb-0 h1">NY Waterway Fare Configuration</span>
-            <form th:action="@{/logout}" method="post" class="d-flex">
-                <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
-            </form>
-        </div>
-    </nav>
+    <nav th:replace="~{fragments :: navbar}"></nav>
 
     <div class="container py-5">
         <div class="row justify-content-center">
             <div class="col-12 col-md-10 col-lg-8">
                 <div class="card shadow-sm text-center">
                     <div class="card-body p-5">
+
+                        <div class="alert alert-success" th:if="${param.passwordChanged != null}">
+                            Your password has been updated.
+                        </div>
 
                         <svg viewBox="0 0 300 150" width="280" class="mb-3" xmlns="http://www.w3.org/2000/svg"
                             role="img" aria-label="Ferry on the water">
@@ -46,6 +43,14 @@
                         <h1 class="display-6 mb-0">
                             Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
                         </h1>
+
+                        <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+                            <a th:if="${isAdmin}" th:href="@{/admin/users/new}" class="btn btn-primary">Create
+                                account</a>
+                            <a th:if="${isAdmin}" th:href="@{/admin/users}" class="btn btn-outline-primary">Manage
+                                users</a>
+                            <a th:href="@{/account/password}" class="btn btn-outline-secondary">Change password</a>
+                        </div>
 
                     </div>
                 </div>

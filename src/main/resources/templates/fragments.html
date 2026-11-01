@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<body>
+    <nav th:fragment="navbar" class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand mb-0 h1" th:href="@{/dashboard}">NY Waterway Fare Configuration</a>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+            </form>
+        </div>
+    </nav>
+</body>
+
+</html>

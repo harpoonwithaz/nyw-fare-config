@@ -8,27 +8,26 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
-
 @Configuration
 public class DataInitializer {
 
-    private static final String PW = "1234";
+    private static final String STARTER_PASSWORD = "1234";
 
     @Bean
     CommandLineRunner seedUsers(AppUserRepository repo, PasswordEncoder encoder) {
         return args -> {
-            // The list below is the ONLY set of valid logins.
-            // Format: email, username, password, role, enabled
-            List<AppUser> users = List.of(
-                    new AppUser("admin@caracal.com", "admin", encoder.encode(PW), Role.CLIENT_SERVICES, true),
-                    new AppUser("ceo@caracal.com", "ceo", encoder.encode(PW), Role.CLIENT_SERVICES, true),
-                    new AppUser("operator@nywaterway.com", "operator", encoder.encode(PW), Role.OPERATOR, true),
-                    new AppUser("user@nywaterway.com", "user", encoder.encode(PW), Role.OPERATOR, true),
-                    new AppUser("eldon@caracal.com", "eldon", encoder.encode(PW), Role.CLIENT_SERVICES, true));
-
-            repo.deleteAll(); // wipes old users (including the earlier test accounts)
-            repo.saveAll(users); // re-creates exactly the list above
+            seed(repo, encoder, "admin@caracal.com", "admin", Role.CLIENT_SERVICES);
+            seed(repo, encoder, "ceo@caracal.com", "ceo", Role.CLIENT_SERVICES);
+            seed(repo, encoder, "operator@nywaterway.com", "operator", Role.OPERATOR);
+            seed(repo, encoder, "user@nywaterway.com", "user", Role.OPERATOR);
+            seed(repo, encoder, "eldon@caracal.com", "eldon", Role.CLIENT_SERVICES);
         };
+    }
+
+    private static void seed(AppUserRepository repo, PasswordEncoder encoder,
+            String email, String username, Role role) {
+        if (!repo.existsByUsernameIgnoreCase(username) && !repo.existsByEmailIgnoreCase(email)) {
+            repo.save(new AppUser(email, username, encoder.encode(STARTER_PASSWORD), role, true));
+        }
     }
 }

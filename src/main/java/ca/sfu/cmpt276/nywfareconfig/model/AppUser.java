@@ -60,4 +60,12 @@ public class AppUser {
     public boolean isEnabled() {
         return enabled;
     }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
 }
