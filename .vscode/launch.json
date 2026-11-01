@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Spring Boot - NywFareConfigApplication",
+      "request": "launch",
+      "mainClass": "ca.sfu.cmpt276.nywfareconfig.NywFareConfigApplication",
+      "projectName": "nyw-fare-config",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
