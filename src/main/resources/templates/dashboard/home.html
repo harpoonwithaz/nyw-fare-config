@@ -15,11 +15,37 @@
 <body class="d-flex vh-100 overflow-hidden">
 
     <!-- Sidebar -->
-   <div th:replace="~{fragments/sidebar :: sidebar-nav('fare-matrix')}"></div>
+    <div th:replace="~{fragments/sidebar :: sidebar-nav('home')}"></div>
 
     <!-- Main viewport -->
     <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-10 col-lg-8">
+                    <div class="card shadow-sm text-center">
+                        <div class="card-body p-5">
 
+                            <div class="alert alert-success" th:if="${param.passwordChanged != null}">
+                                Your password has been updated.
+                            </div>
+
+                            <h1 class="display-6 mb-0">
+                                Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
+                            </h1>
+
+                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+                                <a th:if="${isAdmin}" th:href="@{/admin/users/new}" class="btn btn-primary">Create
+                                    account</a>
+                                <a th:if="${isAdmin}" th:href="@{/admin/users}" class="btn btn-outline-primary">Manage
+                                    users</a>
+                                <a th:href="@{/account/password}" class="btn btn-outline-secondary">Change password</a>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Bootstrap -->

@@ -33,7 +33,8 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
+.vscode/*
+!.vscode/launch.json
 
 ### macOS ###
 .DS_Store
@@ -54,3 +55,4 @@ application-local.properties
 graphify-out/
 ruvector.db
 CLAUDE.md
+local.properties
