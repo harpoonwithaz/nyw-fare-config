@@ -41,7 +41,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a 
+                <a th:href="@{/fares/alerts}"
                    class="nav-link text-white"
                    th:classappend="${activePage == 'alerts'} ? 'active' : ''"
                    th:attr="aria-current=${activePage == 'alerts'} ? 'page' : null">
