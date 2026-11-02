@@ -1,10 +1,9 @@
 <!-- src/main/resources/templates/fragments/sidebar.html -->
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-    <aside th:fragment="sidebar-nav(activePage)" 
+    <aside th:fragment="sidebar-nav(activePage)"
            class="d-flex flex-column flex-shrink-0 p-3 text-white bg-dark h-100" 
            style="width: 280px;">
         
@@ -18,6 +17,14 @@
         <!-- Navigation Links -->
         <ul class="nav nav-pills flex-column mb-auto gap-1">
             <li class="nav-item">
+                <a th:href="@{/}" 
+                   class="nav-link text-white"
+                   th:classappend="${activePage == 'home'} ? 'active' : ''"
+                   th:attr="aria-current=${activePage == 'home'} ? 'page' : null">
+                    <i class="bi bi-house-door me-2"></i> Home
+                </a>
+            </li>
+            <li class="nav-item">
                 <a th:href="@{/fares}" 
                    class="nav-link text-white"
                    th:classappend="${activePage == 'fare-matrix'} ? 'active' : ''"
@@ -26,7 +33,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a th:href="@{/fares/availability}" 
+                <a 
                    class="nav-link text-white"
                    th:classappend="${activePage == 'availability'} ? 'active' : ''"
                    th:attr="aria-current=${activePage == 'availability'} ? 'page' : null">
@@ -34,7 +41,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a th:href="@{/fares/alerts}" 
+                <a 
                    class="nav-link text-white"
                    th:classappend="${activePage == 'alerts'} ? 'active' : ''"
                    th:attr="aria-current=${activePage == 'alerts'} ? 'page' : null">
@@ -42,7 +49,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a th:href="@{/fares/publish}" 
+                <a 
                    class="nav-link text-white"
                    th:classappend="${activePage == 'publish'} ? 'active' : ''"
                    th:attr="aria-current=${activePage == 'publish'} ? 'page' : null">
@@ -61,29 +68,27 @@
                     data-bs-toggle="dropdown" 
                     aria-expanded="false">
                 
-                <!-- Avatar Initials (Defaults to 'AD' if unauthenticated) -->
+                <!-- Authenticated user -->
                 <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2 text-white fw-semibold"
                      style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;"
-                     th:text="${#authentication != null ? #strings.substring(#authentication.name, 0, 2).toUpperCase() : 'AD'}">
-                    EX
+                     th:text="${currentUser.username.substring(0, 2).toUpperCase()}">
                 </div>
 
                 <!-- Username / Email -->
                 <span class="fw-semibold text-truncate me-auto" 
                       style="max-width: 160px;"
-                      th:text="${#authentication != null ? #authentication.name : 'admin@fareconfig.com'}">
-                    example@email.com
+                      th:text="${currentUser.email}">
                 </span>
             </button>
 
             <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="userMenuButton">
                 <li>
                     <h6 class="dropdown-header text-secondary small text-uppercase">
-                        Role: <span class="text-white" th:text="${#authentication != null ? #authentication.authorities[0] : 'ROLE_ADMIN'}">ROLE_ADMIN</span>
+                        Role: <span class="text-white" th:text="${currentUser.role.label}"></span>
                     </h6>
                 </li>
-                <li><a class="dropdown-item" th:href="@{/profile}">Account Profile</a></li>
-                <li><a class="dropdown-item" th:href="@{/audit-logs}">Audit Log</a></li>
+                <li><a class="dropdown-item" >Account Profile</a></li>
+                <li><a class="dropdown-item" >Audit Log</a></li>
                 <li><hr class="dropdown-divider border-secondary"></li>
                 <li>
                     <!-- Spring Security CSRF-compliant logout POST -->
