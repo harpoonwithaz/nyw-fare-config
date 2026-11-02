@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.controller;
+package ca.sfu.cmpt276.nywfareconfig.security.controller;
 
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,7 +15,7 @@ public class LoginController {
                 && !(authentication instanceof AnonymousAuthenticationToken)) {
             return "redirect:/dashboard";
         }
-        return "login";
+        return "auth/login";
     }
 
     @GetMapping("/")

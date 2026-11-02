@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.model;
+package ca.sfu.cmpt276.nywfareconfig.security.model;
 
 import jakarta.persistence.*;
 

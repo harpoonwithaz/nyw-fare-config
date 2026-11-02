@@ -1,8 +1,5 @@
-package ca.sfu.cmpt276.nywfareconfig.controller;
+package ca.sfu.cmpt276.nywfareconfig.security.controller;
 
-import ca.sfu.cmpt276.nywfareconfig.model.Role;
-import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
-import ca.sfu.cmpt276.nywfareconfig.service.UserService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +8,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.security.service.UserService;
 
 import java.util.List;
 
@@ -29,7 +30,7 @@ public class AdminController {
         model.addAttribute("users", userService.listUsers());
         model.addAttribute("roles", Role.values());
         model.addAttribute("currentUserId", user.getId());
-        return "users";
+        return "admin/users";
     }
 
     @PostMapping("/users/{id}/role")
@@ -46,7 +47,7 @@ public class AdminController {
     @GetMapping("/users/new")
     public String newUserForm(Model model) {
         model.addAttribute("roles", Role.values());
-        return "create-account";
+        return "admin/create-account";
     }
 
     @PostMapping("/users/new")
@@ -63,7 +64,7 @@ public class AdminController {
             model.addAttribute("username", username);
             model.addAttribute("selectedRole", role);
             model.addAttribute("roles", Role.values());
-            return "create-account";
+            return "admin/create-account";
         }
         return "redirect:/admin/users?created";
     }

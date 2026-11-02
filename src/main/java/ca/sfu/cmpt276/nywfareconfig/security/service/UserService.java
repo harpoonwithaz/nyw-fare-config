@@ -1,9 +1,5 @@
-package ca.sfu.cmpt276.nywfareconfig.service;
+package ca.sfu.cmpt276.nywfareconfig.security.service;
 
-import ca.sfu.cmpt276.nywfareconfig.model.AppUser;
-import ca.sfu.cmpt276.nywfareconfig.model.Role;
-import ca.sfu.cmpt276.nywfareconfig.repository.AppUserRepository;
-import ca.sfu.cmpt276.nywfareconfig.security.PasswordPolicy;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
@@ -11,6 +7,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Service;
+
+import ca.sfu.cmpt276.nywfareconfig.security.PasswordPolicy;
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.security.repository.AppUserRepository;
 
 import java.util.ArrayList;
 import java.util.List;

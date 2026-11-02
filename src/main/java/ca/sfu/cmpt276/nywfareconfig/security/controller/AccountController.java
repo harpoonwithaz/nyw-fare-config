@@ -1,13 +1,14 @@
-package ca.sfu.cmpt276.nywfareconfig.controller;
+package ca.sfu.cmpt276.nywfareconfig.security.controller;
 
-import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
-import ca.sfu.cmpt276.nywfareconfig.service.UserService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.security.service.UserService;
 
 import java.util.List;
 
@@ -22,7 +23,7 @@ public class AccountController {
 
     @GetMapping("/account/password")
     public String passwordForm() {
-        return "change-password";
+        return "auth/change-password";
     }
 
     @PostMapping("/account/password")
@@ -34,7 +35,7 @@ public class AccountController {
         List<String> errors = userService.changePassword(user.getId(), currentPassword, newPassword, confirmPassword);
         if (!errors.isEmpty()) {
             model.addAttribute("errors", errors);
-            return "change-password";
+            return "auth/change-password";
         }
         return "redirect:/dashboard?passwordChanged";
     }

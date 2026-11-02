@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.config;
+package ca.sfu.cmpt276.nywfareconfig.security.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

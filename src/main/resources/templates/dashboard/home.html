@@ -15,80 +15,36 @@
 <body class="d-flex vh-100 overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="d-flex flex-column flex-shrink-0 p-3 text-white bg-dark h-100" style="width: 280px;">
-        <a href="#" class="d-flex align-items-center mb-3 mb-md-0 text-white text-decoration-none">
-            <span class="fs-3 fw-bold">Fare Config</span>
-        </a>
-
-        <hr class="border-secondary my-3">
-
-        <!-- Nav Links -->
-        <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item">
-                <a href="#" class="nav-link active text-white" aria-current="page">
-                    <i class="bi bi-grid-3x3 me-2"></i> Fare Matrix
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#" class="nav-link link-primary text-white">
-                    <i class="bi bi-clock-history me-2"></i> Availability Rules
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#" class="nav-link link-primary text-white">
-                    <i class="bi bi-info-circle me-2"></i> Service Alerts &amp; TVM Canvas
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#" class="nav-link link-primary text-white">
-                    <i class="bi bi-cloud-upload me-2"></i> Review &amp; Publish
-                </a>
-            </li>
-        </ul>
-
-        <hr class="border-secondary my-3">
-
-        <!-- Bottom User Dropup -->
-        <div class="dropdown dropup">
-            <button
-                class="btn btn-dark dropdown-toggle d-flex align-items-center text-white border-0 w-100 p-0 text-start"
-                type="button" id="userMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2 text-white fw-semibold"
-                    style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
-                    EX
-                </div>
-                <span class="fw-semibold text-truncate me-auto" style="max-width: 160px;" th:text="${email}">
-                </span>
-            </button>
-
-            <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="userMenuButton">
-                <li>
-                    <h6 class="dropdown-header text-white" th:text="|Role: ${role}|"></h6>
-                </li>
-                <li><a class="dropdown-item" href="#">Account Profile</a></li>
-                <li><a class="dropdown-item" href="#">Audit Log</a></li>
-                <li>
-                    <hr class="dropdown-divider border-secondary">
-                </li>
-                <li>
-                    <form th:action="@{/logout}" method="post" class="d-flex">
-                        <button type="submit" class="dropdown-item text-danger">Log out</button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    </aside>
+    <div th:replace="~{fragments/sidebar :: sidebar-nav('home')}"></div>
 
     <!-- Main viewport -->
     <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <h1 class="display-6 mb-0">
-            Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
-        </h1>
-        <div th:if="${isAdmin}">
-            <p>Your are an admin.</p>
-            <form th:action="@{/admin}" method="get">
-                <button type="submit" class="btn text-danger">Go to admin page</button>
-            </form>
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-10 col-lg-8">
+                    <div class="card shadow-sm text-center">
+                        <div class="card-body p-5">
+
+                            <div class="alert alert-success" th:if="${param.passwordChanged != null}">
+                                Your password has been updated.
+                            </div>
+
+                            <h1 class="display-6 mb-0">
+                                Welcome, <span th:text="${#strings.capitalize(username)}">User</span>!
+                            </h1>
+
+                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+                                <a th:if="${isAdmin}" th:href="@{/admin/users/new}" class="btn btn-primary">Create
+                                    account</a>
+                                <a th:if="${isAdmin}" th:href="@{/admin/users}" class="btn btn-outline-primary">Manage
+                                    users</a>
+                                <a th:href="@{/account/password}" class="btn btn-outline-secondary">Change password</a>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 

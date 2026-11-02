@@ -1,7 +1,8 @@
-package ca.sfu.cmpt276.nywfareconfig.repository;
+package ca.sfu.cmpt276.nywfareconfig.security.repository;
 
-import ca.sfu.cmpt276.nywfareconfig.model.AppUser;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
 
 import java.util.Optional;
 

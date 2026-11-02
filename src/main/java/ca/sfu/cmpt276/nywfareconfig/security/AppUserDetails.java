@@ -1,10 +1,11 @@
 package ca.sfu.cmpt276.nywfareconfig.security;
 
-import ca.sfu.cmpt276.nywfareconfig.model.AppUser;
-import ca.sfu.cmpt276.nywfareconfig.model.Role;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
 
 import java.util.Collection;
 import java.util.List;
