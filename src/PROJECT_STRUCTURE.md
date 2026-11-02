@@ -151,6 +151,8 @@ src/
 │   │   │   │   ├── change-summary.html
 │   │   │   │   └── fragments/
 │   │   │   │       └── fare-grid.html
+│   │   │   ├── fragments/
+│   │   │   |   └── sidebar.html
 │   │   │   ├── availability/
 │   │   │   │   ├── index.html
 │   │   │   │   └── sales-window-form.html

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<body>
+    <div class="card shadow-sm border-0" th:fragment="od-grid(terminal)">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <div>
+                <h5 class="mb-0 fw-bold">Origin Terminal: Edgewater (EDGEWTR)</h5>
+                <small class="text-muted">Origin ID: 201 | Timezone: America/New_York</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="btn-discard">Discard Edits</button>
+                <button class="btn btn-primary btn-sm" id="btn-save" data-bs-toggle="modal"
+                    data-bs-target="#confirmSaveModal">
+                    Save Rate Changes <span class="badge bg-warning text-dark ms-1">1</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle text-center mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-start ps-3" style="min-width: 180px;">Destination (DEST)</th>
+                        <th>Adult Oneway</th>
+                        <th>Child Oneway</th>
+                        <th>Senior 65+</th>
+                        <th>10-Trip Pass</th>
+                        <th>Monthly Pass</th>
+                        <th>Bike Oneway</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Midtown Row -->
+                    <tr>
+                        <td class="text-start ps-3 fw-semibold">
+                            Midtown / W 39th St
+                            <div class="text-muted small fw-normal">MIDTOWN (ID: 102)</div>
+                        </td>
+                        <!-- Draft / Modified Cell -->
+                        <td class="table-warning position-relative p-1">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="0.01" min="0.00"
+                                    class="form-control text-end fw-bold text-primary" value="14.00">
+                            </div>
+                            <small class="text-muted d-block" style="font-size: 0.7rem;">Prev: $13.25</small>
+                        </td>
+                        <!-- Standard Cell -->
+                        <td class="p-1">
+                            <span class="fare-display py-1 px-2 d-inline-block">$9.00</span>
+                        </td>
+                        <!-- Switched Off / Retired Assignment -->
+                        <td class="bg-light">
+                            <span class="badge bg-secondary-subtle text-secondary border">NOT_SOLD</span>
+                        </td>
+                        <td class="p-1">
+                            <span class="fare-display py-1 px-2 d-inline-block">$122.50</span>
+                        </td>
+                        <td class="p-1">
+                            <span class="fare-display py-1 px-2 d-inline-block">$414.50</span>
+                        </td>
+                        <!-- Unconfigured Pair -->
+                        <td class="bg-light">
+                            <span class="badge bg-light text-muted border">N/A</span>
+                        </td>
+                    </tr>
+
+                    <!-- Brookfield Place Row -->
+                    <tr>
+                        <td class="text-start ps-3 fw-semibold">
+                            Brookfield Place
+                            <div class="text-muted small fw-normal">BROOKFD (ID: 103)</div>
+                        </td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$15.00</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$8.50</span></td>
+                        <td class="bg-light"><span
+                                class="badge bg-secondary-subtle text-secondary border">NOT_SOLD</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$139.50</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$438.50</span></td>
+                        <td class="bg-light"><span class="badge bg-light text-muted border">N/A</span></td>
+                    </tr>
+
+                    <!-- Pier 11 / Wall St Row -->
+                    <tr>
+                        <td class="text-start ps-3 fw-semibold">
+                            Pier 11 / Wall St
+                            <div class="text-muted small fw-normal">PIER11 (ID: 104)</div>
+                        </td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$15.00</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$8.50</span></td>
+                        <td class="bg-light"><span
+                                class="badge bg-secondary-subtle text-secondary border">NOT_SOLD</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$139.50</span></td>
+                        <td class="p-1"><span class="fare-display py-1 px-2 d-inline-block">$438.50</span></td>
+                        <td class="bg-light"><span class="badge bg-light text-muted border">N/A</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>
