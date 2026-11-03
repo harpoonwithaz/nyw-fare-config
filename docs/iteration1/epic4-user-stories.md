@@ -1,12 +1,8 @@
-# User Stories
-
----
-
 ## Epic 4: Pre-Purchase Warnings and TVM Preview
 
 When a rider picks a ticket that can't be used right now, the ticket machine (TVM) should show a short heads-up before they pay. The rider can still buy the ticket. The warning just makes sure they know when it will work.
 
-Our client (Eldon, Caracal) described three cases in our Oct 16 and Oct 30 meetings:
+Our client described three cases in our meetings so far:
 
 - **Weekday-only routes:** On a Saturday, a rider picks Edgewater → Midtown and sees "This route doesn't run on weekends. Your ticket is valid Monday."
 - **Rush-hour-only routes:** Some routes only run during weekday morning and evening rush hours, so riders outside those hours see a notice.
@@ -14,13 +10,13 @@ Our client (Eldon, Caracal) described three cases in our Oct 16 and Oct 30 meeti
 
 These are **not** outage or maintenance messages. Every warning is shown in English and Spanish, like the client's current TVM screens. Caracal's platform API has no endpoints for warnings or route service hours, so this epic stores both in our own database. Epic 3 (Availability) decides when a ticket is sold, and Epic 4 decides what the rider is told.
 
-**Note:** The character limits below (200 for messages, 20 for button labels) are our best guess. We'll confirm them with Eldon at a Friday sync.
+**Note:** The character limits below (200 for messages, 20 for button labels) are our best guess. We'll confirm the character limit at a client sync.
 
 ---
 
 ### Story 4.1: View Warning Messages
 
-- **GitHub Title:** `[Alerts] View Warning Messages`
+- **GitHub Issue Title:** `[Alerts] View Warning Messages`
 
 - **Iteration:** `1`
 
@@ -64,7 +60,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ### Story 4.2: Create a Bilingual Warning
 
-- **GitHub Title:** `[Alerts] Create a Bilingual Warning`
+- **GitHub Issue Title:** `[Alerts] Create a Bilingual Warning`
 
 - **Iteration:** `1`
 
@@ -111,7 +107,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ### Story 4.3: Edit or Delete a Warning
 
-- **GitHub Title:** `[Alerts] Edit or Delete a Warning`
+- **GitHub Issue Title:** `[Alerts] Edit or Delete a Warning`
 
 - **Iteration:** `2`
 
@@ -155,7 +151,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ### Story 4.4: Show When the Ticket Becomes Valid
 
-- **GitHub Title:** `[Alerts] Show When the Ticket Becomes Valid`
+- **GitHub Issue Title:** `[Alerts] Show When the Ticket Becomes Valid`
 
 - **Iteration:** `2`
 
@@ -200,7 +196,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ### Story 4.5: Clear Button Labels on the Warning Popup
 
-- **GitHub Title:** `[Alerts] Clear Button Labels on the Warning Popup`
+- **GitHub Issue Title:** `[Alerts] Clear Button Labels on the Warning Popup`
 
 - **Iteration:** `2`
 
@@ -243,7 +239,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ### Story 4.6: Live TVM Preview
 
-- **GitHub Title:** `[Alerts] Live TVM Preview`
+- **GitHub Issue Title:** `[Alerts] Live TVM Preview`
 
 - **Iteration:** `2`
 
@@ -254,7 +250,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 - **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`)
 
 - **Preconditions & Triggers:**
-  - *Precondition:* The user is on the create or edit warning form in a desktop browser (the scope agreed with Eldon on Oct 30).
+  - *Precondition:* The user is on the create or edit warning form in a desktop browser.
   - *Trigger:* The user types in a field, switches language, or changes the preview date and time.
 
 - **Actions / Postconditions:**
@@ -287,7 +283,7 @@ These are **not** outage or maintenance messages. Every warning is shown in Engl
 
 ---
 
-## UI Mockups
+#### UI Mockups
 
 **Warnings list (Stories 4.1 and 4.3)**
 

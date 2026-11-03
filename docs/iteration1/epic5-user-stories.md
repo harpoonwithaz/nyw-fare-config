@@ -2,7 +2,7 @@
 
 ### Story 5.1: View Pending Configuration Changes
 
-- **GitHub Title:** `[Epic 5] View Pending Configuration Changes`
+- **GitHub Issue Title:** `[Epic 5] View Pending Configuration Changes`
 
 - **Iteration:** `3`
 
@@ -78,7 +78,7 @@ Example of the Configuration Review page:
 
 ### Story 5.2: Validate Configuration Discrepancies
 
-- **GitHub Title:** `[Epic 5] Validate Configuration Discrepancies`
+- **GitHub Issue Title:** `[Epic 5] Validate Configuration Discrepancies`
 
 - **Iteration:** `3`
 
@@ -155,7 +155,7 @@ Example of the Configuration Review page:
 
 ### Story 5.3: Publish Verified Configurations
 
-- **GitHub Title:** `[Epic 5] Publish Verified Configurations`
+- **GitHub Issue Title:** `[Epic 5] Publish Verified Configurations`
 
 - **Iteration:** `3`
 
@@ -235,7 +235,7 @@ Example of the Configuration Review page:
 
 ### Story 5.4: View Configuration Change and Publication History
 
-- **GitHub Title:** `[Epic 5] View Configuration Change and Publication History`
+- **GitHub Issue Title:** `[Epic 5] View Configuration Change and Publication History`
 
 - **Iteration:** `3`
 
@@ -302,4 +302,3 @@ Example of the Configuration Review page:
 - [ ] Handle Caracal API failures and missing optional record fields without crashing or displaying misleading results.
 - [ ] Enforce access for authenticated `OPERATOR` and `CLIENT_SERVICES` users through Spring Security.
 - [ ] Implement automated JUnit and MockMvc tests for history retrieval, empty states, backend failures, and access control.
-
