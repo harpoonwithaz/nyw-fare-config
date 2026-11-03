@@ -1,7 +1,3 @@
-# User Stories
-
----
-
 ## Epic 2: Interactive Origin-Destination Rate Grid & Fare Management
 
 This document defines the formal user stories and sub-stories for Epic 2 of the NY Waterway Fare Configuration Tool. Each story adheres strictly to the CMPT 276 agile project specification, INVEST criteria, and standardized persona definitions.
@@ -10,7 +6,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.1: Unified Tenant Context Switching & Dual-Matrix View Scaffolding
 
-- **GitHub Title:** `[Rate Grid] Unified Tenant Context Switching & Dual-Matrix View Scaffolding`
+- **GitHub Issue Title:** `[Rate Grid] Unified Tenant Context Switching & Dual-Matrix View Scaffolding`
 
 - **Iteration:** `1`
 
@@ -53,7 +49,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.2: O-D Mode Direct Inline Rate Editing & Numeric Input Masking
 
-- **GitHub Title:** `[Rate Grid] O-D Mode Direct Inline Rate Editing & Numeric Input Masking`
+- **GitHub Issue Title:** `[Rate Grid] O-D Mode Direct Inline Rate Editing & Numeric Input Masking`
 
 - **Iteration:** `2`
 
@@ -97,7 +93,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.3: Zonal Cell Action Modal for Rate Tier Management (Parent Story)
 
-- **GitHub Title:** `[Rate Grid] Zonal Cell Action Modal for Rate Tier Management`
+- **GitHub Issue Title:** `[Rate Grid] Zonal Cell Action Modal for Rate Tier Management`
 
 - **Iteration:** `2`
 
@@ -142,7 +138,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.3a: Zonal Action Modal UI & Tier Selection Dropdown
 
-- **GitHub Title:** `[Rate Grid] Zonal Action Modal UI & Tier Selection Dropdown`
+- **GitHub Issue Title:** `[Rate Grid] Zonal Action Modal UI & Tier Selection Dropdown`
 
 - **Iteration:** `2`
 
@@ -186,7 +182,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.3b: Global Tier Adjustment & New Tier Creation Logic
 
-- **GitHub Title:** `[Rate Grid] Global Tier Adjustment & New Tier Creation Logic`
+- **GitHub Issue Title:** `[Rate Grid] Global Tier Adjustment & New Tier Creation Logic`
 
 - **Iteration:** `2`
 
@@ -228,7 +224,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.4: Global Rate Tier Catalog & Bulk Adjustment Tool (Parent Story)
 
-- **GitHub Title:** `[Rate Grid] Global Rate Tier Catalog & Bulk Adjustment Tool`
+- **GitHub Issue Title:** `[Rate Grid] Global Rate Tier Catalog & Bulk Adjustment Tool`
 
 - **Iteration:** `2`
 
@@ -271,7 +267,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.4a: Rate Tier Catalog View & Summary Table
 
-- **GitHub Title:** `[Rate Grid] Rate Tier Catalog View & Summary Table`
+- **GitHub Issue Title:** `[Rate Grid] Rate Tier Catalog View & Summary Table`
 
 - **Iteration:** `2`
 
@@ -314,7 +310,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.4b: Bulk Percentage & Flat Fare Adjustment Engine
 
-- **GitHub Title:** `[Rate Grid] Bulk Percentage & Flat Fare Adjustment Engine`
+- **GitHub Issue Title:** `[Rate Grid] Bulk Percentage & Flat Fare Adjustment Engine`
 
 - **Iteration:** `2`
 
@@ -358,7 +354,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.5: Station-to-Zone Topology Mapping Side Panel
 
-- **GitHub Title:** `[Rate Grid] Station-to-Zone Topology Mapping Side Panel`
+- **GitHub Issue Title:** `[Rate Grid] Station-to-Zone Topology Mapping Side Panel`
 
 - **Iteration:** `2`
 
@@ -402,7 +398,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.6: Visual Draft Tracking, Diff Confirmation, & Platform Batch API Dispatch (Parent Story)
 
-- **GitHub Title:** `[Rate Grid] Visual Draft Tracking, Diff Confirmation, & Platform Batch API Dispatch`
+- **GitHub Issue Title:** `[Rate Grid] Visual Draft Tracking, Diff Confirmation, & Platform Batch API Dispatch`
 
 - **Iteration:** `3`
 
@@ -448,7 +444,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.6a: Visual Draft State Engine & Cell Revert Controls
 
-- **GitHub Title:** `[Rate Grid] Visual Draft State Engine & Cell Revert Controls`
+- **GitHub Issue Title:** `[Rate Grid] Visual Draft State Engine & Cell Revert Controls`
 
 - **Iteration:** `2`
 
@@ -491,7 +487,7 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ### Story 2.6b: Transaction Review Diff Modal & Batch API Dispatch
 
-- **GitHub Title:** `[Rate Grid] Transaction Review Diff Modal & Batch API Dispatch`
+- **GitHub Issue Title:** `[Rate Grid] Transaction Review Diff Modal & Batch API Dispatch`
 
 - **Iteration:** `3`
 
