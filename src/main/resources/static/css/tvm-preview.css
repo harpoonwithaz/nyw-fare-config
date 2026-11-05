@@ -1,0 +1,85 @@
+/* Small grey headings that split the form into sections */
+.form-section {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+
+/* Keep the preview in view while scrolling the form */
+.tvm-sticky {
+  position: sticky;
+  top: 1rem;
+}
+
+/* Simulated TVM touchscreen */
+.tvm-screen {
+  width: 340px;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;     /* keeps the kiosk shape at any window size */
+  background: #111;
+  color: #fff;
+  border: 8px solid #2b2b2b; /* bezel so it reads as a machine */
+  border-radius: 16px;
+  padding: 20px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.tvm-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #adb5bd;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.tvm-title {
+  color: #ffc107;          /* yellow, like a real service notice */
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.tvm-title-ok {
+  color: #6ee7b7;          /* green when nothing is wrong */
+}
+
+.tvm-message {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere; /* long words wrap instead of spilling out */
+}
+
+.tvm-next {
+  color: #adb5bd;
+  font-size: 0.95rem;
+}
+
+/* Big buttons, easy to tap on a touchscreen */
+.tvm-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tvm-btn-primary {
+  background: #ffc107;
+  color: #111;
+  border: none;
+}
+
+.tvm-btn-secondary {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #fff;
+}
