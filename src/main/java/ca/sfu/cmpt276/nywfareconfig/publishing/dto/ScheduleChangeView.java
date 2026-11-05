@@ -1,4 +1,3 @@
-
 package ca.sfu.cmpt276.nywfareconfig.publishing.dto;
 
 public record ScheduleChangeView(

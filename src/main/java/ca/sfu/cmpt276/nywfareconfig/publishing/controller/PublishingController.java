@@ -32,7 +32,7 @@ public class PublishingController {
             List<ScheduleChangeView> scheduleChanges =
                     stagingService.getScheduleChanges();
 
-            //Count changed fares.
+            //Count changed fares
             long changedFares = fareChanges.stream()
                     .filter(ReviewView::isChanged)
                     .count();
