@@ -19,27 +19,92 @@
 
     <!-- Main viewport -->
     <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <h1 class="h3 mb-0">Service Alerts &amp; TVM Canvas</h1>
-        </div>
+        <h1 class="h3 mb-1">Service Alerts &amp; TVM Canvas</h1>
         <p class="text-muted mb-4">
             Pre-purchase warnings riders see on the ticket machine when a ticket isn't valid yet.
             For example, a weekday-only route on a Saturday, or a promo ticket bought before its start date.
         </p>
 
         <div class="row g-4">
-            <!-- Warnings list (empty state) -->
+            <!-- Left: what staff edit -->
             <div class="col-lg-7">
                 <div class="card h-100">
                     <div class="card-header fw-semibold">Warning details</div>
                     <div class="card-body">
-                        
-                        
+                        <!-- Sample routes for now, real list comes from Caracal later -->
+                        <div class="mb-3">
+                            <label for="route" class="form-label">Route</label>
+                            <select id="route" class="form-select">
+                                <option value="EDGEWATER-MIDTOWN">Edgewater → Midtown</option>
+                                <option value="EDGEWATER-BROOKFD">Edgewater → Brookfield Place</option>
+                                <option value="EDGEWATER-PIER11">Edgewater → Pier 11</option>
+                                <option value="PORTIMP-MIDTOWN">Port Imperial → Midtown</option>
+                                <option value="PORTIMP-PIER11">Port Imperial → Pier 11</option>
+                            </select>
+                        </div>
+                        <!-- Messages stay stacked since they can get long -->
+                        <div class="mb-3">
+                            <label for="messageEn" class="form-label">Message (EN)</label>
+                            <textarea id="messageEn" class="form-control" rows="3" maxlength="200"
+                                placeholder="Enter warning text here..."></textarea>
+                            <div class="form-text"><span id="countEn">0</span>/200</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="messageEs" class="form-label">Message (ES)</label>
+                            <textarea id="messageEs" class="form-control" rows="3" maxlength="200"
+                                placeholder="Ingrese el texto de advertencia aquí..."></textarea>
+                            <div class="form-text"><span id="countEs">0</span>/200</div>
+                        </div>
+                        <!-- Button labels: EN and ES side by side so they're easy to compare -->
+                        <div class="mb-3">
+                            <label for="continueEn" class="form-label">Continue Button</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="text" id="continueEn" class="form-control" maxlength="20"
+                                        placeholder="EN: Buy for Monday">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" id="continueEs" class="form-control" maxlength="20"
+                                        placeholder="ES: Comprar para el lunes">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="backEn" class="form-label">Back Button</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="text" id="backEn" class="form-control" maxlength="20"
+                                        placeholder="EN: Choose another">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" id="backEs" class="form-control" maxlength="20"
+                                        placeholder="ES: Elegir otra">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Where each button takes the rider (same in both languages) -->
+                        <div class="mb-3">
+                            <label for="continueAction" class="form-label">Continue button action</label>
+                            <select id="continueAction" class="form-select">
+                                <option value="PAYMENT">Go to payment</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="backAction" class="form-label">Back button action</label>
+                            <select id="backAction" class="form-select">
+                                <option value="ROUTE_LIST">Back to route list</option>
+                                <option value="HOME">Back to home screen</option>
+                            </select>
+                        </div>
+                        <!-- Pretend it's this time on the TVM, to test when the warning shows -->
+                        <div class="mb-3">
+                            <label for="clock" class="form-label">Simulated TVM Time</label>
+                            <input type="datetime-local" id="clock" class="form-control">
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Example TVM preview -->
+            <!-- Right: what the rider sees on the machine -->
             <div class="col-lg-5">
                 <div class="card h-100">
                     <div class="card-header fw-semibold">TVM preview</div>
@@ -48,16 +113,19 @@
                             <div class="text-warning fw-bold mb-2">
                                 <i class="bi bi-exclamation-triangle-fill me-1"></i> SERVICE NOTICE
                             </div>
-                            <p class="mb-1">No ferry service on this route on weekends. Your ticket is valid Monday.</p>
+                            <p class="mb-1">No ferry service on this route on weekends. Your ticket is valid Monday.
+                            </p>
                             <p class="small text-white-50 mb-3">
-                                No hay servicio de ferry en esta ruta los fines de semana. Su boleto es válido el lunes.
+                                No hay servicio de ferry en esta ruta los fines de semana. Su boleto es válido el
+                                lunes.
                             </p>
                             <div class="d-grid gap-2">
                                 <span class="btn btn-warning disabled">Buy for Monday</span>
                                 <span class="btn btn-outline-light disabled">Choose another</span>
                             </div>
                         </div>
-                        <p class="small text-muted mt-2 mb-0">Edgewater → Midtown, Adult One-Way, shown on weekends.</p>
+                        <p class="small text-muted mt-2 mb-0">Edgewater → Midtown, Adult One-Way, shown on weekends.
+                        </p>
                     </div>
                 </div>
             </div>
