@@ -2,6 +2,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.model;
 
 import java.util.Map;
 
+// Represents an origin-to-destination connection in NYW mode.
 public class Route {
     private String destSiteCode;
     private String destName;

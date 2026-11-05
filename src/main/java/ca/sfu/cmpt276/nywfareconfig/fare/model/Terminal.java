@@ -2,6 +2,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.model;
 
 import java.util.List;
 
+// Represents an NYW origin terminal and its available outbound routes.
 public class Terminal {
     // Identification
     private String originId;
