@@ -4,8 +4,7 @@ set -e
 if [ -f .env ]; then
   # Automatically export all variables defined in .env
   set -a
-  # Filter out blank lines and comment lines before sourcing
-  source <(grep -v '^\s*#' .env | grep -v '^\s*$')
+  . ./.env # Now works on macOS and Linux and Windows (Git Bash)
   set +a
 else
   echo "Warning: .env file not found. Running with system environment."
