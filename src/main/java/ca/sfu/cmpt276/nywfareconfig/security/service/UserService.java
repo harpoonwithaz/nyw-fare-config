@@ -1,5 +1,9 @@
 package ca.sfu.cmpt276.nywfareconfig.security.service;
 
+import ca.sfu.cmpt276.nywfareconfig.security.PasswordPolicy;
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.security.repository.AppUserRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
@@ -8,13 +12,9 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Service;
 
-import ca.sfu.cmpt276.nywfareconfig.security.PasswordPolicy;
-import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
-import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
-import ca.sfu.cmpt276.nywfareconfig.security.repository.AppUserRepository;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Service
@@ -35,8 +35,25 @@ public class UserService {
         this.sessions = sessions;
     }
 
-    public List<AppUser> listUsers() {
-        return repository.findAll(Sort.by("username").ascending());
+    public List<AppUser> listUsers(String query) {
+        String q = query == null ? "" : query.trim();
+        Sort sort = Sort.by("username").ascending();
+        if (q.isEmpty()) {
+            return repository.findAll(sort);
+        }
+        return repository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(q, q, sort);
+    }
+
+    public long countUsers() {
+        return repository.count();
+    }
+
+    public long countByRole(Role role) {
+        return repository.countByRole(role);
+    }
+
+    public Optional<AppUser> findUser(Long id) {
+        return repository.findById(id);
     }
 
     public List<String> createUser(String email, String username, String password,
@@ -133,11 +150,35 @@ public class UserService {
         if (target.getRole() == role) {
             return null;
         }
+        if (target.getRole() == Role.CLIENT_SERVICES
+                && repository.countByRole(Role.CLIENT_SERVICES) <= 1) {
+            return "lastadmin";
+        }
 
         target.setRole(role);
         repository.save(target);
 
         String username = target.getUsername();
+        sessions.ifAvailable(repo -> endSessions(repo, username));
+        return null;
+    }
+
+    public String deleteUser(Long actorId, Long targetId) {
+        if (actorId != null && actorId.equals(targetId)) {
+            return "self";
+        }
+
+        AppUser target = repository.findById(targetId).orElse(null);
+        if (target == null) {
+            return "notfound";
+        }
+        if (target.getRole() == Role.CLIENT_SERVICES
+                && repository.countByRole(Role.CLIENT_SERVICES) <= 1) {
+            return "lastadmin";
+        }
+
+        String username = target.getUsername();
+        repository.delete(target);
         sessions.ifAvailable(repo -> endSessions(repo, username));
         return null;
     }
