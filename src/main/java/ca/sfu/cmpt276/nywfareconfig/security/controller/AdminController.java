@@ -1,5 +1,9 @@
 package ca.sfu.cmpt276.nywfareconfig.security.controller;
 
+import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.security.service.UserService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,11 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
-import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
-import ca.sfu.cmpt276.nywfareconfig.security.service.UserService;
-
 import java.util.List;
+import java.util.Optional;
 
 @Controller
 @RequestMapping("/admin")
@@ -26,10 +27,18 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public String users(@AuthenticationPrincipal AppUserDetails user, Model model) {
-        model.addAttribute("users", userService.listUsers());
+    public String users(@AuthenticationPrincipal AppUserDetails user,
+            @RequestParam(name = "q", defaultValue = "") String q,
+            Model model) {
+        List<AppUser> users = userService.listUsers(q);
+        model.addAttribute("users", users);
+        model.addAttribute("shownCount", users.size());
+        model.addAttribute("totalUsers", userService.countUsers());
+        model.addAttribute("adminCount", userService.countByRole(Role.CLIENT_SERVICES));
+        model.addAttribute("operatorCount", userService.countByRole(Role.OPERATOR));
         model.addAttribute("roles", Role.values());
         model.addAttribute("currentUserId", user.getId());
+        model.addAttribute("q", q.trim());
         return "admin/users";
     }
 
@@ -42,6 +51,31 @@ public class AdminController {
             return "redirect:/admin/users?error=" + error;
         }
         return "redirect:/admin/users?roleChanged";
+    }
+
+    @GetMapping("/users/{id}/delete")
+    public String confirmDelete(@AuthenticationPrincipal AppUserDetails user,
+            @PathVariable("id") Long id,
+            Model model) {
+        if (user.getId().equals(id)) {
+            return "redirect:/admin/users?error=self";
+        }
+        Optional<AppUser> target = userService.findUser(id);
+        if (target.isEmpty()) {
+            return "redirect:/admin/users?error=notfound";
+        }
+        model.addAttribute("target", target.get());
+        return "admin/confirm-delete";
+    }
+
+    @PostMapping("/users/{id}/delete")
+    public String deleteUser(@AuthenticationPrincipal AppUserDetails user,
+            @PathVariable("id") Long id) {
+        String error = userService.deleteUser(user.getId(), id);
+        if (error != null) {
+            return "redirect:/admin/users?error=" + error;
+        }
+        return "redirect:/admin/users?deleted";
     }
 
     @GetMapping("/users/new")
