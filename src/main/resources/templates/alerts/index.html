@@ -122,8 +122,8 @@
                     <div class="card-body">
                         <!-- Language the rider picked on the machine -->
                         <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Preview language">
-                            <button type="button" id="langEn" class="btn btn-outline-secondary active">EN</button>
-                            <button type="button" id="langEs" class="btn btn-outline-secondary">ES</button>
+                            <button type="button" id="langEn" class="btn btn-outline-secondary active" aria-pressed="true">EN</button>
+                            <button type="button" id="langEs" class="btn btn-outline-secondary" aria-pressed="false">ES</button>
                         </div>
 
                         <!-- Only one of these screens shows at a time -->
@@ -173,6 +173,8 @@
 
     <!-- Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Loaded last so all the elements above exist before it runs -->
+    <script th:src="@{/js/tvm-preview.js}"></script>
 </body>
 
 </html>

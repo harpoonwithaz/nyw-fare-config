@@ -56,6 +56,12 @@
   overflow-wrap: anywhere; /* long words wrap instead of spilling out */
 }
 
+/* Placeholder note when a message hasn't been written yet */
+.tvm-missing {
+  color: #ff8787;
+  font-style: italic;
+}
+
 .tvm-next {
   color: #adb5bd;
   font-size: 0.95rem;
@@ -82,4 +88,14 @@
   background: transparent;
   color: #fff;
   border: 1px solid #fff;
+}
+
+.tvm-btn:hover {
+  filter: brightness(0.92);
+}
+
+/* Clear outline when tabbing with the keyboard */
+.tvm-btn:focus-visible {
+  outline: 3px solid #4dabf7;
+  outline-offset: 2px;
 }
