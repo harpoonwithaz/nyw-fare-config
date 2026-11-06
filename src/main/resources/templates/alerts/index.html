@@ -23,7 +23,7 @@
         <h1 class="h3 mb-1">Service Alerts &amp; TVM Canvas</h1>
         <p class="text-muted mb-4">
             Pre-purchase warnings riders see on the ticket machine when a ticket isn't valid yet.
-            For example, a weekday-only route on a Saturday, or a promo ticket bought before its start date.
+            For example, a weekday-only route on a Saturday, or a rush-hour route in the middle of the day.
         </p>
 
         <div class="row g-4">
@@ -50,13 +50,13 @@
                         <div class="mb-3">
                             <label for="messageEn" class="form-label">English</label>
                             <textarea id="messageEn" class="form-control" rows="3" maxlength="200"
-                                placeholder="Enter warning text here...">SERVICE NOTICE: No ferry service on this route on weekends. Your ticket is valid Monday.</textarea>
+                                placeholder="Enter warning text here...">SERVICE NOTICE: No ferry service on this route at this time. Service runs weekdays during morning and evening rush hours. Please check the schedule before buying.</textarea>
                             <div class="form-text"><span id="countEn">0</span>/200</div>
                         </div>
                         <div class="mb-4">
                             <label for="messageEs" class="form-label">Spanish</label>
                             <textarea id="messageEs" class="form-control" rows="3" maxlength="200"
-                                placeholder="Ingrese el texto de advertencia aquí...">AVISO DE SERVICIO: No hay servicio de ferry en esta ruta los fines de semana. Su boleto es válido el lunes.</textarea>
+                                placeholder="Ingrese el texto de advertencia aquí...">AVISO DE SERVICIO: No hay servicio de ferry en esta ruta en este momento. Opera entre semana en horas pico de mañana y tarde. Consulte el horario antes de comprar.</textarea>
                             <div class="form-text"><span id="countEs">0</span>/200</div>
                         </div>
 
@@ -67,11 +67,11 @@
                             <div class="row g-2">
                                 <div class="col-6">
                                     <input type="text" id="continueEn" class="form-control" maxlength="20"
-                                        placeholder="EN: Buy for Monday" value="Buy for Monday">
+                                        placeholder="EN: Buy anyway" value="Buy anyway">
                                 </div>
                                 <div class="col-6">
                                     <input type="text" id="continueEs" class="form-control" maxlength="20"
-                                        placeholder="ES: Comprar para el lunes" value="Comprar para el lunes">
+                                        placeholder="ES: Comprar igual" value="Comprar igual">
                                 </div>
                             </div>
                         </div>
@@ -110,6 +110,13 @@
                         <div>
                             <label for="clock" class="form-label">Simulated TVM time</label>
                             <input type="datetime-local" id="clock" class="form-control">
+                            <!-- Quick times for the demo, one for each rule -->
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="sat-10">Sat 10:00 AM</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="wed-13">Wed 1:00 PM</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="wed-08">Wed 8:00 AM</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="now">Now</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -131,37 +138,47 @@
                             <!-- Top strip like the real machine: route and time -->
                             <div class="tvm-status">
                                 <span id="tvmRoute">Edgewater → Midtown</span>
-                                <span id="tvmTime">Sat 10:00 AM</span>
+                                <span id="tvmTime"></span>
                             </div>
 
                             <!-- Shown when the ticket can't be used right now -->
                             <div id="screenWarning">
                                 <div class="tvm-title">
-                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> SERVICE NOTICE
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                    <span data-en="SERVICE NOTICE" data-es="AVISO DE SERVICIO">SERVICE NOTICE</span>
                                 </div>
                                 <p id="tvmMessage" class="tvm-message" aria-live="polite">Warning message appears here</p>
-                                <p id="tvmNextValid" class="tvm-next">Valid Monday 6:00 AM</p>
+                                <p id="tvmNextValid" class="tvm-next"></p>
                                 <button type="button" id="tvmContinue" class="tvm-btn tvm-btn-primary">Continue</button>
                                 <button type="button" id="tvmBack" class="tvm-btn tvm-btn-secondary">Go back</button>
                             </div>
 
                             <!-- Route is running, so no warning needed -->
                             <div id="screenReady" hidden>
-                                <div class="tvm-title tvm-title-ok">Ready to buy</div>
-                                <p class="tvm-message">No warning right now. This route is running.</p>
-                                <button type="button" id="tvmBuy" class="tvm-btn tvm-btn-primary">Buy ticket</button>
+                                <div class="tvm-title tvm-title-ok" data-en="Ready to buy" data-es="Listo para comprar">Ready to buy</div>
+                                <p class="tvm-message" data-en="This route is running right now." data-es="Esta ruta está en servicio ahora.">This route is running right now.</p>
+                                <button type="button" id="tvmBuy" class="tvm-btn tvm-btn-primary" data-en="Buy ticket" data-es="Comprar boleto">Buy ticket</button>
                             </div>
 
                             <!-- Where "continue" goes -->
                             <div id="screenPayment" hidden>
-                                <div class="tvm-title tvm-title-ok">Payment</div>
-                                <p class="tvm-message">Tap your card to pay.</p>
+                                <div class="tvm-title tvm-title-ok" data-en="Payment" data-es="Pago">Payment</div>
+                                <p class="tvm-message" data-en="Tap your card to pay." data-es="Acerque su tarjeta para pagar.">Tap your card to pay.</p>
+                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
                             </div>
 
                             <!-- Where "back" goes -->
                             <div id="screenRoutes" hidden>
-                                <div class="tvm-title tvm-title-ok">Choose your destination</div>
+                                <div class="tvm-title tvm-title-ok" data-en="Choose your destination" data-es="Elija su destino">Choose your destination</div>
                                 <p class="tvm-message">Midtown · Brookfield Place · Pier 11</p>
+                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
+                            </div>
+
+                            <!-- Where "back" goes when set to the home screen -->
+                            <div id="screenHome" hidden>
+                                <div class="tvm-title tvm-title-ok">NY Waterway</div>
+                                <p class="tvm-message" data-en="Welcome! Touch to buy a ferry ticket." data-es="¡Bienvenido! Toque para comprar un boleto de ferry.">Welcome! Touch to buy a ferry ticket.</p>
+                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
                             </div>
                         </div>
                         <p class="small text-muted text-center mt-2 mb-0">Preview only, nothing is saved yet.</p>

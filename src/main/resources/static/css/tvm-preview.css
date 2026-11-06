@@ -20,14 +20,13 @@
 .tvm-screen {
   width: 340px;
   max-width: 100%;
-  aspect-ratio: 3 / 4;     /* keeps the kiosk shape at any window size */
+  aspect-ratio: 3 / 4;     /* keeps the kiosk shape, but grows taller rather than cutting off the buttons */
   background: #111;
   color: #fff;
   border: 8px solid #2b2b2b; /* bezel so it reads as a machine */
   border-radius: 16px;
   padding: 20px;
   margin: 0 auto;
-  overflow: hidden;
 }
 
 .tvm-status {
