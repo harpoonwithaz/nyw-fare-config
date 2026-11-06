@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.TenantContext;
@@ -18,57 +19,58 @@ import ca.sfu.cmpt276.nywfareconfig.fare.service.*;
 public class FareController {
 
     private final TenantContext tenantContext;
-    private final TenantService tenantService;
+    private final FareService fareService;
 
-    public FareController(TenantContext tenantContext, TenantService tenantService) {
+    public FareController(TenantContext tenantContext, FareService fareService) {
         this.tenantContext = tenantContext;
-        this.tenantService = tenantService;
+        this.fareService = fareService;
     }
 
-    // Empty fair view
-    @GetMapping("")
+    @GetMapping
     public String getFares(
             @RequestParam(required = false) String tenant,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String product,
             Model model) {
 
-        // Sync tenant if provided and changed
-        if (tenant != null && !tenantContext.hasTenant(tenant)) {
-            Tenant resolvedTenant = tenantService.getTenantById(tenant);
-            if (resolvedTenant != null) {
-                tenantContext.resetForTenant(resolvedTenant);
+        // Process explicit tenant selection
+        if (tenant != null && !tenant.isBlank()) {
+            boolean isNewTenant = tenantContext.getSelectedTenant() == null ||
+                    !tenantContext.getSelectedTenant().getCode().equalsIgnoreCase(tenant);
+
+            if (isNewTenant) {
+                Tenant resolvedTenant = fareService.getTenantByCode(tenant);
+                tenantContext.setSelectedTenant(resolvedTenant);
+
+                // Clear secondary filter state when switching tenants
+                tenantContext.setSelectedOrigin(null);
+                tenantContext.setSelectedProduct(null);
             }
         }
 
-        // Sync secondary attributes based on resolved tenant's gridMode
-        if (tenantContext.hasTenant()) {
-            GridMode mode = tenantContext.getSelectedTenant().getGridMode();
+        // Process secondary selections only when a tenant is actively chosen
+        Tenant currentTenant = tenantContext.getSelectedTenant();
+        if (currentTenant != null) {
+            if (currentTenant.getGridMode() == GridMode.OD) {
+                if (origin != null && !origin.isBlank()) {
+                    tenantContext.setSelectedOrigin(origin);
+                }
+            } else if (currentTenant.getGridMode() == GridMode.ZONAL) {
+                if (product != null && !product.isBlank()) {
+                    tenantContext.setSelectedProduct(product);
+                }
+            }
 
-            if (mode == GridMode.OD && origin != null) {
-                tenantContext.setSelectedOrigin(origin);
-            } else if (mode == GridMode.ZONAL && product != null) {
-                tenantContext.setSelectedProduct(product);
+            // Populate gridView only when both tenant and secondary filter are selected
+            String activeFilter = (currentTenant.getGridMode() == GridMode.OD)
+                    ? tenantContext.getSelectedOrigin()
+                    : tenantContext.getSelectedProduct();
+
+            if (activeFilter != null && !activeFilter.isBlank()) {
+                FareGrid gridView = fareService.buildMockGrid(currentTenant, activeFilter);
+                model.addAttribute("gridView", gridView);
             }
         }
-
-        // Populate dropdown list (selected item marked active)
-        String activeTenantId = tenantContext.hasTenant()
-                ? tenantContext.getSelectedTenant().getId()
-                : null;
-
-        List<Tenant> availableTenants = tenantService.getTenantsList().stream()
-                .map(t -> new Tenant(
-                        t.getId(),
-                        t.getDisplayName(),
-                        t.getGridMode(),
-                        t.getId().equalsIgnoreCase(activeTenantId)))
-                .toList();
-
-        model.addAttribute("availableTenants", availableTenants);
-        model.addAttribute("selectedTenant", tenantContext.getSelectedTenant());
-        model.addAttribute("selectedOrigin", tenantContext.getSelectedOrigin());
-        model.addAttribute("selectedProduct", tenantContext.getSelectedProduct());
 
         return "fare/fare";
     }
