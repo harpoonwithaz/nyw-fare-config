@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div th:fragment="groupEditModal" class="modal fade" id="groupEditModal" tabindex="-1" aria-labelledby="groupEditModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupEditModalLabel"><i class="bi bi-collection me-2"></i>Bulk Route Group Edit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Route Group</label>
+                            <select class="form-select">
+                                <option>All Manhattan Terminals</option>
+                                <option>New Jersey Commuter Lines</option>
+                                <option>Weekend-Only Services</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Apply Price Multiplier / Adjustment</label>
+                            <input type="text" class="form-control" placeholder="e.g., +$1.00 or 1.1x">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Bulk Availability Status</label>
+                            <select class="form-select">
+                                <option>No Change</option>
+                                <option value="true">Enable All (Yes)</option>
+                                <option value="false">Disable All (No)</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm">Apply Group Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
