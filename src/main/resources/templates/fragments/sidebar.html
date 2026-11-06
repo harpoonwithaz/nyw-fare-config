@@ -49,11 +49,11 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a 
-                   class="nav-link text-white"
-                   th:classappend="${activePage == 'publish'} ? 'active' : ''"
-                   th:attr="aria-current=${activePage == 'publish'} ? 'page' : null">
-                    <i class="bi bi-cloud-upload me-2"></i> Review &amp; Publish
+                <a th:href="@{/publishing/review}"
+                    class="nav-link text-white"
+                    th:classappend="${activePage == 'publish'} ? 'active' : ''"
+                    th:attr="aria-current=${activePage == 'publish'} ? 'page' : null">
+                        <i class="bi bi-cloud-upload me-2"></i> Review &amp; Publish
                 </a>
             </li>
         </ul>
