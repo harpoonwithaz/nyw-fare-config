@@ -1,28 +1,211 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.service;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import ca.sfu.cmpt276.nywfareconfig.fare.model.*;
+import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.Tenant;
+
+@Service
 public class FareService {
-    private static List<String> headers;
 
+    public FareService() {
+    }
 
+    /**
+     * Returns the list of demo tenants supported by the platform[cite: 2, 3].
+     */
+    public List<Tenant> getAvailableTenants() {
+        List<Tenant> tenantList = new ArrayList<>();
+        tenantList.add(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
+        tenantList.add(new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true));
+        return tenantList;
+    }
 
-    public static List<Terminal> getOriginTerminals() {
-        // HARD CODED MOCK DATA
-        // TODO: Call database
-        
-        
-        List<Terminal> originTerminals = new ArrayList<Terminal>();
+    /**
+     * Resolves a Tenant instance by its natural tenant code.
+     */
+    public Tenant getTenantByCode(String tenantCode) {
+        if (tenantCode == null) {
+            return null;
+        }
+        return switch (tenantCode.toUpperCase()) {
+            case "NYW_SANDBOX", "NYW" -> new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+            case "METRA" -> new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true);
+            default -> null;
+        };
+    }
 
-        originTerminals.add(new Terminal("201", "Edgewater"));
-        originTerminals.add(new Terminal("100", "Belford"));
+    /**
+     * Returns secondary filter options depending on the tenant mode:
+     * - O-D Mode: Origin Terminal codes
+     * - Zonal Mode: Ticket Product codes
+     */
+    public List<String> getSecondaryFilterOptions(String tenantCode) {
+        if (tenantCode == null) {
+            return List.of();
+        }
+        return switch (tenantCode.toUpperCase()) {
+            case "NYW_SANDBOX", "NYW" -> List.of("EDGEWTR", "PORTIMP", "MIDTOWN");
+            case "METRA" -> List.of("ADULT_ONEWAY", "FULL_10TRIP", "FULL_MONTHLY");
+            default -> List.of();
+        };
+    }
 
-        return originTerminals;
+    /**
+     * Builds the structured 2D FareGrid view-model based on the active mode[cite: 1, 5].
+     */
+    public FareGrid buildMockGrid(Tenant tenant, String filterValue) {
+        if (tenant == null) {
+            return null;
+        }
+        if (tenant.getGridMode() == GridMode.ZONAL) {
+            return buildZonalGrid(filterValue != null ? filterValue : "ADULT_ONEWAY", tenant);
+        }
+        return buildOdGrid(filterValue != null ? filterValue : "EDGEWTR", tenant);
+    }
+
+    /**
+     * Builds Point-to-Point (O-D) matrix for NY Waterway[cite: 3, 5].
+     * - Rows: Outbound Destination Terminals[cite: 3, 5]
+     * - Columns: Ticket Products[cite: 3, 5]
+     */
+    private FareGrid buildOdGrid(String originSiteCode, Tenant tenant) {
+        String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "EDGEWTR";
+
+        // Columns: Products[cite: 3, 5]
+        List<String> colHeaders = List.of(
+            "Adult One-Way",
+            "Child One-Way",
+            "Senior 65+",
+            "10-Trip Pass",
+            "Monthly Pass"
+        );
+
+        // Rows: Outbound Destination sites[cite: 3, 5]
+        List<String> rowHeaders = switch (normalizedOrigin) {
+            case "PORTIMP" -> List.of("Midtown / W. 39th St", "Brookfield Place", "Pier 11 / Wall St");
+            case "MIDTOWN" -> List.of("Edgewater", "Port Imperial", "Hoboken 14th St");
+            case "EDGEWTR" -> List.of("Midtown / W. 39th St", "Brookfield Place", "Pier 11 / Wall St");
+            default -> List.of("Midtown / W. 39th St", "Brookfield Place");
+        };
+
+        List<List<FareCell>> rows = new ArrayList<>();
+
+        for (String dest : rowHeaders) {
+            List<FareCell> rowCells = new ArrayList<>();
+            for (String prod : colHeaders) {
+                // NYW discontinued Senior tickets across all terminals -> NOT_SOLD[cite: 3, 10]
+                if ("Senior 65+".equals(prod)) {
+                    rowCells.add(new FareCell(FareCell.Status.NOT_SOLD, dest, prod));
+                } 
+                // Pier 11 is not directly served from Edgewater -> NA badge[cite: 3, 5]
+                else if ("EDGEWTR".equals(normalizedOrigin) && "Pier 11 / Wall St".equals(dest)) {
+                    rowCells.add(new FareCell(FareCell.Status.NA, dest, prod));
+                } 
+                // Standard active pricing[cite: 3, 5]
+                else {
+                    Double price = resolveOdPrice(dest, prod);
+                    rowCells.add(new FareCell(
+                        price,
+                        String.format("$%.2f", price),
+                        FareCell.Status.ACTIVE,
+                        true,
+                        dest,
+                        prod
+                    ));
+                }
+            }
+            rows.add(rowCells);
+        }
+
+        return new FareGrid(
+            tenant,
+            "Origin Terminal",
+            normalizedOrigin,
+            colHeaders,
+            rowHeaders,
+            rows
+        );
+    }
+
+    /**
+     * Builds symmetric Zone-to-Zone matrix for Metra Rail[cite: 3, 5].
+     * - Rows: Origin Zones (Zone 1 to 3)[cite: 3, 5]
+     * - Columns: Destination Zones (Zone 1 to 3)[cite: 3, 5]
+     */
+    private FareGrid buildZonalGrid(String productCode, Tenant tenant) {
+        String normalizedProduct = productCode != null ? productCode.toUpperCase() : "ADULT_ONEWAY";
+
+        List<String> colHeaders = List.of("Zone 1", "Zone 2", "Zone 3");
+        List<String> rowHeaders = List.of("Zone 1", "Zone 2", "Zone 3");
+
+        // 3x3 baseline rates matching the system rate schedule[cite: 3, 5]
+        Double[][] baseRates = switch (normalizedProduct) {
+            case "FULL_10TRIP" -> new Double[][] {
+                { 22.50, 36.00, 58.50 },
+                { 36.00, 22.50, 36.00 },
+                { 58.50, 36.00, 22.50 }
+            };
+            case "FULL_MONTHLY" -> new Double[][] {
+                { 75.00, 120.00, 195.00 },
+                { 120.00, 75.00, 120.00 },
+                { 195.00, 120.00, 75.00 }
+            };
+            case "ADULT_ONEWAY" -> new Double[][] {
+                { 2.50, 4.00, 6.50 },
+                { 4.00, 2.50, 4.00 },
+                { 6.50, 4.00, 2.50 }
+            };
+            default -> new Double[][] {
+                { 2.50, 4.00, 6.50 },
+                { 4.00, 2.50, 4.00 },
+                { 6.50, 4.00, 2.50 }
+            };
+        };
+
+        List<List<FareCell>> rows = new ArrayList<>();
+
+        for (int r = 0; r < rowHeaders.size(); r++) {
+            List<FareCell> rowCells = new ArrayList<>();
+            for (int c = 0; c < colHeaders.size(); c++) {
+                Double price = baseRates[r][c];
+                rowCells.add(new FareCell(
+                    price,
+                    String.format("$%.2f", price),
+                    FareCell.Status.ACTIVE,
+                    true,
+                    rowHeaders.get(r),
+                    colHeaders.get(c)
+                ));
+            }
+            rows.add(rowCells);
+        }
+
+        return new FareGrid(
+            tenant,
+            "Ticket Product",
+            normalizedProduct,
+            colHeaders,
+            rowHeaders,
+            rows
+        );
+    }
+
+    /**
+     * Helper to mock realistic NYW ticket prices[cite: 3, 5].
+     */
+    private Double resolveOdPrice(String dest, String prod) {
+        double base = dest.contains("Midtown") ? 13.25 : 15.00;
+        return switch (prod) {
+            case "Child One-Way" -> base - 4.25;
+            case "10-Trip Pass" -> base * 8.5;
+            case "Monthly Pass" -> base * 31.25;
+            default -> base; // Adult One-Way[cite: 3, 5]
+        };
     }
 }
