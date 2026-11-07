@@ -24,4 +24,4 @@ jobs:
         run: chmod +x mvnw
 
       - name: Run Unit and Slice Tests
-        run: ./mvnw clean test -Dtest="!*ApplicationTests,!*IT,!*IntegrationTest"
+        run: ./mvnw clean test -Dtest="!NywFareConfigApplicationTests"
