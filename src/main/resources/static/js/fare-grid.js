@@ -20,6 +20,7 @@
     input.className = 'form-control form-control-sm text-center font-monospace fare-cell-input';
     input.setAttribute('aria-label', 'Edit fare for ' + cell.dataset.rowKey + ' to ' + cell.dataset.colKey);
 
+    // Convert span to input box
     valueElement.replaceWith(input);
     input.focus();
     input.select();
@@ -28,7 +29,11 @@
       if (!input.isConnected) {
         return;
       }
+
+      // TODO: Contact draft manager to draft changed value
       var value = input.value.trim() || originalValue;
+
+      // Convert input box back to span
       var span = document.createElement('span');
       span.className = valueElement.className;
       span.textContent = formatPrice(value);
