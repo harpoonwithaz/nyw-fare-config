@@ -23,7 +23,7 @@
 
     <!-- Table Scroll Container -->
     <div class="table-responsive">
-      <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table">
+      <table class="table table-bordered table-hover align-middle mb-0 text-center fare-matrix-table">
         <thead class="table-light">
           <tr>
             <!-- Corner Axis Label -->
@@ -50,9 +50,7 @@
 
             <!-- Matrix Intersection Cells -->
             <td th:each="cell : ${row}" class="py-2 px-3 fare-cell-container"
-              th:attr="data-row-key=${cell.rowKey}, data-col-key=${cell.colKey}, data-status=${cell.status},
-                data-inline-editable=${cell.editable and gridView.tenant.gridMode.name() == 'OD'},
-                data-value=${cell.price}">
+              th:attr="data-row-key=${cell.rowKey}, data-col-key=${cell.colKey}, data-status=${cell.status}">
 
               <!-- Active Rate -->
               <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell.Status).ACTIVE}"
