@@ -1,0 +1,16 @@
+.fare-cell-container[data-inline-editable="true"] {
+  cursor: pointer;
+}
+
+.fare-cell-container:hover {
+  background-color: var(--bs-table-hover-bg);
+}
+
+.fare-cell-value:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.fare-cell-input {
+  min-width: 6rem;
+}

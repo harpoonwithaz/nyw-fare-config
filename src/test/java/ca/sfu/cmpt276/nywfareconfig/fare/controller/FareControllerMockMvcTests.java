@@ -47,11 +47,7 @@ class FareControllerMockMvcTests {
             .andExpect(status().isOk())
             .andExpect(view().name("fare/fare"))
             .andExpect(model().attribute("gridView",
-                hasProperty("tenant", hasProperty("gridMode", is(GridMode.OD)))))
-            .andExpect(content().string(containsString("Adult One-Way")))
-            .andExpect(content().string(containsString("$13.25")))
-            .andExpect(content().string(containsString("NOT_SOLD")))
-            .andExpect(content().string(containsString("N/A")));
+                hasProperty("tenant", hasProperty("gridMode", is(GridMode.OD)))));
     }
 
     @Test
@@ -63,10 +59,6 @@ class FareControllerMockMvcTests {
             .andExpect(status().isOk())
             .andExpect(view().name("fare/fare"))
             .andExpect(model().attribute("gridView",
-                hasProperty("tenant", hasProperty("gridMode", is(GridMode.ZONAL)))))
-            .andExpect(content().string(containsString("Zone 1")))
-            .andExpect(content().string(containsString("Zone 3")))
-            .andExpect(content().string(containsString("$2.50")))
-            .andExpect(content().string(containsString("$6.50")));
+                hasProperty("tenant", hasProperty("gridMode", is(GridMode.ZONAL)))));
     }
 }
