@@ -39,6 +39,8 @@ class FareControllerMockMvcTests {
     private MockMvc mockMvc;
 
     @Test
+    // Execute GET /fares?tenant=NYW_SANDBOX&origin=EDGEWTR asserting HTTP 200, 
+    // checking model attributes for matrixMode=OD and verifying table cells in the Thymeleaf response
     void getNywFaresRendersOdMatrix() throws Exception {
         mockMvc.perform(get("/fares")
                 .with(user(TEST_USER))
@@ -51,6 +53,7 @@ class FareControllerMockMvcTests {
     }
 
     @Test
+    // Execute GET /fares?tenant=METRA&product=ADULT_ONEWAY asserting HTTP 200 and matrixMode=ZONAL.
     void getMetraFaresRendersZonalMatrix() throws Exception {
         mockMvc.perform(get("/fares")
                 .with(user(TEST_USER))
