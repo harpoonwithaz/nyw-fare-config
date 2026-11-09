@@ -14,3 +14,8 @@
 .fare-cell-input {
   min-width: 6rem;
 }
+
+.fare-cell-container .invalid-feedback {
+  display: block;
+  font-size: 0.75rem;
+}
