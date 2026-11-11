@@ -48,4 +48,8 @@ public class TenantContext implements Serializable {
     public void setSelectedProduct(String selectedProduct) {
         this.selectedProduct = selectedProduct;
     }
+
+    public boolean isSecondarySelected() {
+        return selectedOrigin != null || selectedProduct != null;
+    }
 }

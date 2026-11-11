@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
   <meta charset="UTF-8">
@@ -10,6 +10,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" th:href="@{/css/fare-grid.css}">
 </head>
 
 <body class="d-flex vh-100 overflow-hidden">
@@ -21,31 +22,20 @@
   <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
 
     <!-- Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h2 class="h4 fw-bold mb-1">Fare Grid Management</h2>
         <p class="text-muted small mb-0">Configure point-to-point routes and zonal price schedules</p>
       </div>
-
-      <!-- Global Action Bar Placeholders -->
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
-          <i class="bi bi-arrow-counterclockwise me-1"></i> Discard Drafts
-        </button>
-        <button type="button" class="btn btn-success btn-sm" disabled>
-          <i class="bi bi-check2-circle me-1"></i> Save Rate Changes
-          <span class="badge bg-light text-dark ms-1">0</span>
-        </button>
-      </div>
     </div>
 
-    <!-- Step 1 & 2: Context Selector Card -->
-    <div class="card shadow-sm border-0 mb-4">
+    <!-- Context Selector Card (Filters Only) -->
+    <div class="card shadow-sm mb-3">
       <div class="card-body p-3">
         <form th:action="@{/fares}" method="get" class="row g-3 align-items-end">
 
-          <!-- 1. Tenant Selector (Starts Unselected) -->
-          <div class="col-md-3">
+          <!-- Tenant Selector -->
+          <div class="col-md-3 col-sm-6">
             <label for="tenantSelect" class="form-label fw-semibold small text-uppercase text-secondary">
               Tenant Environment
             </label>
@@ -57,39 +47,31 @@
             </select>
           </div>
 
-          <!-- 2A. Point-to-Point (O-D) Secondary Controls -->
+          <!-- Point-to-Point (O-D) Mode Filter -->
           <th:block
             th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD}">
-            <div class="col-md-3">
+            <div class="col-md-3 col-sm-6">
               <label for="originSelect" class="form-label fw-semibold small text-uppercase text-secondary">
                 Origin Terminal
               </label>
-              <select id="originSelect" name="origin" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="" th:selected="${tenantContext.selectedOrigin == null}">-- Select Terminal --</option>
-                <option value="EDGEWTR" th:selected="${tenantContext.selectedOrigin == 'EDGEWTR'}">Edgewater (EDGEWTR)
-                </option>
-                <option value="PORTIMP" th:selected="${tenantContext.selectedOrigin == 'PORTIMP'}">Port Imperial
-                  (PORTIMP)</option>
-                <option value="MIDTOWN" th:selected="${tenantContext.selectedOrigin == 'MIDTOWN'}">Midtown / W. 39th St
-                  (MIDTOWN)</option>
-              </select>
-            </div>
-            <div class="col-md-6 d-flex gap-2">
-              <button type="submit" class="btn btn-primary btn-sm"
-                th:disabled="${tenantContext.selectedOrigin == null}">
-                <i class="bi bi-filter me-1"></i> Load Outbound Fares
-              </button>
-              <button type="button" class="btn btn-outline-primary btn-sm"
-                th:disabled="${tenantContext.selectedOrigin == null}">
-                <i class="bi bi-plus-lg me-1"></i> Add Route Rule
-              </button>
+              <div class="input-group input-group-sm">
+                <select id="originSelect" name="origin" class="form-select" onchange="this.form.submit()">
+                  <option value="" th:selected="${tenantContext.selectedOrigin == null}">-- Select Terminal --</option>
+                  <option value="EDGEWTR" th:selected="${tenantContext.selectedOrigin == 'EDGEWTR'}">Edgewater (EDGEWTR)
+                  </option>
+                  <option value="PORTIMP" th:selected="${tenantContext.selectedOrigin == 'PORTIMP'}">Port Imperial
+                    (PORTIMP)</option>
+                  <option value="MIDTOWN" th:selected="${tenantContext.selectedOrigin == 'MIDTOWN'}">Midtown / W. 39th
+                    St (MIDTOWN)</option>
+                </select>
+              </div>
             </div>
           </th:block>
 
-          <!-- 2B. Zonal Mode Secondary Controls -->
+          <!-- Zonal Mode Filter -->
           <th:block
             th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL}">
-            <div class="col-md-3">
+            <div class="col-md-3 col-sm-6">
               <label for="productSelect" class="form-label fw-semibold small text-uppercase text-secondary">
                 Ticket Product / Class
               </label>
@@ -104,52 +86,83 @@
                   Commuter Pass</option>
               </select>
             </div>
-            <div class="col-md-6 d-flex gap-2">
-              <button type="button" class="btn btn-outline-primary btn-sm" title="View all system tiers">
-                <i class="bi bi-layers me-1"></i> Manage Rate Tiers
-              </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm"
-                title="Apply flat or percentage adjustment">
-                <i class="bi bi-percent me-1"></i> Bulk Fare Adjustment
-              </button>
-              <button type="button" class="btn btn-outline-dark btn-sm" title="Open Station to Zone Assignment Drawer">
-                <i class="bi bi-diagram-3 me-1"></i> Station Zone Mapping
-              </button>
-            </div>
           </th:block>
 
         </form>
       </div>
     </div>
 
-    <!-- Workflow Guidance & Empty States -->
-    <!-- Prompt: No Tenant Chosen -->
-    <div th:if="${tenantContext.selectedTenant == null}"
-      class="alert alert-info border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-info-circle-fill fs-5 me-2"></i>
-      <div>
-        <strong>No Tenant Selected:</strong> Choose an active tenant above to begin configuration.
+    <!-- Server-Side Workflow Guidance Feedback Cards -->
+    <th:block th:if="${tenantContext.selectedTenant == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('No Tenant Selected: Choose an active tenant above to begin configuration.', 'info')}"></div>
+    </th:block>
+
+    <th:block
+      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('Origin Terminal Required: Select a departure terminal to load outbound destination pricing.', 'warning')}"></div>
+    </th:block>
+
+    <th:block
+      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL and tenantContext.selectedProduct == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('Ticket Product Required: Select a fare product to populate the symmetric Zone-to-Zone matrix.', 'warning')}"></div>
+    </th:block>
+
+    <!-- Client-Side Grid Feedback Cards (Toggled by fare-grid.js) -->
+    <div id="grid-feedback-container">
+      <div class="grid-feedback-slot" data-feedback-level="info" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'info')}"></div>
+      </div>
+      <div class="grid-feedback-slot" data-feedback-level="warning" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'warning')}"></div>
+      </div>
+      <div class="grid-feedback-slot" data-feedback-level="danger" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'danger')}"></div>
       </div>
     </div>
 
-    <!-- Prompt: Tenant Chosen (OD), but No Terminal Selected -->
-    <div
-      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}"
-      class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-geo-alt-fill fs-5 me-2"></i>
-      <div>
-        <strong>Origin Terminal Required:</strong> Select a departure terminal to load outbound destination pricing.
-      </div>
-    </div>
+    <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
+    <div class="card shadow border-bottom-0"
+      th:if="${tenantContext.selectedTenant != null and tenantContext.isSecondarySelected()}">
 
-    <!-- Prompt: Tenant Chosen (ZONAL), but No Product Selected -->
-    <div
-      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL and tenantContext.selectedProduct == null}"
-      class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-ticket-perforated-fill fs-5 me-2"></i>
-      <div>
-        <strong>Ticket Product Required:</strong> Select a fare product to populate the symmetric Zone-to-Zone matrix.
+      <!-- Operational Controls & Save/Discard Actions -->
+      <div
+        class="card-header bg-white border-bottom py-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+        <!-- Context Creation & Configuration Actions -->
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <!-- O-D Actions -->
+          <th:block
+            th:if="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD}">
+            <button type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-plus-lg me-1"></i> Add Route Rule
+            </button>
+          </th:block>
+
+          <!-- Zonal Actions -->
+          <th:block
+            th:if="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL}">
+            <button type="button" class="btn btn-outline-primary btn-sm" title="View all system tiers">
+              <i class="bi bi-layers me-1"></i> Manage Rate Tiers
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-sm" title="Open Station to Zone Assignment Drawer">
+              <i class="bi bi-diagram-3 me-1"></i> Station Zone Mapping
+            </button>
+          </th:block>
+        </div>
+
+        <!-- Edit State Actions (Close to Grid) -->
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" disabled id="discardDraftsBtn">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Discard Drafts
+          </button>
+          <button type="button" class="btn btn-success btn-sm" disabled id="saveChangesBtn">
+            <i class="bi bi-check2-circle me-1"></i> Save Rate Changes
+            <span class="badge bg-light text-dark ms-1" id="changesCounter">0</span>
+          </button>
+        </div>
+
       </div>
+
     </div>
 
     <!-- Render Matrix Table Fragment When Context is Fully Resolved -->
@@ -161,6 +174,7 @@
 
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script th:src="@{/js/fare-grid.js}"></script>
 </body>
 
 </html>
