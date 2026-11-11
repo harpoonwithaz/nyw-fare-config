@@ -1,21 +1,79 @@
+/* Table layout stability */
+.fare-matrix-table th,
+.fare-matrix-table td.fare-cell-container {
+  vertical-align: middle;
+  position: relative;
+  height: 48px;
+}
+
+/* Editable O-D price cells */
 .fare-cell-container[data-inline-editable="true"] {
   cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
 }
 
-.fare-cell-container:hover {
-  background-color: var(--bs-table-hover-bg);
+.fare-cell-container[data-inline-editable="true"]:hover {
+  background-color: #f1f5f9;
 }
 
-.fare-cell-value:focus-visible {
-  outline: 2px solid var(--bs-primary);
-  outline-offset: 2px;
+/* Locked / unconfigured cells (NOT_SOLD, NA) */
+.fare-cell-container[data-inline-editable="false"] {
+  cursor: not-allowed;
+  user-select: none;
 }
 
-.fare-cell-input {
-  min-width: 6rem;
+/* Brief visual feedback when an operator clicks a locked cell */
+.fare-cell-container.cell-locked-feedback .badge {
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+  transition: all 0.15s ease-in-out;
 }
 
-.fare-cell-container .invalid-feedback {
+/* Inline numeric input styling */
+.fare-inline-input {
+  width: 100%;
+  max-width: 110px;
+  margin: 0 auto;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--bs-font-monospace, monospace);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+  border: 1px solid #0d6efd;
+  border-radius: 0.25rem;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* Hide browser number spin buttons to keep spreadsheet look clean */
+.fare-inline-input::-webkit-outer-spin-button,
+.fare-inline-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fare-inline-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Invalid input state (.is-invalid) */
+.fare-inline-input.is-invalid {
+  border-color: #dc3545;
+  background-color: #fff8f8;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.2);
+}
+
+.fare-cell-container.has-error {
+  background-color: #fff5f5 !important;
+}
+
+/* Compact inline error message under the input */
+.fare-cell-feedback {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1.1;
+  color: #dc3545;
+  margin-top: 0.2rem;
+  font-weight: 600;
 }

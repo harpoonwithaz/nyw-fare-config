@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
   <meta charset="UTF-8">
@@ -27,8 +27,6 @@
         <h2 class="h4 fw-bold mb-1">Fare Grid Management</h2>
         <p class="text-muted small mb-0">Configure point-to-point routes and zonal price schedules</p>
       </div>
-
-
     </div>
 
     <!-- Context Selector Card (Filters Only) -->
@@ -94,6 +92,34 @@
       </div>
     </div>
 
+    <!-- Server-Side Workflow Guidance Feedback Cards -->
+    <th:block th:if="${tenantContext.selectedTenant == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('No Tenant Selected: Choose an active tenant above to begin configuration.', 'info')}"></div>
+    </th:block>
+
+    <th:block
+      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('Origin Terminal Required: Select a departure terminal to load outbound destination pricing.', 'warning')}"></div>
+    </th:block>
+
+    <th:block
+      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL and tenantContext.selectedProduct == null}">
+      <div th:replace="~{fare/fragments/feedback-card :: feedback-card('Ticket Product Required: Select a fare product to populate the symmetric Zone-to-Zone matrix.', 'warning')}"></div>
+    </th:block>
+
+    <!-- Client-Side Grid Feedback Cards (Toggled by fare-grid.js) -->
+    <div id="grid-feedback-container">
+      <div class="grid-feedback-slot" data-feedback-level="info" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'info')}"></div>
+      </div>
+      <div class="grid-feedback-slot" data-feedback-level="warning" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'warning')}"></div>
+      </div>
+      <div class="grid-feedback-slot" data-feedback-level="danger" hidden>
+        <div th:replace="~{fare/fragments/feedback-card :: feedback-card('', 'danger')}"></div>
+      </div>
+    </div>
+
     <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
     <div class="card shadow border-bottom-0"
       th:if="${tenantContext.selectedTenant != null and tenantContext.isSecondarySelected()}">
@@ -137,36 +163,6 @@
 
       </div>
 
-    </div>
-
-    <!-- Workflow Guidance & Empty States -->
-    <!-- Prompt: No Tenant Chosen -->
-    <div th:if="${tenantContext.selectedTenant == null}"
-      class="alert alert-info border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-info-circle-fill fs-5 me-2"></i>
-      <div>
-        <strong>No Tenant Selected:</strong> Choose an active tenant above to begin configuration.
-      </div>
-    </div>
-
-    <!-- Prompt: Tenant Chosen (OD), but No Terminal Selected -->
-    <div
-      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}"
-      class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-geo-alt-fill fs-5 me-2"></i>
-      <div>
-        <strong>Origin Terminal Required:</strong> Select a departure terminal to load outbound destination pricing.
-      </div>
-    </div>
-
-    <!-- Prompt: Tenant Chosen (ZONAL), but No Product Selected -->
-    <div
-      th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL and tenantContext.selectedProduct == null}"
-      class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-      <i class="bi bi-ticket-perforated-fill fs-5 me-2"></i>
-      <div>
-        <strong>Ticket Product Required:</strong> Select a fare product to populate the symmetric Zone-to-Zone matrix.
-      </div>
     </div>
 
     <!-- Render Matrix Table Fragment When Context is Fully Resolved -->

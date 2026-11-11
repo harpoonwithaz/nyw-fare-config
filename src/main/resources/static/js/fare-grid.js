@@ -1,5 +1,5 @@
 /**
- * Story 2.2: O-D Mode Direct Inline Rate Editing & Numeric Input Masking
+ * O-D Mode Direct Inline Rate Editing & Numeric Input Masking
  */
 (() => {
   'use strict';
@@ -15,14 +15,7 @@
     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'
   ]);
 
-  const FEEDBACK_ICONS = {
-    danger: 'bi-exclamation-octagon-fill',
-    warning: 'bi-exclamation-triangle-fill',
-    secondary: 'bi-info-circle-fill',
-    info: 'bi-info-circle-fill'
-  };
-
-  const FEEDBACK_DURATION = 10000; // 10 seconds
+  const FEEDBACK_TIMER = 10000; // 10 Seconds
 
   /**
    * Formats a numeric value to a two-decimal string (e.g., "14.00")
@@ -73,70 +66,59 @@
   }
 
   /**
-   * Hides the existing feedback card in fare.html
+   * Hides all client-side grid feedback cards
    */
   function hideGridFeedback() {
-    const banner = document.getElementById('fare-grid-feedback-banner');
-    if (!banner) return;
+    const container = document.getElementById('grid-feedback-container');
+    if (!container) return;
 
-    clearTimeout(banner._hideTimer);
-    banner.classList.remove('d-flex');
-    banner.classList.add('d-none');
+    clearTimeout(container._hideTimer);
+    container.querySelectorAll('.grid-feedback-slot').forEach((slot) => {
+      slot.hidden = true;
+    });
   }
 
   /**
-   * Toggles the existing feedback card in fare.html and updates its message and style
+   * Toggles the matching feedback card fragment (info, warning, or danger) and sets its message text
    */
-  function showGridFeedback(message, type = 'warning') {
-    const banner = document.getElementById('fare-grid-feedback-banner');
-    const messageEl = document.getElementById('fare-grid-feedback-message');
-    const iconEl = document.getElementById('fare-grid-feedback-icon');
-    const closeBtn = document.getElementById('fare-grid-feedback-close');
+  function showGridFeedback(message, level = 'warning') {
+    const container = document.getElementById('grid-feedback-container');
+    if (!container) return;
 
-    if (!banner || !messageEl) return;
+    container.querySelectorAll('.grid-feedback-slot').forEach((slot) => {
+      const isTarget = slot.dataset.feedbackLevel === level;
+      slot.hidden = !isTarget;
 
-    banner.classList.remove('alert-warning', 'alert-danger', 'alert-secondary', 'alert-info', 'd-none');
-    banner.classList.add(`alert-${type}`, 'd-flex');
+      if (isTarget) {
+        const textEl = slot.querySelector('.feedback-card-text');
+        if (textEl) {
+          textEl.textContent = message;
+        }
+      }
+    });
 
-    if (iconEl) {
-      iconEl.className = `bi ${FEEDBACK_ICONS[type] || FEEDBACK_ICONS.warning} fs-5 me-2`;
-    }
-
-    messageEl.textContent = message;
-
-    if (closeBtn && !closeBtn.dataset.boundClose) {
-      closeBtn.dataset.boundClose = 'true';
-      closeBtn.addEventListener('click', hideGridFeedback);
-    }
-
-    clearTimeout(banner._hideTimer);
-    banner._hideTimer = setTimeout(hideGridFeedback, FEEDBACK_DURATION);
+    clearTimeout(container._hideTimer);
+    container._hideTimer = setTimeout(hideGridFeedback, FEEDBACK_TIMER);
   }
 
   /**
-   * Marks an active cell input as invalid or valid and manages ARIA attributes
+   * Marks an active cell input as invalid or valid
    */
   function setInputValidityUI(cell, input, isValid, errorMessage = '') {
     let feedbackEl = cell.querySelector('.fare-cell-feedback');
 
     if (!isValid) {
       input.classList.add('is-invalid');
-      input.setAttribute('aria-invalid', 'true');
       cell.classList.add('has-error');
 
       if (!feedbackEl) {
         feedbackEl = document.createElement('span');
         feedbackEl.className = 'fare-cell-feedback';
-        feedbackEl.id = `err-${cell.dataset.rowKey}-${cell.dataset.colKey}`;
-        feedbackEl.setAttribute('role', 'alert');
         cell.appendChild(feedbackEl);
       }
       feedbackEl.textContent = errorMessage;
-      input.setAttribute('aria-describedby', feedbackEl.id);
     } else {
       input.classList.remove('is-invalid');
-      input.setAttribute('aria-invalid', 'false');
-      input.removeAttribute('aria-describedby');
       cell.classList.remove('has-error');
       if (feedbackEl) feedbackEl.remove();
     }
@@ -171,7 +153,7 @@
     if (!result.valid) {
       setInputValidityUI(cell, input, false, result.reason);
       showGridFeedback(
-        `Invalid fare for ${cell.dataset.rowKey} (${cell.dataset.colKey}): ${result.reason}`,
+        `Invalid Fare (${cell.dataset.rowKey} - ${cell.dataset.colKey}): ${result.reason}`,
         'danger'
       );
       return false;
@@ -229,7 +211,6 @@
     input.inputMode = 'decimal';
     input.className = 'fare-inline-input';
     input.value = rawPrice;
-    input.setAttribute('aria-label', `Edit fare for ${cell.dataset.rowKey} ${cell.dataset.colKey}`);
 
     let lastAcceptedValue = rawPrice;
     let isCanceling = false;
@@ -257,6 +238,7 @@
         event.preventDefault();
         isCanceling = true;
         cancelEdit(cell);
+        hideGridFeedback();
         return;
       }
 
@@ -352,7 +334,7 @@
       } else {
         setInputValidityUI(cell, input, false, 'Pasted value must be a positive amount (max 2 decimals).');
         showGridFeedback(
-          `Invalid pasted fare for ${cell.dataset.rowKey} (${cell.dataset.colKey}): must be a positive amount with up to 2 decimal places.`,
+          `Invalid Pasted Fare (${cell.dataset.rowKey} - ${cell.dataset.colKey}): Pasted value must be a positive amount with up to 2 decimal places.`,
           'danger'
         );
       }
@@ -411,12 +393,6 @@
     const tables = document.querySelectorAll('.fare-matrix-table');
 
     tables.forEach((table) => {
-      table.querySelectorAll('td.fare-cell-container[data-inline-editable="true"]').forEach((cell) => {
-        if (!cell.hasAttribute('tabindex')) {
-          cell.setAttribute('tabindex', '0');
-        }
-      });
-
       table.addEventListener('click', (event) => {
         const cell = event.target.closest('td.fare-cell-container');
         if (!cell || !table.contains(cell)) return;
@@ -437,30 +413,19 @@
 
           if (status === 'NOT_SOLD') {
             showGridFeedback(
-              `Route ${cell.dataset.rowKey} (${cell.dataset.colKey}) is flagged as NOT_SOLD. Enable product availability before editing its price.`,
+              `Route Not Sold: ${cell.dataset.rowKey} (${cell.dataset.colKey}) is flagged as NOT_SOLD. Enable product availability before editing its price.`,
               'warning'
             );
           } else if (status === 'NA') {
             showGridFeedback(
-              `Route ${cell.dataset.rowKey} (${cell.dataset.colKey}) is N/A (unserved combination) and cannot be priced.`,
-              'secondary'
+              `Route Not Available: ${cell.dataset.rowKey} (${cell.dataset.colKey}) is N/A (unserved combination) and cannot be priced.`,
+              'info'
             );
           }
           return;
         }
 
         openInlineEditor(cell);
-      });
-
-      table.addEventListener('keydown', (event) => {
-        if (event.target.classList.contains('fare-inline-input')) return;
-        const cell = event.target.closest('td.fare-cell-container[data-inline-editable="true"]');
-        if (!cell) return;
-
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openInlineEditor(cell);
-        }
       });
     });
   }
