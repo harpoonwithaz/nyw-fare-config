@@ -17,4 +17,9 @@ public class DashboardController {
         model.addAttribute("isAdmin", user.getRole() == Role.CLIENT_SERVICES);
         return "dashboard/home";
     }
+
+    @GetMapping("usage-guide")
+    public String getUsageGuide() {
+        return "dashboard/usage-guide";
+    }
 }
