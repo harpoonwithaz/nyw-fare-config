@@ -33,7 +33,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a 
+                <a th:href="@{/availability}"
                    class="nav-link text-white"
                    th:classappend="${activePage == 'availability'} ? 'active' : ''"
                    th:attr="aria-current=${activePage == 'availability'} ? 'page' : null">
