@@ -1,34 +1,50 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.model;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
-@Table(name = "service_alerts")
+@Table(name = "service_notices")
 public class ServiceAlert {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tenant_id", nullable = false)
-    private String tenantId;
+    @Column(name = "tenant_code", nullable = false)
+    private String tenantCode;
 
-    @Column(name = "origin_code", nullable = false)
-    private String originCode;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "service_notice_routes", joinColumns = @JoinColumn(name = "notice_id"))
+    @Column(name = "route_key", nullable = false, length = 80)
+    private Set<String> routeKeys = new LinkedHashSet<>();
 
-    @Column(name = "destination_code", nullable = false)
-    private String destinationCode;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger_type", nullable = false, length = 40)
+    private TriggerType triggerType = TriggerType.WEEKENDS;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "product_code", length = 40)
+    private String productCode;
 
     @Column(name = "message_en", nullable = false, length = 500)
     private String messageEn;
@@ -67,8 +83,8 @@ public class ServiceAlert {
     protected ServiceAlert() {
     }
 
-    public ServiceAlert(String tenantId) {
-        this.tenantId = tenantId;
+    public ServiceAlert(String tenantCode) {
+        this.tenantCode = tenantCode;
     }
 
     @PrePersist
@@ -87,16 +103,24 @@ public class ServiceAlert {
         return id;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getTenantCode() {
+        return tenantCode;
     }
 
-    public String getOriginCode() {
-        return originCode;
+    public Set<String> getRouteKeys() {
+        return routeKeys;
     }
 
-    public String getDestinationCode() {
-        return destinationCode;
+    public TriggerType getTriggerType() {
+        return triggerType;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public String getProductCode() {
+        return productCode;
     }
 
     public String getMessageEn() {
@@ -143,12 +167,21 @@ public class ServiceAlert {
         return updatedAt;
     }
 
-    public void setOriginCode(String originCode) {
-        this.originCode = originCode;
+    public void setRouteKeys(Set<String> keys) {
+        this.routeKeys.clear();
+        this.routeKeys.addAll(keys);
     }
 
-    public void setDestinationCode(String destinationCode) {
-        this.destinationCode = destinationCode;
+    public void setTriggerType(TriggerType triggerType) {
+        this.triggerType = triggerType;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public void setProductCode(String productCode) {
+        this.productCode = productCode;
     }
 
     public void setMessageEn(String messageEn) {

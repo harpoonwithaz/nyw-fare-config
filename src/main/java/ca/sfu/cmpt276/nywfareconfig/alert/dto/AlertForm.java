@@ -1,11 +1,19 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.dto;
 
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
 
 public class AlertForm {
 
-    private String originCode;
-    private String destinationCode;
+    private List<String> routeKeys = new ArrayList<>();
+    private TriggerType triggerType = TriggerType.WEEKENDS;
+    private String startDate;
+    private String productCode;
     private String messageEn;
     private String messageEs;
     private String confirmLabelEn;
@@ -14,20 +22,52 @@ public class AlertForm {
     private String dismissLabelEs;
     private AlertStatus status = AlertStatus.DRAFT;
 
-    public String getOriginCode() {
-        return originCode;
+    public static AlertForm from(ServiceAlert alert) {
+        AlertForm form = new AlertForm();
+        form.routeKeys = new ArrayList<>(new TreeSet<>(alert.getRouteKeys()));
+        form.triggerType = alert.getTriggerType();
+        form.startDate = alert.getStartDate() == null ? null : alert.getStartDate().toString();
+        form.productCode = alert.getProductCode();
+        form.messageEn = alert.getMessageEn();
+        form.messageEs = alert.getMessageEs();
+        form.confirmLabelEn = alert.getConfirmLabelEn();
+        form.confirmLabelEs = alert.getConfirmLabelEs();
+        form.dismissLabelEn = alert.getDismissLabelEn();
+        form.dismissLabelEs = alert.getDismissLabelEs();
+        form.status = alert.getStatus();
+        return form;
     }
 
-    public void setOriginCode(String originCode) {
-        this.originCode = originCode;
+    public List<String> getRouteKeys() {
+        return routeKeys;
     }
 
-    public String getDestinationCode() {
-        return destinationCode;
+    public void setRouteKeys(List<String> routeKeys) {
+        this.routeKeys = routeKeys == null ? new ArrayList<>() : routeKeys;
     }
 
-    public void setDestinationCode(String destinationCode) {
-        this.destinationCode = destinationCode;
+    public TriggerType getTriggerType() {
+        return triggerType;
+    }
+
+    public void setTriggerType(TriggerType triggerType) {
+        this.triggerType = triggerType;
+    }
+
+    public String getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(String startDate) {
+        this.startDate = startDate;
+    }
+
+    public String getProductCode() {
+        return productCode;
+    }
+
+    public void setProductCode(String productCode) {
+        this.productCode = productCode;
     }
 
     public String getMessageEn() {

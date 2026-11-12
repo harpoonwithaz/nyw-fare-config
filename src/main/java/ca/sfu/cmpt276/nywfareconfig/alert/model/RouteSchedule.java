@@ -22,7 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "route_schedules", uniqueConstraints = @UniqueConstraint(columnNames = { "tenant_id", "origin_code",
+@Table(name = "route_schedules", uniqueConstraints = @UniqueConstraint(columnNames = { "tenant_code", "origin_code",
         "destination_code" }))
 public class RouteSchedule {
 
@@ -30,8 +30,8 @@ public class RouteSchedule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tenant_id", nullable = false)
-    private String tenantId;
+    @Column(name = "tenant_code", nullable = false)
+    private String tenantCode;
 
     @Column(name = "origin_code", nullable = false)
     private String originCode;
@@ -54,8 +54,8 @@ public class RouteSchedule {
     protected RouteSchedule() {
     }
 
-    public RouteSchedule(String tenantId, String originCode, String destinationCode) {
-        this.tenantId = tenantId;
+    public RouteSchedule(String tenantCode, String originCode, String destinationCode) {
+        this.tenantCode = tenantCode;
         this.originCode = originCode;
         this.destinationCode = destinationCode;
     }
@@ -70,8 +70,8 @@ public class RouteSchedule {
         return id;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getTenantCode() {
+        return tenantCode;
     }
 
     public String getOriginCode() {

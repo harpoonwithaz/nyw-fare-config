@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ServiceAlertRepository extends JpaRepository<ServiceAlert, Long> {
-    List<ServiceAlert> findByTenantId(String tenantId, Sort sort);
+    List<ServiceAlert> findByTenantCode(String tenantCode, Sort sort);
 
-    Optional<ServiceAlert> findByIdAndTenantId(Long id, String tenantId);
+    Optional<ServiceAlert> findByIdAndTenantCode(Long id, String tenantCode);
 }

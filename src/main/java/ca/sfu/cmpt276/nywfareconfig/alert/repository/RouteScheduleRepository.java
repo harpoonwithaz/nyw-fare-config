@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RouteScheduleRepository extends JpaRepository<RouteSchedule, Long> {
-    List<RouteSchedule> findByTenantId(String tenantId);
+    List<RouteSchedule> findByTenantCode(String tenantCode);
 
-    Optional<RouteSchedule> findByTenantIdAndOriginCodeAndDestinationCode(String tenantId, String originCode,
+    Optional<RouteSchedule> findByTenantCodeAndOriginCodeAndDestinationCode(String tenantCode, String originCode,
             String destinationCode);
 }
