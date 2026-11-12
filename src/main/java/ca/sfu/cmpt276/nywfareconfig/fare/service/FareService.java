@@ -20,7 +20,7 @@ public class FareService {
 
     public Optional<FareRule> getFareRule(String tenantCode, String origin, String dest, String product) {
         // TODO: Call GET /functions/product-get
-        return null;
+        return Optional.empty();
     }
 
     /**

@@ -26,7 +26,7 @@ public class FareRule {
 
     // Resolved Rate & Sellability State
     private BigDecimal price;           // Effective price (staged draft if present, else Caracal baseline)
-    private FareStatus status;              // "VALUE", "NOT_SOLD", "CONDITIONAL", or "NA"
+    private FareStatus status;          // ACTIVE, NOT_SOLD, or NA
     private boolean hasPendingDraft;    // True if overlaid by an uncommitted FareDraft
     public FareRule(String tenantCode, GridMode gridMode, String originDimensionKey, String destDimensionKey,
             String originIdentifier, String destIdentifier, String productCode, String priceRuleSetName,

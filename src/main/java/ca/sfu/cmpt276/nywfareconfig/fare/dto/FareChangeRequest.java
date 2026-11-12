@@ -33,7 +33,7 @@ public class FareChangeRequest {
     @Digits(integer = 6, fraction = 2, message = "Fare must have at most 2 decimal places.")
     private BigDecimal newPrice;
 
-    @NotNull (message = "Target status must be VALUE or NOT_SOLD.")
+    @NotNull (message = "Target status is required.")
     private FareStatus targetStatus;
 
     @NotNull(message = "Invalid action type.")
@@ -76,6 +76,11 @@ public class FareChangeRequest {
             return true;
         }
         return newPrice != null;
+    }
+
+    @AssertTrue(message = "Status must be editable.")
+    public boolean isEditable() {
+        return this.targetStatus != FareStatus.NA;
     }
 
     public String getTenantCode() {

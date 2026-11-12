@@ -143,11 +143,11 @@ public class FareDraft {
         this.actorEmail = actorEmail;
     }
 
-    public GridMode getMatrixMode() {
+    public GridMode getGridMode() {
         return gridMode;
     }
 
-    public void setMatrixMode(GridMode gridMode) {
+    public void setGridMode(GridMode gridMode) {
         this.gridMode = gridMode;
     }
 
