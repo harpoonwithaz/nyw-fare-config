@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.fare.model;
+package ca.sfu.cmpt276.nywfareconfig.tenant.model;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;

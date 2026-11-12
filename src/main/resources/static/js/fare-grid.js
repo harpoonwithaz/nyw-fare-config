@@ -65,6 +65,10 @@
     };
   }
 
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { validateFareInput };
+  }
+
   /**
    * Hides all client-side grid feedback cards
    */
@@ -429,6 +433,8 @@
       });
     });
   }
+
+  if (typeof document === 'undefined') return;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initFareGridInlineEditing);

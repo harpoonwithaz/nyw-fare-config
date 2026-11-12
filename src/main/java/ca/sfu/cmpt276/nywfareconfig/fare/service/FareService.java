@@ -8,36 +8,12 @@ import org.springframework.stereotype.Service;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
 @Service
 public class FareService {
 
     public FareService() {
-    }
-
-    /**
-     * Returns the list of demo tenants supported by the platform[cite: 2, 3].
-     */
-    public List<Tenant> getAvailableTenants() {
-        List<Tenant> tenantList = new ArrayList<>();
-        tenantList.add(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
-        tenantList.add(new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true));
-        return tenantList;
-    }
-
-    /**
-     * Resolves a Tenant instance by its natural tenant code.
-     */
-    public Tenant getTenantByCode(String tenantCode) {
-        if (tenantCode == null) {
-            return null;
-        }
-        return switch (tenantCode.toUpperCase()) {
-            case "NYW_SANDBOX", "NYW" -> new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
-            case "METRA" -> new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true);
-            default -> null;
-        };
     }
 
     /**

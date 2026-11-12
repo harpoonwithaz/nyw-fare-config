@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 
@@ -6,312 +7,284 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuration Review - NYW Fare Config</title>
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
-          rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head>
 
 <body class="d-flex vh-100 overflow-hidden">
 
-    <!-- Existing Sidebar -->
+    <!-- Existing sidebar -->
     <div th:replace="~{fragments/sidebar :: sidebar-nav('publish')}"></div>
 
-    <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <div class="container-fluid">
+    <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-width: 0;">
 
-            <!-- Page Heading -->
-            <div class="mb-4">
-                <h1 class="h3">Configuration Review</h1>
-                <p class="text-muted">
-                    Compare published baseline configurations with staged changes.
-                </p>
-            </div>
+        <!-- Shared tenant navbar from main -->
+        <div th:replace="~{fragments/navbar :: top-navbar}"></div>
 
-            <!-- Configuration Details -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <h5>Configuration Details</h5>
-                    <p class="mb-0">
-                        <strong>Tenant:</strong>
-                        <span th:text="${tenantCode}">NYW_SANDBOX</span>
-                    </p>
-                </div>
-            </div>
+        <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
+            <div class="container-fluid">
 
-            <!-- Summary Cards -->
-            <div class="row g-3 mb-4">
-
-                <div class="col-md-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="text-muted">Total Items</h6>
-
-                            <!-- STORY 5.1: Summary counter identifier -->
-                            <h2 id="totalItemsCount"
-                                class="mb-0"
-                                th:text="${totalCount}">0</h2>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="text-muted">Changed</h6>
-
-                            <!-- STORY 5.1: Changed counter identifier -->
-                            <h2 id="changedItemsCount"
-                                class="text-warning mb-0"
-                                th:text="${changedCount}">0</h2>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="text-muted">Unchanged</h6>
-
-                            <!-- STORY 5.1: Unchanged counter identifier -->
-                            <h2 id="unchangedItemsCount"
-                                class="text-success mb-0"
-                                th:text="${unchangedCount}">0</h2>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Shared Filter -->
-            <div class="form-check mb-4">
-                <input class="form-check-input"
-                       type="checkbox"
-                       id="showChangedOnly">
-
-                <label class="form-check-label" for="showChangedOnly">
-                    Show Changed Only
-                </label>
-            </div>
-
-            <!-- ====================================================== -->
-            <!-- STORY 5.1: Fare Configuration Comparison               -->
-            <!-- Fare data is now retrieved from the Spring Boot API.  -->
-            <!-- ====================================================== -->
-
-            <div class="card shadow-sm mb-4">
-
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Fare Changes</h5>
-                </div>
-
-                <div class="card-body">
-                    <div class="table-responsive">
-
-                        <table class="table table-bordered table-hover align-middle">
-
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Ticket Type</th>
-                                    <th>Published Baseline</th>
-                                    <th>Staged Draft</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-
-                            <!-- STORY 5.1: Dynamically populated by publishing-review.js -->
-                            <tbody id="fareChangesTableBody">
-                                <tr>
-                                    <td colspan="4"
-                                        class="text-center text-muted py-3">
-                                        Loading fare configurations...
-                                    </td>
-                                </tr>
-                            </tbody>
-
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- END STORY 5.1: Fare Configuration Comparison -->
-
-            <!-- Schedule & Availability Changes -->
-            <!-- Still rendered by Thymeleaf using StagingService data -->
-            <div class="card shadow-sm mb-4">
-
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Schedule &amp; Availability Changes</h5>
-                </div>
-
-                <div class="card-body">
-                    <div class="table-responsive">
-
-                        <table class="table table-bordered table-hover align-middle">
-
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Setting</th>
-                                    <th>Published Baseline</th>
-                                    <th>Staged Draft</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                <tr th:each="schedule : ${scheduleChanges}"
-                                    th:attr="data-changed=${schedule.isChanged()}">
-
-                                    <td th:text="${schedule.settingName()}">
-                                        Weekend Service
-                                    </td>
-
-                                    <td th:text="${schedule.baselineValue()}">
-                                        Disabled
-                                    </td>
-
-                                    <td th:text="${schedule.stagedValue()}"
-                                        th:classappend="${schedule.isChanged()} ? 'table-warning' : ''">
-                                        Enabled
-                                    </td>
-
-                                    <td>
-                                        <span class="badge"
-                                              th:classappend="${schedule.isChanged()} ? 'bg-warning text-dark' : 'bg-success'"
-                                              th:text="${schedule.isChanged()} ? 'Changed' : 'Unchanged'">
-                                            Changed
-                                        </span>
-                                    </td>
-
-                                </tr>
-                            </tbody>
-
-                        </table>
-                    </div>
-
-                    <p class="text-muted text-center"
-                       th:if="${#lists.isEmpty(scheduleChanges)}">
-                        No schedule configurations available for review.
-                    </p>
-
-                </div>
-            </div>
-
-            <!-- Operator Review Workflow -->
-            <div class="card shadow-sm mb-4">
-
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">
-                        <i class="bi bi-clipboard-check me-2"></i>
-                        Operator Review Workflow
-                    </h5>
-                </div>
-
-                <div class="card-body">
-
+                <div class="mb-4">
+                    <h1 class="h3">Configuration Review</h1>
                     <p class="text-muted">
-                        Review and verify all staged configuration changes
-                        before proceeding with publication.
+                        Compare published baseline configurations with staged changes.
                     </p>
+                </div>
 
-                    <!-- Review Steps -->
-                    <ol class="list-group list-group-numbered mb-4">
+                <!-- Configuration Details -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>Configuration Details</h5>
+                        <p class="mb-0">
+                            <strong>Tenant:</strong>
 
-                        <li class="list-group-item">
-                            <strong>Review Pending Changes</strong>
-                            <div class="text-muted small">
-                                Examine all proposed fare and schedule updates.
+                            <th:block th:if="${tenantContext.selectedTenant != null}">
+                                <span class="fw-bold text-dark"
+                                      th:text="${tenantContext.selectedTenant.displayName}">
+                                </span>
+                            </th:block>
+
+                            <span th:if="${tenantContext.selectedTenant == null}"
+                                  class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                None Selected
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- STORY 5.1: Summary Counters -->
+                <div class="row g-3 mb-4">
+
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted">Total Items</h6>
+                                <h2 id="totalItemsCount"
+                                    class="mb-0"
+                                    th:text="${totalCount}">0</h2>
                             </div>
-                        </li>
+                        </div>
+                    </div>
 
-                        <li class="list-group-item">
-                            <strong>Compare Against Published Baseline</strong>
-                            <div class="text-muted small">
-                                Verify the differences between currently published
-                                values and staged draft values.
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted">Changed</h6>
+                                <h2 id="changedItemsCount"
+                                    class="text-warning mb-0"
+                                    th:text="${changedCount}">0</h2>
                             </div>
-                        </li>
+                        </div>
+                    </div>
 
-                        <li class="list-group-item">
-                            <strong>Verify Configuration Accuracy</strong>
-                            <div class="text-muted small">
-                                Confirm that the proposed changes are correct
-                                and ready for publication.
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted">Unchanged</h6>
+                                <h2 id="unchangedItemsCount"
+                                    class="text-success mb-0"
+                                    th:text="${unchangedCount}">0</h2>
                             </div>
-                        </li>
-
-                        <li class="list-group-item">
-                            <strong>Publish Verified Configuration</strong>
-                            <div class="text-muted small">
-                                Proceed with publication only after
-                                verification is complete.
-                            </div>
-                        </li>
-
-                    </ol>
-
-                    <!-- Prototype Publishing Controls -->
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-
-                        <span class="badge bg-secondary">
-                            Prototype - Publication Unavailable
-                        </span>
-
-                        <button type="button"
-                                class="btn btn-primary"
-                                disabled>
-                            <i class="bi bi-cloud-upload me-2"></i>
-                            Publish Configuration
-                        </button>
-
+                        </div>
                     </div>
 
                 </div>
+
+                <!-- Shared Changed-Only Filter -->
+                <div class="form-check mb-4">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="showChangedOnly">
+
+                    <label class="form-check-label" for="showChangedOnly">
+                        Show Changed Only
+                    </label>
+                </div>
+
+                <!-- STORY 5.1: API-Powered Fare Configuration Review -->
+                <div class="card shadow-sm mb-4">
+
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Fare Changes</h5>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="table-responsive">
+
+                            <table class="table table-bordered table-hover align-middle">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tenant</th>
+                                        <th>Mode</th>
+                                        <th>Origin / Context</th>
+                                        <th>Destination / Zone</th>
+                                        <th>Product / Tier</th>
+                                        <th>Published Baseline</th>
+                                        <th>Staged Draft</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <!-- Populated by publishing-review.js -->
+                                <tbody id="fareChangesTableBody">
+                                    <tr>
+                                        <td colspan="8"
+                                            class="text-center text-muted py-3">
+                                            Loading fare configurations...
+                                        </td>
+                                    </tr>
+                                </tbody>
+
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedule & Availability Changes -->
+                <div class="card shadow-sm mb-4">
+
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            Schedule &amp; Availability Changes
+                        </h5>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="table-responsive">
+
+                            <table class="table table-bordered table-hover align-middle">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Setting</th>
+                                        <th>Published Baseline</th>
+                                        <th>Staged Draft</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    <tr th:each="schedule : ${scheduleChanges}"
+                                        th:attr="data-changed=${schedule.isChanged()}">
+
+                                        <td th:text="${schedule.settingName()}">
+                                            Weekend Service
+                                        </td>
+
+                                        <td th:text="${schedule.baselineValue()}">
+                                            Disabled
+                                        </td>
+
+                                        <td th:text="${schedule.stagedValue()}"
+                                            th:classappend="${schedule.isChanged()} ? 'table-warning' : ''">
+                                            Enabled
+                                        </td>
+
+                                        <td>
+                                            <span class="badge"
+                                                  th:classappend="${schedule.isChanged()} ? 'bg-warning text-dark' : 'bg-success'"
+                                                  th:text="${schedule.isChanged()} ? 'Changed' : 'Unchanged'">
+                                                Changed
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+
+                            </table>
+                        </div>
+
+                        <p class="text-muted text-center"
+                           th:if="${#lists.isEmpty(scheduleChanges)}">
+                            No schedule configurations available for review.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Operator Review Workflow -->
+                <div class="card shadow-sm mb-4">
+
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clipboard-check me-2"></i>
+                            Operator Review Workflow
+                        </h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <p class="text-muted">
+                            Review and verify all staged configuration changes
+                            before proceeding with publication.
+                        </p>
+
+                        <ol class="list-group list-group-numbered mb-4">
+
+                            <li class="list-group-item">
+                                <strong>Review Pending Changes</strong>
+                                <div class="text-muted small">
+                                    Examine all proposed fare and schedule updates.
+                                </div>
+                            </li>
+
+                            <li class="list-group-item">
+                                <strong>Compare Against Published Baseline</strong>
+                                <div class="text-muted small">
+                                    Verify the differences between currently published
+                                    values and staged draft values.
+                                </div>
+                            </li>
+
+                            <li class="list-group-item">
+                                <strong>Verify Configuration Accuracy</strong>
+                                <div class="text-muted small">
+                                    Confirm that the proposed changes are correct
+                                    and ready for publication.
+                                </div>
+                            </li>
+
+                            <li class="list-group-item">
+                                <strong>Publish Verified Configuration</strong>
+                                <div class="text-muted small">
+                                    Proceed with publication only after
+                                    verification is complete.
+                                </div>
+                            </li>
+
+                        </ol>
+
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
+                            <span class="badge bg-secondary">
+                                Prototype - Publication Unavailable
+                            </span>
+
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    disabled>
+                                <i class="bi bi-cloud-upload me-2"></i>
+                                Publish Configuration
+                            </button>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prototype Notice -->
+                <p class="text-muted small">
+                    Prototype only: all fare and schedule values are illustrative.
+                    No actual configuration changes or publishing operations are performed.
+                </p>
+
             </div>
-
-            <!-- Prototype Notice -->
-            <p class="text-muted small">
-                Prototype only: all fare and schedule values are illustrative.
-                No actual configuration changes or publishing operations are performed.
-            </p>
-
-        </div>
-    </main>
+        </main>
+    </div>
 
     <!-- Bootstrap JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Existing changed-only filter for fare and schedule rows -->
-    <script>
-        const showChangedOnly = document.getElementById("showChangedOnly");
-
-        showChangedOnly.addEventListener("change", function () {
-
-            const rows = document.querySelectorAll("tr[data-changed]");
-
-            rows.forEach(function (row) {
-
-                const isChanged = row.dataset.changed === "true";
-
-                row.style.display =
-                    showChangedOnly.checked && !isChanged
-                        ? "none"
-                        : "";
-            });
-        });
-    </script>
-
-    <!-- STORY 5.1: Fetch and render fare comparisons from Spring Boot -->
+    <!-- STORY 5.1: Loads fare changes and handles the shared filter -->
     <script th:src="@{/js/publishing-review.js}"></script>
 
 </body>
 </html>
-
-
-
-
-
-
