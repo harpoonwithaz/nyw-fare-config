@@ -2,50 +2,87 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>NY Waterway - Availability &amp; Lifecycle Management</title>
-    <!-- Bootstrap 5 CSS CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal & Product Availability | NYW Fare Config</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/style.css}">
 </head>
 <body class="bg-light">
 
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Optional Sidebar Fragment Integration -->
-            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse px-0 min-vh-100"
-                 th:insert="~{fragments/sidebar :: sidebar-nav('availability')}">
-            </nav>
+<div class="d-flex">
+    <!-- Sidebar -->
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
 
-            <!-- Main Content Area -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="bi bi-calendar-check me-2"></i>Ticket Availability &amp; Route Rules</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#groupEditModal">
-                            <i class="bi bi-collection me-1"></i> Bulk Route Group Edit
-                        </button>
-                        <button type="button" class="btn btn-sm btn-success" id="saveChangesBtn">
-                            <i class="bi bi-save me-1"></i> Save Changes
-                        </button>
-                    </div>
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <!-- Top Header & Site Navigation -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div>
+                <h2 class="h3 fw-bold mb-1">Terminal Ticket Availability</h2>
+                <p class="text-muted mb-0">Configure active ticket offerings and temporal sales conditions for terminal sites.</p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <!-- Terminal Selector -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2" 
+                            type="button" id="terminalSelectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-geo-alt-fill text-primary"></i>
+                        <span th:text="${siteCode == 'MNHTN' ? 'Manhattan Terminal' : (siteCode == 'EDGEWTR' ? 'Edgewater Terminal' : (siteCode == 'WALLST' ? 'Wall Street Terminal' : 'Battery Park Terminal'))}">Manhattan Terminal</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="terminalSelectDropdown">
+                        <li th:each="t : ${terminals}">
+                            <a class="dropdown-item d-flex align-items-center gap-2" 
+                               th:classappend="${t.code == siteCode} ? 'active' : ''"
+                               th:href="@{/availability(site=${t.code})}">
+                                <i class="bi bi-building"></i>
+                                <span th:text="${t.name}">Terminal Name</span>
+                            </a>
+                        </li>
+                    </ul>
                 </div>
 
-                <!-- Include the Availability Table Fragment -->
-                <div th:replace="~{availability/fragments/availability-table :: routeTable}"></div>
-            </main>
+                <!-- Global Action Buttons -->
+                <button id="btnOpenConditionModal" class="btn btn-outline-primary d-flex align-items-center gap-2" 
+                        data-bs-toggle="modal" data-bs-target="#conditionBuilderModal">
+                    <i class="bi bi-calendar-plus"></i>
+                    <span>Add Temporal Condition</span>
+                </button>
+
+                <button id="btnSaveAvailabilityDrafts" class="btn btn-success d-flex align-items-center gap-2 disabled" disabled>
+                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                    <span>Save Availability Drafts</span>
+                </button>
+            </div>
         </div>
-    </div>
 
-    <!-- Bulk Edit Modal Fragment -->
-    <div th:replace="~{availability/fragments/group-edit-modal :: groupEditModal}"></div>
+        <!-- Notification Banner -->
+        <div id="availabilityAlert" class="alert alert-info alert-dismissible fade show d-none mb-4 shadow-sm" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <span id="availabilityAlertText">Modifications are held in client staging buffer. Click "Save Availability Drafts" to push to staging table.</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
 
-    <!-- Bootstrap 5 JS Bundle CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Simple interactive mock script for frontend prototype feedback
-        document.getElementById('saveChangesBtn').addEventListener('click', function() {
-            alert('Availability and pricing rules staged successfully!');
-        });
-    </script>
+        <!-- Availability Table Card -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-secondary">
+                    <i class="bi bi-card-checklist me-2"></i>Product Offerings & Rules for Site: 
+                    <strong class="text-dark" th:text="${siteCode}">MNHTN</strong>
+                </span>
+                <span class="badge bg-light text-dark border">Epic 3 Domain Rule Active</span>
+            </div>
+            <div class="card-body p-0">
+                <div th:replace="~{availability/fragments/availability-table :: availabilityTable}"></div>
+            </div>
+        </div>
+
+        <!-- Modal Include -->
+        <div th:replace="~{availability/fragments/group-edit-modal :: conditionBuilderModal}"></div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/availability.js}"></script>
 </body>
 </html>
