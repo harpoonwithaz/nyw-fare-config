@@ -84,11 +84,9 @@
             <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="userMenuButton">
                 <li>
                     <h6 class="dropdown-header text-secondary small text-uppercase">
-                        Role: <span class="text-white" th:text="${currentUser.role.label}"></span>
+                        <span class="text-white" th:text="${currentUser.role.label}"></span>
                     </h6>
                 </li>
-                <li><a class="dropdown-item" >Account Profile</a></li>
-                <li><a class="dropdown-item" >Audit Log</a></li>
                 <li><hr class="dropdown-divider border-secondary"></li>
                 <li>
                     <!-- Spring Security CSRF-compliant logout POST -->

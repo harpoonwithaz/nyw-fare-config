@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<body>
+
+  <!-- Global Top Context Navbar Fragment -->
+  <header th:fragment="top-navbar"
+    class="bg-white border-bottom shadow-sm px-4 py-2 d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+    <!-- Left: Global Tenant Switcher Form (POST /context/tenant) -->
+    <form th:action="@{/context/tenant}" method="post" class="d-flex align-items-center gap-2 m-0">
+      <input type="hidden" name="returnUrl" th:value="${currentUri}" />
+
+      <label for="globalTenantSelect"
+        class="form-label fw-semibold small text-uppercase text-secondary mb-0 text-nowrap">
+        <i class="bi bi-building me-1"></i> Tenant Environment
+      </label>
+
+      <select id="globalTenantSelect" name="tenant" class="form-select form-select-sm" style="min-width: 200px;"
+        onchange="this.form.submit()">
+        <option value="" th:selected="${tenantContext.selectedTenant == null}">Select Tenant</option>
+        <option th:each="tenant : ${availableTenants}" th:value="${tenant.code}" th:text="${tenant.displayName}"
+          th:selected="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.code == tenant.code}">
+        </option>
+      </select>
+    </form>
+
+    <!-- Right: Active Workspace & Mode Indicator -->
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-secondary small fw-semibold text-uppercase">Active Environment:</span>
+
+      <th:block th:if="${tenantContext.selectedTenant != null}">
+        <span class="fw-bold text-dark" th:text="${tenantContext.selectedTenant.displayName}"></span>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle"
+          th:text="${tenantContext.selectedTenant.gridMode.name() + ' MODE'}">
+        </span>
+      </th:block>
+
+      <span th:if="${tenantContext.selectedTenant == null}"
+        class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+        None Selected
+      </span>
+    </div>
+
+
+
+  </header>
+
+</body>
+
+</html>
