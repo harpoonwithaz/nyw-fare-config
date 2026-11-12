@@ -55,19 +55,19 @@
                 data-value=${cell.price}, data-original-price=${cell.price}">
 
               <!-- Active Rate -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell.Status).ACTIVE}"
+              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).ACTIVE}"
                 class="fw-bold font-monospace text-dark fare-cell-value" th:text="${cell.formattedPrice}">
                 $0.00
               </span>
 
               <!-- Route Not Sold -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell.Status).NOT_SOLD}"
+              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).NOT_SOLD}"
                 class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
                 NOT_SOLD
               </span>
 
               <!-- Unserved / Inactive Combination -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell.Status).NA}"
+              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).NA}"
                 class="badge bg-light text-muted border px-2 py-1">
                 N/A
               </span>

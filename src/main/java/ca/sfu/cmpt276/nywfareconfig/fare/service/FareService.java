@@ -5,9 +5,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.*;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
 @Service
@@ -77,11 +77,11 @@ public class FareService {
             for (String prod : colHeaders) {
                 // NYW discontinued Senior tickets across all terminals -> NOT_SOLD[cite: 3, 10]
                 if ("Senior 65+".equals(prod)) {
-                    rowCells.add(new FareCell(FareCell.Status.NOT_SOLD, dest, prod));
+                    rowCells.add(new FareCell(FareStatus.NOT_SOLD, dest, prod));
                 } 
                 // Pier 11 is not directly served from Edgewater -> NA badge[cite: 3, 5]
                 else if ("EDGEWTR".equals(normalizedOrigin) && "Pier 11 / Wall St".equals(dest)) {
-                    rowCells.add(new FareCell(FareCell.Status.NA, dest, prod));
+                    rowCells.add(new FareCell(FareStatus.NA, dest, prod));
                 } 
                 // Standard active pricing[cite: 3, 5]
                 else {
@@ -89,7 +89,7 @@ public class FareService {
                     rowCells.add(new FareCell(
                         price,
                         String.format("$%.2f", price),
-                        FareCell.Status.ACTIVE,
+                        FareStatus.ACTIVE,
                         true,
                         dest,
                         prod
@@ -153,7 +153,7 @@ public class FareService {
                 rowCells.add(new FareCell(
                     price,
                     String.format("$%.2f", price),
-                    FareCell.Status.ACTIVE,
+                    FareStatus.ACTIVE,
                     true,
                     rowHeaders.get(r),
                     colHeaders.get(c)
