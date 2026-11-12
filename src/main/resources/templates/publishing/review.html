@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 
@@ -50,7 +49,11 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h6 class="text-muted">Total Items</h6>
-                            <h2 class="mb-0" th:text="${totalCount}">0</h2>
+
+                            <!-- STORY 5.1: Summary counter identifier -->
+                            <h2 id="totalItemsCount"
+                                class="mb-0"
+                                th:text="${totalCount}">0</h2>
                         </div>
                     </div>
                 </div>
@@ -59,7 +62,10 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h6 class="text-muted">Changed</h6>
-                            <h2 class="text-warning mb-0"
+
+                            <!-- STORY 5.1: Changed counter identifier -->
+                            <h2 id="changedItemsCount"
+                                class="text-warning mb-0"
                                 th:text="${changedCount}">0</h2>
                         </div>
                     </div>
@@ -69,7 +75,10 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h6 class="text-muted">Unchanged</h6>
-                            <h2 class="text-success mb-0"
+
+                            <!-- STORY 5.1: Unchanged counter identifier -->
+                            <h2 id="unchangedItemsCount"
+                                class="text-success mb-0"
                                 th:text="${unchangedCount}">0</h2>
                         </div>
                     </div>
@@ -88,7 +97,11 @@
                 </label>
             </div>
 
-            <!-- Fare Changes -->
+            <!-- ====================================================== -->
+            <!-- STORY 5.1: Fare Configuration Comparison               -->
+            <!-- Fare data is now retrieved from the Spring Boot API.  -->
+            <!-- ====================================================== -->
+
             <div class="card shadow-sm mb-4">
 
                 <div class="card-header bg-white">
@@ -109,45 +122,25 @@
                                 </tr>
                             </thead>
 
-                            <tbody>
-                                <tr th:each="fare : ${pendingChanges}"
-                                    th:attr="data-changed=${fare.isChanged()}">
-
-                                    <td th:text="${fare.ticketType()}">
-                                        Adult One-Way
+                            <!-- STORY 5.1: Dynamically populated by publishing-review.js -->
+                            <tbody id="fareChangesTableBody">
+                                <tr>
+                                    <td colspan="4"
+                                        class="text-center text-muted py-3">
+                                        Loading fare configurations...
                                     </td>
-
-                                    <td th:text="${#numbers.formatDecimal(fare.publishedPrice(), 1, 2)}">
-                                        9.00
-                                    </td>
-
-                                    <td th:text="${#numbers.formatDecimal(fare.draftPrice(), 1, 2)}"
-                                        th:classappend="${fare.isChanged()} ? 'table-warning' : ''">
-                                        10.00
-                                    </td>
-
-                                    <td>
-                                        <span class="badge"
-                                              th:classappend="${fare.isChanged()} ? 'bg-warning text-dark' : 'bg-success'"
-                                              th:text="${fare.isChanged()} ? 'Changed' : 'Unchanged'">
-                                            Changed
-                                        </span>
-                                    </td>
-
                                 </tr>
                             </tbody>
 
                         </table>
                     </div>
-
-                    <p class="text-muted text-center"
-                       th:if="${#lists.isEmpty(pendingChanges)}">
-                        No fare configurations available for review.
-                    </p>
                 </div>
             </div>
 
+            <!-- END STORY 5.1: Fare Configuration Comparison -->
+
             <!-- Schedule & Availability Changes -->
+            <!-- Still rendered by Thymeleaf using StagingService data -->
             <div class="card shadow-sm mb-4">
 
                 <div class="card-header bg-white">
@@ -203,6 +196,7 @@
                        th:if="${#lists.isEmpty(scheduleChanges)}">
                         No schedule configurations available for review.
                     </p>
+
                 </div>
             </div>
 
@@ -290,7 +284,7 @@
     <!-- Bootstrap JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Filter Both Tables -->
+    <!-- Existing changed-only filter for fare and schedule rows -->
     <script>
         const showChangedOnly = document.getElementById("showChangedOnly");
 
@@ -310,8 +304,12 @@
         });
     </script>
 
+    <!-- STORY 5.1: Fetch and render fare comparisons from Spring Boot -->
+    <script th:src="@{/js/publishing-review.js}"></script>
+
 </body>
 </html>
+
 
 
 
