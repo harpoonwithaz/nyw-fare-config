@@ -41,6 +41,6 @@ public class AlertController {
         model.addAttribute("search", search);
         model.addAttribute("status", status);
         model.addAttribute("route", route);
-        return "alerts/index";
+        return "alerts/alerts";
     }
 }
