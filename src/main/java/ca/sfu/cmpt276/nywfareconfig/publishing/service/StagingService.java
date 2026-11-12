@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ReviewView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
 
@@ -42,6 +43,11 @@ public class StagingService {
             )
         );
     }
+
+    // Staging method invoked by Epic 3 AvailabilityService
+    public void stageAvailabilityChange(String tenantCode, AvailabilityRule rule) {
+        System.out.println("Staging availability toggle for tenant " + tenantCode 
+            + ": Product [" + rule.getProductCode() + "] at Site [" + rule.getSiteCode() 
+            + "] -> Available: " + rule.isAvailable());
+    }
 }
-
-
