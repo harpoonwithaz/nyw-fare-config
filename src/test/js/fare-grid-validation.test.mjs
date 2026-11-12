@@ -1,21 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fareGrid from '../../main/resources/static/js/fare-grid.js';
 
-// Validation logic matching fare-grid.js
-const CURRENCY_REGEX = /^\d+(\.\d{1,2})?$/;
-const MAX_FARE_AMOUNT = 9999.99;
-
-function validateFareInput(rawString) {
-  const trimmed = String(rawString ?? '').trim();
-  if (trimmed === '') return { valid: false, reason: 'Fare cannot be blank.' };
-  if (!CURRENCY_REGEX.test(trimmed)) return { valid: false, reason: 'Invalid format.' };
-
-  const num = Number(trimmed);
-  if (!Number.isFinite(num) || num < 0) return { valid: false, reason: 'Must be positive.' };
-  if (num > MAX_FARE_AMOUNT) return { valid: false, reason: 'Exceeds maximum fare.' };
-
-  return { valid: true, normalized: num.toFixed(2) };
-}
+const { validateFareInput } = fareGrid;
 
 describe('Story 2.2 Keystroke & Currency Validation Rules', () => {
   it('accepts standard positive currency values', () => {
