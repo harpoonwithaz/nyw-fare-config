@@ -116,7 +116,7 @@ class TenantContextControllerTest {
         "/fares",
         "/fares/grid",
         "/availability",
-        "/alerts",
+        "/fares/alerts",
         "/review",
         "/publishing",
         "/history",
