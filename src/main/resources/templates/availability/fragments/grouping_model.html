@@ -1,43 +1,121 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-    <div th:fragment="groupEditModal" class="modal fade" id="groupEditModal" tabindex="-1" aria-labelledby="groupEditModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="groupEditModalLabel"><i class="bi bi-collection me-2"></i>Bulk Route Group Edit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Select Route Group</label>
-                            <select class="form-select">
-                                <option>All Manhattan Terminals</option>
-                                <option>New Jersey Commuter Lines</option>
-                                <option>Weekend-Only Services</option>
-                            </select>
+
+<div th:fragment="conditionBuilderModal" 
+     class="modal fade" 
+     id="conditionBuilderModal" 
+     tabindex="-1" 
+     aria-labelledby="conditionBuilderModalLabel" 
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <!-- Modal Header -->
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="conditionBuilderModalLabel">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Temporal Condition & Rule Builder</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body p-4">
+                <form id="conditionBuilderForm">
+                    <!-- Hidden Target Fields -->
+                    <input type="hidden" id="modalProductCode" name="productCode" value="ADULT">
+                    <input type="hidden" id="modalSiteCode" name="siteCode" th:value="${siteCode}">
+
+                    <!-- Selected Target Badge -->
+                    <div class="mb-4 p-3 bg-light rounded border d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted small d-block">Target Configuration</span>
+                            <strong class="text-dark fs-6" id="modalTargetLabel">Product: ADULT | Site: MNHTN</strong>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Apply Price Multiplier / Adjustment</label>
-                            <input type="text" class="form-control" placeholder="e.g., +$1.00 or 1.1x">
+                        <span class="badge bg-primary-subtle text-primary border">Story 3.3 Rule Engine</span>
+                    </div>
+
+                    <!-- Condition Type Selector -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Condition Type</label>
+                        <div class="btn-group w-100" role="group" aria-label="Condition Type Selector">
+                            <input type="radio" class="btn-check" name="conditionType" id="typeRecurring" value="RECURRING_WEEKLY" checked>
+                            <label class="btn btn-outline-primary" for="typeRecurring">
+                                <i class="bi bi-arrow-repeat me-1"></i>Recurring Weekly Window
+                            </label>
+
+                            <input type="radio" class="btn-check" name="conditionType" id="typePromo" value="TEMPORARY_PROMO">
+                            <label class="btn btn-outline-primary" for="typePromo">
+                                <i class="bi bi-calendar-range me-1"></i>Temporary Date-Range Promo
+                            </label>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Bulk Availability Status</label>
-                            <select class="form-select">
-                                <option>No Change</option>
-                                <option value="true">Enable All (Yes)</option>
-                                <option value="false">Disable All (No)</option>
-                            </select>
+                    </div>
+
+                    <!-- Section 1: Days of Week Multi-select (Recurring) -->
+                    <div id="sectionDaysOfWeek" class="mb-4">
+                        <label class="form-label fw-bold">Active Days of Week</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-1" value="1" checked>
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-1">Mon</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-2" value="2" checked>
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-2">Tue</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-3" value="3" checked>
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-3">Wed</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-4" value="4" checked>
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-4">Thu</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-5" value="5" checked>
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-5">Fri</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-6" value="6">
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-6">Sat</label>
+
+                            <input type="checkbox" class="btn-check day-checkbox" id="day-7" value="7">
+                            <label class="btn btn-outline-secondary btn-sm px-3" for="day-7">Sun</label>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary btn-sm">Apply Group Changes</button>
-                </div>
+                        <div class="form-text">Uncheck days on which this ticket offering should be automatically disabled.</div>
+                    </div>
+
+                    <!-- Section 2: Time Range Inputs (Recurring) -->
+                    <div id="sectionTimeRange" class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="inputStartTime" class="form-label fw-bold">Daily Start Time</label>
+                            <input type="time" class="form-control" id="inputStartTime" value="06:00">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="inputEndTime" class="form-label fw-bold">Daily End Time</label>
+                            <input type="time" class="form-control" id="inputEndTime" value="22:00">
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Date Range Inputs (Temporary Promo) -->
+                    <div id="sectionDateRange" class="row g-3 mb-4 d-none">
+                        <div class="col-md-6">
+                            <label for="inputStartDate" class="form-label fw-bold">Effective Start Date</label>
+                            <input type="date" class="form-control" id="inputStartDate">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="inputEndDate" class="form-label fw-bold">Effective End Date</label>
+                            <input type="date" class="form-control" id="inputEndDate">
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btnApplyCondition" class="btn btn-primary d-flex align-items-center gap-1">
+                    <i class="bi bi-check-lg"></i>
+                    <span>Apply Temporal Rule to Staging</span>
+                </button>
             </div>
         </div>
     </div>
+</div>
+
 </body>
 </html>
