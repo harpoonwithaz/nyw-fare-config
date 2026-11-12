@@ -22,7 +22,7 @@ public class TenantContextController {
     private static final List<String> ALLOWED_PATH_PREFIXES = List.of(
             "/fares",
             "/availability",
-            "/alerts",
+            "/fares/alerts",
             "/review",
             "/publishing",
             "/history",
