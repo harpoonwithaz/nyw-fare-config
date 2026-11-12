@@ -10,6 +10,7 @@
     <!-- Left: Global Tenant Switcher Form (POST /context/tenant) -->
     <form th:action="@{/context/tenant}" method="post" class="d-flex align-items-center gap-2 m-0">
       <input type="hidden" name="returnUrl" th:value="${currentUri}" />
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
 
       <label for="globalTenantSelect"
         class="form-label fw-semibold small text-uppercase text-secondary mb-0 text-nowrap">
