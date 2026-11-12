@@ -6,9 +6,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ReviewView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 
 @Controller
 public class PublishingController {
@@ -24,9 +24,9 @@ public class PublishingController {
     @GetMapping("/publishing/review")
         public String showReviewPage(Model model) {
 
-            // Retrieve sample fare changes
-            List<ReviewView> fareChanges =
-                    stagingService.getPendingChanges();
+            // STORY 5.1: Use the same configuration records as the REST API.
+            List<ConfigurationChangeView> fareChanges =
+                    stagingService.getConfigurationChanges();
 
             // Retrieve sample schedule changes
             List<ScheduleChangeView> scheduleChanges =
@@ -34,7 +34,7 @@ public class PublishingController {
 
             //Count changed fares
             long changedFares = fareChanges.stream()
-                    .filter(ReviewView::isChanged)
+                    .filter(ConfigurationChangeView::isChanged)
                     .count();
             
             //Count changed schedules
