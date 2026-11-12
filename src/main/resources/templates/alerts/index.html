@@ -17,84 +17,96 @@
     <!-- Sidebar -->
     <div th:replace="~{fragments/sidebar :: sidebar-nav('alerts')}"></div>
 
-    <!-- Main viewport -->
-    <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1 class="h3 mb-1">Service Alerts</h1>
-                <p class="text-muted mb-0">Warnings shown before purchase when a route isn't running.</p>
-            </div>
-            <a th:href="@{/fares/alerts/new}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i> New alert
-            </a>
-        </div>
+    <!-- Right column: tenant navbar on top, page content below -->
+    <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-width: 0;">
 
-        <!-- Filters use GET so the search stays in the URL -->
-        <form th:action="@{/fares/alerts}" method="get" class="row g-2 mb-3">
-            <div class="col-md-5">
-                <label for="search" class="visually-hidden">Search</label>
-                <input type="search" id="search" name="search" class="form-control"
-                    placeholder="Search message text" th:value="${search}">
-            </div>
-            <div class="col-md-3">
-                <label for="status" class="visually-hidden">Status</label>
-                <select id="status" name="status" class="form-select">
-                    <option value="">All statuses</option>
-                    <option value="DRAFT" th:selected="${status == 'DRAFT'}">Draft</option>
-                    <option value="ACTIVE" th:selected="${status == 'ACTIVE'}">Active</option>
-                    <option value="ARCHIVED" th:selected="${status == 'ARCHIVED'}">Archived</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label for="route" class="visually-hidden">Route</label>
-                <select id="route" name="route" class="form-select">
-                    <option value="">All routes</option>
-                    <!-- One group per origin terminal -->
-                    <optgroup th:each="terminal : ${routeOptions}" th:label="${terminal.key}">
-                        <option th:each="option : ${terminal.value}" th:value="${option.key()}"
-                            th:text="${option.label()}" th:selected="${option.key() == route}">Route</option>
-                    </optgroup>
-                </select>
-            </div>
-            <div class="col-md-1 d-grid">
-                <button type="submit" class="btn btn-outline-secondary">Filter</button>
-            </div>
-        </form>
+        <div th:replace="~{fragments/navbar :: top-navbar}"></div>
 
-        <div th:if="${#lists.isEmpty(alerts)}" class="card card-body text-center text-muted py-5">
-            <i class="bi bi-chat-square-text fs-1 d-block mb-2"></i>
-            No alerts yet
-        </div>
+        <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h3 mb-1">Service Alerts</h1>
+                    <p class="text-muted mb-0">Warnings shown before purchase when a route isn't running.</p>
+                </div>
+                <a th:if="${tenantContext.selectedTenant != null}" th:href="@{/fares/alerts/new}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i> New alert
+                </a>
+            </div>
 
-        <div th:unless="${#lists.isEmpty(alerts)}" class="table-responsive">
-            <table class="table table-hover align-middle bg-white border">
-                <thead class="table-light">
-                    <tr>
-                        <th scope="col">Message</th>
-                        <th scope="col">Spanish</th>
-                        <th scope="col">Status</th>
-                        <th scope="col" class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Field names follow HS's AlertForm; check them once ServiceAlert is pushed -->
-                    <tr th:each="alert : ${alerts}">
-                        <td class="text-truncate" style="max-width: 360px;" th:text="${alert.messageEn}">Message</td>
-                        <td>
-                            <span th:if="${#strings.isEmpty(alert.messageEs)}" class="badge text-bg-warning">Missing</span>
-                            <i th:unless="${#strings.isEmpty(alert.messageEs)}" class="bi bi-check-lg text-success"
-                                aria-label="Has Spanish"></i>
-                        </td>
-                        <td><span class="badge text-bg-secondary" th:text="${alert.status}">DRAFT</span></td>
-                        <td class="text-end">
-                            <a th:href="@{/fares/alerts/{id}/edit(id=${alert.id})}"
-                                class="btn btn-sm btn-outline-primary">Edit</a>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </main>
+            <!-- Same prompt as the fare grid until a tenant is picked in the navbar -->
+            <th:block th:if="${tenantContext.selectedTenant == null}">
+                <div th:replace="~{fare/fragments/feedback-card :: feedback-card('No Tenant Selected: Choose an active tenant above to begin configuration.', 'info')}"></div>
+            </th:block>
+
+            <th:block th:if="${tenantContext.selectedTenant != null}">
+                <!-- Filters use GET so the search stays in the URL -->
+                <form th:action="@{/fares/alerts}" method="get" class="row g-2 mb-3">
+                    <div class="col-md-5">
+                        <label for="search" class="visually-hidden">Search</label>
+                        <input type="search" id="search" name="search" class="form-control"
+                            placeholder="Search message text" th:value="${search}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="visually-hidden">Status</label>
+                        <select id="status" name="status" class="form-select">
+                            <option value="">All statuses</option>
+                            <option value="DRAFT" th:selected="${status == 'DRAFT'}">Draft</option>
+                            <option value="ACTIVE" th:selected="${status == 'ACTIVE'}">Active</option>
+                            <option value="ARCHIVED" th:selected="${status == 'ARCHIVED'}">Archived</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="route" class="visually-hidden">Route</label>
+                        <select id="route" name="route" class="form-select">
+                            <option value="">All routes</option>
+                            <!-- One group per origin terminal -->
+                            <optgroup th:each="terminal : ${routeOptions}" th:label="${terminal.key}">
+                                <option th:each="option : ${terminal.value}" th:value="${option.key()}"
+                                    th:text="${option.label()}" th:selected="${option.key() == route}">Route</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+                    </div>
+                </form>
+
+                <div th:if="${#lists.isEmpty(alerts)}" class="card card-body text-center text-muted py-5">
+                    <i class="bi bi-chat-square-text fs-1 d-block mb-2"></i>
+                    No alerts yet
+                </div>
+
+                <div th:unless="${#lists.isEmpty(alerts)}" class="table-responsive">
+                    <table class="table table-hover align-middle bg-white border">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Message</th>
+                                <th scope="col">Spanish</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Field names follow HS's AlertForm; check them once ServiceAlert is pushed -->
+                            <tr th:each="alert : ${alerts}">
+                                <td class="text-truncate" style="max-width: 360px;" th:text="${alert.messageEn}">Message</td>
+                                <td>
+                                    <span th:if="${#strings.isEmpty(alert.messageEs)}" class="badge text-bg-warning">Missing</span>
+                                    <i th:unless="${#strings.isEmpty(alert.messageEs)}" class="bi bi-check-lg text-success"
+                                        aria-label="Has Spanish"></i>
+                                </td>
+                                <td><span class="badge text-bg-secondary" th:text="${alert.status}">DRAFT</span></td>
+                                <td class="text-end">
+                                    <a th:href="@{/fares/alerts/{id}/edit(id=${alert.id})}"
+                                        class="btn btn-sm btn-outline-primary">Edit</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </th:block>
+        </main>
+    </div>
 
     <!-- Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

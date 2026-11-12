@@ -8,12 +8,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import ca.sfu.cmpt276.nywfareconfig.fare.model.TenantContext;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
 @Controller
 public class AlertController {
-
-    private static final String DEFAULT_TENANT = "NYW_SANDBOX";
 
     private final TenantContext tenantContext;
 
@@ -27,7 +25,11 @@ public class AlertController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String route,
             Model model) {
-        String tenantCode = currentTenantCode();
+        // No tenant picked yet: the page shows the "select a tenant" prompt, like the fare grid
+        if (tenantContext.getSelectedTenant() == null) {
+            return "alerts/index";
+        }
+        String tenantCode = tenantContext.getSelectedTenant().getCode();
 
         // TODO: swap for alertService.list(tenantCode, search, status, route) once the backend is merged
         model.addAttribute("alerts", List.of());
@@ -40,13 +42,5 @@ public class AlertController {
         model.addAttribute("status", status);
         model.addAttribute("route", route);
         return "alerts/index";
-    }
-
-    // No tenant picked yet (e.g. straight from login) falls back to the sandbox, like the publishing page
-    private String currentTenantCode() {
-        if (tenantContext.getSelectedTenant() == null) {
-            return DEFAULT_TENANT;
-        }
-        return tenantContext.getSelectedTenant().getCode();
     }
 }
