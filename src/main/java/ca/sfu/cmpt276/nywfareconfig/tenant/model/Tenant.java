@@ -1,7 +1,9 @@
-package ca.sfu.cmpt276.nywfareconfig.fare.model;
+package ca.sfu.cmpt276.nywfareconfig.tenant.model;
 
 import java.io.Serializable;
 import java.util.Objects;
+
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 
 public class Tenant implements Serializable {
     private static final long serialVersionUID = 1L;

@@ -3,6 +3,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.dto;
 import java.util.List;
 
 import ca.sfu.cmpt276.nywfareconfig.fare.model.*;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
 // Represents the unified 2D matrix structure consumed directly by the Thymeleaf template.
 public class FareGrid {
