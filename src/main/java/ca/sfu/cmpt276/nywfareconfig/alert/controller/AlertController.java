@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class AlertController {
 
-    // Epic 4 TVM previewer. Everything on the page runs in the browser, nothing is saved yet
+    // Service alerts page (Epic 4)
     @GetMapping("/fares/alerts")
     public String alerts() {
         return "alerts/index";

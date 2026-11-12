@@ -10,7 +10,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" th:href="@{/css/tvm-preview.css}">
 </head>
 
 <body class="d-flex vh-100 overflow-hidden">
@@ -20,178 +19,12 @@
 
     <!-- Main viewport -->
     <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
-        <h1 class="h3 mb-1">Service Alerts &amp; TVM Canvas</h1>
-        <p class="text-muted mb-4">
-            Pre-purchase warnings riders see on the ticket machine when a ticket isn't valid yet.
-            For example, a weekday-only route on a Saturday, or a rush-hour route in the middle of the day.
-        </p>
-
-        <div class="row g-4">
-            <!-- Left: what staff edit -->
-            <div class="col-lg-7">
-                <div class="card h-100">
-                    <div class="card-header fw-semibold">Warning details</div>
-                    <div class="card-body">
-                        <!-- Sample routes for now, real list comes from Caracal later -->
-                        <h6 class="form-section">Route</h6>
-                        <div class="mb-4">
-                            <label for="route" class="form-label visually-hidden">Route</label>
-                            <select id="route" class="form-select">
-                                <option value="EDGEWATER-MIDTOWN">Edgewater → Midtown</option>
-                                <option value="EDGEWATER-BROOKFD">Edgewater → Brookfield Place</option>
-                                <option value="EDGEWATER-PIER11">Edgewater → Pier 11</option>
-                                <option value="PORTIMP-MIDTOWN">Port Imperial → Midtown</option>
-                                <option value="PORTIMP-PIER11">Port Imperial → Pier 11</option>
-                            </select>
-                        </div>
-
-                        <!-- Messages stay stacked since they can get long -->
-                        <h6 class="form-section">Message</h6>
-                        <div class="mb-3">
-                            <label for="messageEn" class="form-label">English</label>
-                            <textarea id="messageEn" class="form-control" rows="3" maxlength="200"
-                                placeholder="Enter warning text here...">SERVICE NOTICE: No ferry service on this route at this time. Service runs weekdays during morning and evening rush hours. Please check the schedule before buying.</textarea>
-                            <div class="form-text"><span id="countEn">0</span>/200</div>
-                        </div>
-                        <div class="mb-4">
-                            <label for="messageEs" class="form-label">Spanish</label>
-                            <textarea id="messageEs" class="form-control" rows="3" maxlength="200"
-                                placeholder="Ingrese el texto de advertencia aquí...">AVISO DE SERVICIO: No hay servicio de ferry en esta ruta en este momento. Opera entre semana en horas pico de mañana y tarde. Consulte el horario antes de comprar.</textarea>
-                            <div class="form-text"><span id="countEs">0</span>/200</div>
-                        </div>
-
-                        <!-- Button labels: EN and ES side by side so they're easy to compare -->
-                        <h6 class="form-section">Buttons</h6>
-                        <div class="mb-3">
-                            <label for="continueEn" class="form-label">Continue button</label>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <input type="text" id="continueEn" class="form-control" maxlength="20"
-                                        placeholder="EN: Buy anyway" value="Buy anyway">
-                                </div>
-                                <div class="col-6">
-                                    <input type="text" id="continueEs" class="form-control" maxlength="20"
-                                        placeholder="ES: Comprar igual" value="Comprar igual">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="backEn" class="form-label">Back button</label>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <input type="text" id="backEn" class="form-control" maxlength="20"
-                                        placeholder="EN: Choose another" value="Choose another">
-                                </div>
-                                <div class="col-6">
-                                    <input type="text" id="backEs" class="form-control" maxlength="20"
-                                        placeholder="ES: Elegir otra" value="Elegir otra">
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Where each button takes the rider (same in both languages) -->
-                        <div class="row g-2 mb-4">
-                            <div class="col-6">
-                                <label for="continueAction" class="form-label">Continue goes to</label>
-                                <select id="continueAction" class="form-select">
-                                    <option value="PAYMENT">Payment</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label for="backAction" class="form-label">Back goes to</label>
-                                <select id="backAction" class="form-select">
-                                    <option value="ROUTE_LIST">Route list</option>
-                                    <option value="HOME">Home screen</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Pretend it's this time on the TVM, to test when the warning shows -->
-                        <h6 class="form-section">Test</h6>
-                        <div>
-                            <label for="clock" class="form-label">Simulated TVM time</label>
-                            <input type="datetime-local" id="clock" class="form-control">
-                            <!-- Quick times for the demo, one for each rule -->
-                            <div class="d-flex flex-wrap gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="sat-10">Sat 10:00 AM</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="wed-13">Wed 1:00 PM</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="wed-08">Wed 8:00 AM</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="now">Now</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Right: what the rider sees on the machine -->
-            <div class="col-lg-5">
-                <!-- Sticks while scrolling the form so the screen stays in view -->
-                <div class="card tvm-sticky">
-                    <div class="card-header fw-semibold">TVM preview</div>
-                    <div class="card-body">
-                        <!-- Language the rider picked on the machine -->
-                        <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Preview language">
-                            <button type="button" id="langEn" class="btn btn-outline-secondary active" aria-pressed="true">EN</button>
-                            <button type="button" id="langEs" class="btn btn-outline-secondary" aria-pressed="false">ES</button>
-                        </div>
-
-                        <!-- Only one of these screens shows at a time -->
-                        <div class="tvm-screen">
-                            <!-- Top strip like the real machine: route and time -->
-                            <div class="tvm-status">
-                                <span id="tvmRoute">Edgewater → Midtown</span>
-                                <span id="tvmTime"></span>
-                            </div>
-
-                            <!-- Shown when the ticket can't be used right now -->
-                            <div id="screenWarning">
-                                <div class="tvm-title">
-                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                    <span data-en="SERVICE NOTICE" data-es="AVISO DE SERVICIO">SERVICE NOTICE</span>
-                                </div>
-                                <p id="tvmMessage" class="tvm-message" aria-live="polite">Warning message appears here</p>
-                                <p id="tvmNextValid" class="tvm-next"></p>
-                                <button type="button" id="tvmContinue" class="tvm-btn tvm-btn-primary">Continue</button>
-                                <button type="button" id="tvmBack" class="tvm-btn tvm-btn-secondary">Go back</button>
-                            </div>
-
-                            <!-- Route is running, so no warning needed -->
-                            <div id="screenReady" hidden>
-                                <div class="tvm-title tvm-title-ok" data-en="Ready to buy" data-es="Listo para comprar">Ready to buy</div>
-                                <p class="tvm-message" data-en="This route is running right now." data-es="Esta ruta está en servicio ahora.">This route is running right now.</p>
-                                <button type="button" id="tvmBuy" class="tvm-btn tvm-btn-primary" data-en="Buy ticket" data-es="Comprar boleto">Buy ticket</button>
-                            </div>
-
-                            <!-- Where "continue" goes -->
-                            <div id="screenPayment" hidden>
-                                <div class="tvm-title tvm-title-ok" data-en="Payment" data-es="Pago">Payment</div>
-                                <p class="tvm-message" data-en="Tap your card to pay." data-es="Acerque su tarjeta para pagar.">Tap your card to pay.</p>
-                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
-                            </div>
-
-                            <!-- Where "back" goes -->
-                            <div id="screenRoutes" hidden>
-                                <div class="tvm-title tvm-title-ok" data-en="Choose your destination" data-es="Elija su destino">Choose your destination</div>
-                                <p class="tvm-message">Midtown · Brookfield Place · Pier 11</p>
-                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
-                            </div>
-
-                            <!-- Where "back" goes when set to the home screen -->
-                            <div id="screenHome" hidden>
-                                <div class="tvm-title tvm-title-ok">NY Waterway</div>
-                                <p class="tvm-message" data-en="Welcome! Touch to buy a ferry ticket." data-es="¡Bienvenido! Toque para comprar un boleto de ferry.">Welcome! Touch to buy a ferry ticket.</p>
-                                <button type="button" class="tvm-btn tvm-btn-secondary" data-restart data-en="Start over" data-es="Empezar de nuevo">Start over</button>
-                            </div>
-                        </div>
-                        <p class="small text-muted text-center mt-2 mb-0">Preview only, nothing is saved yet.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <h1 class="h3 mb-1">Service Alerts</h1>
+        <p class="text-muted mb-4">Warnings shown before purchase when a route isn't running.</p>
     </main>
 
     <!-- Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Loaded last so all the elements above exist before it runs -->
-    <script th:src="@{/js/tvm-preview.js}"></script>
 </body>
 
 </html>
