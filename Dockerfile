@@ -4,5 +4,5 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:25.0.4_7-jre-noble
 COPY --from=build /target/nyw-fare-config-0.0.1-SNAPSHOT.jar nyw-fare-config.jar
-EXPOSE 8080
+EXPOSE 9876
 ENTRYPOINT [ "java", "-jar", "nyw-fare-config.jar" ]
