@@ -56,6 +56,10 @@ public class FareDraft {
     private BigDecimal draftPrice; // Null if targetStatus is NOT_SOLD
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "draft_status", nullable = false, length = 20)
+    private DraftStatus draftStatus = DraftStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_status", nullable = false, length = 30)
     private FareStatus targetStatus;
 
@@ -83,7 +87,8 @@ public class FareDraft {
             BigDecimal originalPrice,
             BigDecimal draftPrice,
             FareStatus targetStatus,
-            FareAction actionType) {
+            FareAction actionType,
+            DraftStatus draftStatus) {
         this.tenantCode = tenantCode;
         this.actorEmail = actorEmail;
         this.gridMode = gridMode;
@@ -92,9 +97,10 @@ public class FareDraft {
         this.productCode = productCode;
         this.tierCode = tierCode;
         this.originalPrice = originalPrice;
-        this.draftPrice = draftPrice;
         this.targetStatus = targetStatus;
+        this.setDraftPrice(draftPrice);
         this.actionType = actionType;
+        this.draftStatus = draftStatus;
     }
 
     @PrePersist
@@ -196,7 +202,15 @@ public class FareDraft {
     }
 
     public void setDraftPrice(BigDecimal draftPrice) {
-        this.draftPrice = draftPrice;
+        this.draftPrice = targetStatus == FareStatus.NOT_SOLD ? null : draftPrice;
+    }
+
+    public DraftStatus getDraftStatus() {
+        return draftStatus;
+    }
+
+    public void setDraftStatus(DraftStatus draftStatus) {
+        this.draftStatus = draftStatus;
     }
 
     public FareStatus getTargetStatus() {
@@ -205,6 +219,9 @@ public class FareDraft {
 
     public void setTargetStatus(FareStatus targetStatus) {
         this.targetStatus = targetStatus;
+        if (targetStatus == FareStatus.NOT_SOLD) {
+            this.draftPrice = null;
+        }
     }
 
     public FareAction getActionType() {

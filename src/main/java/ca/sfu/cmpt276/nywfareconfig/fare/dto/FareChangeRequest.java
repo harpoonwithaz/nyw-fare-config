@@ -67,13 +67,13 @@ public class FareChangeRequest {
     }
 
     /**
-     * Requires a non-null price whenever the cell is sellable (ACTIVE),
-     * while allowing null when toggling a zonal intersection to NOT_SOLD.
+     * Requires a price for sellable cells and prevents a stale price from
+     * being carried by a NOT_SOLD draft.
      */
-    @AssertTrue(message = "Proposed price is required when target status is ACTIVE.")
+    @AssertTrue(message = "Proposed price must be null for NOT_SOLD and non-null for ACTIVE.")
     public boolean isPriceValidForTargetStatus() {
         if (targetStatus == FareStatus.NOT_SOLD) {
-            return true;
+            return newPrice == null;
         }
         return newPrice != null;
     }
