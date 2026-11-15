@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.service;
 
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertChange;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.RouteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -57,6 +59,31 @@ public class AlertService {
         return alerts.findByIdAndTenantCode(id, tenantCode);
     }
 
+    public Optional<ServiceAlert> findPendingReplacement(String tenantCode, Long activeId) {
+        if (isBlank(tenantCode) || activeId == null) {
+            return Optional.empty();
+        }
+        return alerts.findFirstByReplacesAlertIdAndTenantCodeAndStatus(activeId, tenantCode, AlertStatus.DRAFT);
+    }
+
+    public List<AlertChange> pendingChanges(String tenantCode) {
+        List<AlertChange> changes = new ArrayList<>();
+        for (ServiceAlert draft : list(tenantCode, null, AlertStatus.DRAFT, null)) {
+            ServiceAlert current = null;
+            if (draft.getReplacesAlertId() != null) {
+                current = alerts.findByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
+                        .filter(a -> a.getStatus() == AlertStatus.ACTIVE)
+                        .orElse(null);
+            }
+            changes.add(new AlertChange(draft, current));
+        }
+        return changes;
+    }
+
+    public boolean isDeletable(ServiceAlert alert) {
+        return alert != null && alert.getStatus() == AlertStatus.DRAFT;
+    }
+
     @Transactional
     public List<String> save(String tenantCode, Long id, AlertForm form, String actor) {
         List<String> errors = new ArrayList<>();
@@ -70,13 +97,15 @@ public class AlertService {
             return errors;
         }
 
-        ServiceAlert alert;
-        if (id == null) {
-            alert = new ServiceAlert(tenantCode);
-        } else {
-            alert = alerts.findByIdAndTenantCode(id, tenantCode).orElse(null);
-            if (alert == null) {
+        ServiceAlert existing = null;
+        if (id != null) {
+            existing = alerts.findByIdAndTenantCode(id, tenantCode).orElse(null);
+            if (existing == null) {
                 errors.add("That alert no longer exists.");
+                return errors;
+            }
+            if (existing.getStatus() == AlertStatus.ARCHIVED) {
+                errors.add("Archived alerts cannot be edited.");
                 return errors;
             }
         }
@@ -85,7 +114,7 @@ public class AlertService {
 
         TriggerType trigger = form.getTriggerType();
         if (trigger == null) {
-            errors.add("Choose when the alert should appear.");
+            errors.add("Choose when the warning should show.");
         }
 
         LocalDate startDate = null;
@@ -104,7 +133,7 @@ public class AlertService {
 
         String messageEn = clean(form.getMessageEn());
         if (messageEn == null) {
-            errors.add("The English message is required.");
+            errors.add("English message is required.");
         }
         String messageEs = clean(form.getMessageEs());
         String confirmEn = clean(form.getConfirmLabelEn());
@@ -112,40 +141,121 @@ public class AlertService {
         String dismissEn = clean(form.getDismissLabelEn());
         String dismissEs = clean(form.getDismissLabelEs());
 
-        checkMax(messageEn, AlertLimits.MESSAGE_MAX_LENGTH, "The English message", errors);
-        checkMax(messageEs, AlertLimits.MESSAGE_MAX_LENGTH, "The Spanish message", errors);
-        checkMax(confirmEn, AlertLimits.LABEL_MAX_LENGTH, "The English confirm button label", errors);
-        checkMax(confirmEs, AlertLimits.LABEL_MAX_LENGTH, "The Spanish confirm button label", errors);
-        checkMax(dismissEn, AlertLimits.LABEL_MAX_LENGTH, "The English dismiss button label", errors);
-        checkMax(dismissEs, AlertLimits.LABEL_MAX_LENGTH, "The Spanish dismiss button label", errors);
-
-        AlertStatus status = form.getStatus();
-        if (status == null) {
-            errors.add("Choose a status.");
+        if (tooLong(messageEn, AlertLimits.MESSAGE_MAX_LENGTH)) {
+            errors.add("Message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
+        }
+        if (tooLong(messageEs, AlertLimits.MESSAGE_MAX_LENGTH)) {
+            errors.add("Spanish message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
+        }
+        if (tooLong(confirmEn, AlertLimits.LABEL_MAX_LENGTH) || tooLong(confirmEs, AlertLimits.LABEL_MAX_LENGTH)
+                || tooLong(dismissEn, AlertLimits.LABEL_MAX_LENGTH)
+                || tooLong(dismissEs, AlertLimits.LABEL_MAX_LENGTH)) {
+            errors.add("Label must be " + AlertLimits.LABEL_MAX_LENGTH + " characters or fewer.");
         }
 
         if (!errors.isEmpty()) {
             return errors;
         }
 
-        alert.setRouteKeys(routeKeys);
-        alert.setTriggerType(trigger);
-        alert.setStartDate(startDate);
-        alert.setProductCode(productCode);
-        alert.setMessageEn(messageEn);
-        alert.setMessageEs(messageEs);
-        alert.setConfirmLabelEn(confirmEn);
-        alert.setConfirmLabelEs(confirmEs);
-        alert.setDismissLabelEn(dismissEn);
-        alert.setDismissLabelEs(dismissEs);
-        alert.setStatus(status);
-        alert.setUpdatedBy(actor);
-        if (id == null) {
-            alert.setCreatedBy(actor);
+        ServiceAlert target;
+        if (existing == null) {
+            target = new ServiceAlert(tenantCode);
+            target.setCreatedBy(actor);
+        } else if (existing.getStatus() == AlertStatus.ACTIVE) {
+            target = alerts
+                    .findFirstByReplacesAlertIdAndTenantCodeAndStatus(existing.getId(), tenantCode, AlertStatus.DRAFT)
+                    .orElse(null);
+            if (target == null) {
+                target = new ServiceAlert(tenantCode);
+                target.setReplacesAlertId(existing.getId());
+                target.setCreatedBy(actor);
+            }
+        } else {
+            target = existing;
         }
 
-        alerts.save(alert);
+        target.setRouteKeys(routeKeys);
+        target.setTriggerType(trigger);
+        target.setStartDate(startDate);
+        target.setProductCode(productCode);
+        target.setMessageEn(messageEn);
+        target.setMessageEs(messageEs);
+        target.setConfirmLabelEn(confirmEn);
+        target.setConfirmLabelEs(confirmEs);
+        target.setDismissLabelEn(dismissEn);
+        target.setDismissLabelEs(dismissEs);
+        target.setStatus(AlertStatus.DRAFT);
+        target.setUpdatedBy(actor);
+
+        alerts.save(target);
         return errors;
+    }
+
+    @Transactional
+    public List<String> publish(String tenantCode, List<Long> ids, String actor) {
+        List<String> errors = new ArrayList<>();
+
+        if (isBlank(tenantCode)) {
+            errors.add("Select a client before publishing.");
+            return errors;
+        }
+        if (ids == null || ids.isEmpty()) {
+            errors.add("Select at least one alert to publish.");
+            return errors;
+        }
+
+        List<ServiceAlert> drafts = new ArrayList<>();
+        for (Long alertId : new LinkedHashSet<>(ids)) {
+            Optional<ServiceAlert> found = alertId == null
+                    ? Optional.empty()
+                    : alerts.findByIdAndTenantCode(alertId, tenantCode);
+            if (found.isEmpty()) {
+                errors.add("Alert " + alertId + " was not found.");
+            } else if (found.get().getStatus() != AlertStatus.DRAFT) {
+                errors.add("Alert " + alertId + " is not a draft.");
+            } else {
+                drafts.add(found.get());
+            }
+        }
+        if (!errors.isEmpty()) {
+            return errors;
+        }
+
+        Instant now = Instant.now();
+        for (ServiceAlert draft : drafts) {
+            if (draft.getReplacesAlertId() != null) {
+                alerts.findByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
+                        .filter(old -> old.getStatus() == AlertStatus.ACTIVE)
+                        .ifPresent(old -> {
+                            old.setStatus(AlertStatus.ARCHIVED);
+                            old.setArchivedBy(actor);
+                            old.setArchivedAt(now);
+                            alerts.save(old);
+                        });
+            }
+            draft.setStatus(AlertStatus.ACTIVE);
+            draft.setPublishedBy(actor);
+            draft.setPublishedAt(now);
+            alerts.save(draft);
+        }
+        return errors;
+    }
+
+    @Transactional
+    public boolean archive(String tenantCode, Long id, String actor) {
+        if (isBlank(tenantCode) || id == null) {
+            return false;
+        }
+        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        if (found.isEmpty() || found.get().getStatus() != AlertStatus.ACTIVE) {
+            return false;
+        }
+        ServiceAlert alert = found.get();
+        alert.setStatus(AlertStatus.ARCHIVED);
+        alert.setArchivedBy(actor);
+        alert.setArchivedAt(Instant.now());
+        alerts.save(alert);
+        return true;
     }
 
     @Transactional
@@ -153,11 +263,11 @@ public class AlertService {
         if (isBlank(tenantCode) || id == null) {
             return false;
         }
-        Optional<ServiceAlert> alert = alerts.findByIdAndTenantCode(id, tenantCode);
-        if (alert.isEmpty()) {
+        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        if (found.isEmpty() || !isDeletable(found.get())) {
             return false;
         }
-        alerts.delete(alert.get());
+        alerts.delete(found.get());
         return true;
     }
 
@@ -204,7 +314,7 @@ public class AlertService {
     private LocalDate parseStartDate(String raw, List<String> errors) {
         String value = clean(raw);
         if (value == null) {
-            errors.add("Enter a start date for this alert.");
+            errors.add("Start date is required.");
             return null;
         }
         try {
@@ -226,10 +336,8 @@ public class AlertService {
         return value != null && value.toLowerCase().contains(query);
     }
 
-    private static void checkMax(String value, int max, String fieldName, List<String> errors) {
-        if (value != null && value.length() > max) {
-            errors.add(fieldName + " must be at most " + max + " characters.");
-        }
+    private static boolean tooLong(String value, int max) {
+        return value != null && value.length() > max;
     }
 
     private static boolean isBlank(String value) {

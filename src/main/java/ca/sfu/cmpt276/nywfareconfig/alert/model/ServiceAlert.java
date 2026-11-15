@@ -68,11 +68,26 @@ public class ServiceAlert {
     @Column(nullable = false)
     private AlertStatus status = AlertStatus.DRAFT;
 
+    @Column(name = "replaces_alert_id")
+    private Long replacesAlertId;
+
     @Column(name = "created_by")
     private String createdBy;
 
     @Column(name = "updated_by")
     private String updatedBy;
+
+    @Column(name = "published_by")
+    private String publishedBy;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    @Column(name = "archived_by")
+    private String archivedBy;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -151,12 +166,32 @@ public class ServiceAlert {
         return status;
     }
 
+    public Long getReplacesAlertId() {
+        return replacesAlertId;
+    }
+
     public String getCreatedBy() {
         return createdBy;
     }
 
     public String getUpdatedBy() {
         return updatedBy;
+    }
+
+    public String getPublishedBy() {
+        return publishedBy;
+    }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
+    }
+
+    public String getArchivedBy() {
+        return archivedBy;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
     }
 
     public Instant getCreatedAt() {
@@ -212,11 +247,31 @@ public class ServiceAlert {
         this.status = status;
     }
 
+    public void setReplacesAlertId(Long replacesAlertId) {
+        this.replacesAlertId = replacesAlertId;
+    }
+
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
 
     public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
+    }
+
+    public void setPublishedBy(String publishedBy) {
+        this.publishedBy = publishedBy;
+    }
+
+    public void setPublishedAt(Instant publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public void setArchivedBy(String archivedBy) {
+        this.archivedBy = archivedBy;
+    }
+
+    public void setArchivedAt(Instant archivedAt) {
+        this.archivedAt = archivedAt;
     }
 }
