@@ -23,7 +23,10 @@
 
     <!-- Table Scroll Container -->
     <div class="table-responsive">
-      <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table">
+      <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table"
+        th:attr="data-tenant=${gridView.tenant.code},
+                 data-grid-mode=${gridView.tenant.gridMode.name()},
+                 data-filter-value=${gridView.selectedFilterValue}">
         <thead class="table-light">
           <tr>
             <!-- Corner Axis Label -->

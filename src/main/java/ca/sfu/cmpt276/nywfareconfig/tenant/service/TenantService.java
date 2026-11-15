@@ -14,6 +14,8 @@ public class TenantService {
      * Returns the list of demo tenants supported by the platform.
      */
     public List<Tenant> getAvailableTenants() {
+        // TODO: Call GET /functions/tenant-list
+
         List<Tenant> tenantList = new ArrayList<>();
         tenantList.add(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
         tenantList.add(new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true));
@@ -24,6 +26,7 @@ public class TenantService {
      * Resolves a Tenant instance by its natural tenant code.
      */
     public Tenant getTenantByCode(String tenantCode) {
+        // TODO: Call GET /functions/site-list?tenantCode=<tenant>
         if (tenantCode == null) {
             return null;
         }
