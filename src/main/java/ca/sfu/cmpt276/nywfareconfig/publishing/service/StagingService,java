@@ -1,0 +1,64 @@
+package ca.sfu.cmpt276.nywfareconfig.publishing.service;
+
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ReviewView;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
+import ca.sfu.cmpt276.nywfareconfig.publishing.model.FareDraft;
+import ca.sfu.cmpt276.nywfareconfig.publishing.repository.FareDraftRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class StagingService {
+
+    private final FareDraftRepository fareDraftRepository;
+
+    public StagingService(FareDraftRepository fareDraftRepository) {
+        this.fareDraftRepository = fareDraftRepository;
+    }
+
+    public List<ReviewView> getPendingChanges() {
+        return List.of(
+            new ReviewView("Adult One-Way", 9.00, 10.00),
+            new ReviewView("Child One-Way", 5.00, 5.00),
+            new ReviewView("Senior One-Way", 7.00, 7.50),
+            new ReviewView("Adult Round-Trip", 18.00, 20.00)
+        );
+    }
+
+    public List<ScheduleChangeView> getScheduleChanges() {
+        List<FareDraft> stagedDrafts = fareDraftRepository.findByStatus("STAGED");
+        if (!stagedDrafts.isEmpty()) {
+            return stagedDrafts.stream()
+                .filter(d -> "AVAILABILITY_TOGGLE".equals(d.getChangeType()))
+                .map(d -> new ScheduleChangeView(
+                    d.getOrigin() + " - " + d.getProductCode(),
+                    "Previous State",
+                    d.getSummary()
+                ))
+                .toList();
+        }
+
+        return List.of(
+            new ScheduleChangeView("Weekend Service", "Disabled", "Enabled"),
+            new ScheduleChangeView("Monthly Pass Sales Window", "Days 1-5", "Days 1-10")
+        );
+    }
+
+    public void stageAvailabilityChange(String tenantCode, AvailabilityRule rule) {
+        String details = (rule.isAvailable() ? "Enabled" : "Disabled");
+        if (rule.getTemporalCondition() != null) {
+            details += " (" + rule.getTemporalCondition().getConditionType() + ")";
+        }
+
+        FareDraft draft = new FareDraft(
+            tenantCode,
+            "AVAILABILITY_TOGGLE",
+            rule.getSiteCode(),
+            rule.getProductCode(),
+            details
+        );
+        fareDraftRepository.save(draft);
+    }
+}
