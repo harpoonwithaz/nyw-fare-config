@@ -19,6 +19,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/css/**", "/error", "/error/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("CLIENT_SERVICES")
+                        .requestMatchers("/fares/alerts/*/delete", "/fares/alerts/*/archive").hasRole("CLIENT_SERVICES")
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")
