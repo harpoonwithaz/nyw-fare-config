@@ -49,7 +49,7 @@
                 </label>
                 <div class="input-group input-group-sm">
                   <select id="originSelect" name="origin" class="form-select" onchange="this.form.submit()">
-                    <option value="" th:selected="${tenantContext.selectedOrigin == null}">-- Select Terminal --
+                    <option value="" th:selected="${tenantContext.selectedOrigin == null}">Select Terminal
                     </option>
                     <option value="EDGEWTR" th:selected="${tenantContext.selectedOrigin == 'EDGEWTR'}">Edgewater
                       (EDGEWTR)
@@ -72,7 +72,7 @@
                 </label>
                 <select id="productSelect" name="product" class="form-select form-select-sm"
                   onchange="this.form.submit()">
-                  <option value="" th:selected="${tenantContext.selectedProduct == null}">-- Select Product --</option>
+                  <option value="" th:selected="${tenantContext.selectedProduct == null}">Select Product</option>
                   <option value="ADULT_ONEWAY" th:selected="${tenantContext.selectedProduct == 'ADULT_ONEWAY'}">Adult
                     One-Way</option>
                   <option value="FULL_10TRIP" th:selected="${tenantContext.selectedProduct == 'FULL_10TRIP'}">10-Trip
@@ -188,6 +188,7 @@
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script th:src="@{/js/fare-grid.js}"></script>
+  <script th:src="@{/js/draft-manager.js}"></script>
 
   <!-- STORY 2.6b: Review modal JavaScript (created in next step) -->
   <script th:src="@{/js/rate-review.js}"></script>
