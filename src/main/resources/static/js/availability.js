@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
     // client state manager so we don't spam requests on every click
     const stagedAvailabilityDrafts = {
-        siteCode: document.querySelector("[data-site]")?.getAttribute("data-site") || "MNHTN",
+        siteCode: document.querySelector("[data-site]")?.getAttribute("data-site") || "MIDTOWN",
         drafts: {},
         isDirty: false
     };
