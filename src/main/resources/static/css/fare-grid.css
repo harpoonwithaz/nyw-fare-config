@@ -79,7 +79,8 @@
 }
 
 /* Draft state highlight */
-.fare-cell-container.cell-draft {
+.fare-cell-container.cell-draft,
+.table td.cell-draft {
   box-shadow: inset 0 0 0 2px #f59e0b;
 }
 
