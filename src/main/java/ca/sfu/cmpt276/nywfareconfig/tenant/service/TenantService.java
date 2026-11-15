@@ -10,8 +10,8 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
 @Service 
 public class TenantService {
-        /**
-     * Returns the list of demo tenants supported by the platform[cite: 2, 3].
+    /**
+     * Returns the list of demo tenants supported by the platform.
      */
     public List<Tenant> getAvailableTenants() {
         List<Tenant> tenantList = new ArrayList<>();
