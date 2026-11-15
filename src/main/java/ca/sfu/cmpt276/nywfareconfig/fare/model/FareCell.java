@@ -1,16 +1,14 @@
-package ca.sfu.cmpt276.nywfareconfig.fare.dto;
+package ca.sfu.cmpt276.nywfareconfig.fare.model;
+
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
 
 // Encapsulates the pricing and status state of an individual matrix intersection
 public class FareCell {
-    public enum Status {
-        ACTIVE,
-        NOT_SOLD,
-        NA
-    }
-
+    
+    // TODO: Change this to a BigDecimal type to avoid floating point errors
     private Double price;
     private String formattedPrice;
-    private Status status;
+    private FareStatus status;
     private boolean editable;
 
     private String rowKey;
@@ -20,7 +18,7 @@ public class FareCell {
     }
 
     // Overloaded constructor for non-priced cells (NOT_SOLD, NA)
-    public FareCell(Status status, String rowKey, String colKey) {
+    public FareCell(FareStatus status, String rowKey, String colKey) {
         this.rowKey = rowKey;
         this.colKey = colKey;
         this.status = status;
@@ -29,7 +27,7 @@ public class FareCell {
         this.editable = false;
     }
 
-    public FareCell(Double price, String formattedPrice, Status status, boolean editable, String rowKey,
+    public FareCell(Double price, String formattedPrice, FareStatus status, boolean editable, String rowKey,
             String colKey) {
         this.price = price;
         this.formattedPrice = formattedPrice;
@@ -55,11 +53,11 @@ public class FareCell {
         this.formattedPrice = formattedPrice;
     }
 
-    public Status getStatus() {
+    public FareStatus getStatus() {
         return status;
     }
 
-    public void setStatus(Status status) {
+    public void setStatus(FareStatus status) {
         this.status = status;
     }
 
@@ -68,7 +66,7 @@ public class FareCell {
     }
 
     public boolean isPriced() {
-        return price != null && status == Status.ACTIVE;
+        return price != null && status == FareStatus.ACTIVE;
     }
 
     public void setEditable(boolean editable) {
