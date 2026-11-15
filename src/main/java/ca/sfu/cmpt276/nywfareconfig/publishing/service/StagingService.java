@@ -6,11 +6,14 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.DraftStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.FareAction;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.repository.FareDraftRepository;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
-import ca.sfu.cmpt276.nywfareconfig.publishing.model.FareDraft;
-import ca.sfu.cmpt276.nywfareconfig.publishing.repository.FareDraftRepository;
 
 @Service
 public class StagingService {
@@ -26,9 +29,7 @@ public class StagingService {
      * Supports multiple origin terminals and zonal configurations.
      */
     public List<ConfigurationChangeView> getConfigurationChanges() {
-
         return List.of(
-            // NY Waterway: Edgewater to Midtown
             new ConfigurationChangeView(
                 "NYW_SANDBOX",
                 GridMode.OD,
@@ -39,8 +40,6 @@ public class StagingService {
                 new BigDecimal("13.25"),
                 new BigDecimal("14.00")
             ),
-
-            // NY Waterway: Port Imperial to Midtown
             new ConfigurationChangeView(
                 "NYW_SANDBOX",
                 GridMode.OD,
@@ -51,8 +50,6 @@ public class StagingService {
                 new BigDecimal("112.63"),
                 new BigDecimal("115.00")
             ),
-
-            // NY Waterway: Midtown to Edgewater
             new ConfigurationChangeView(
                 "NYW_SANDBOX",
                 GridMode.OD,
@@ -63,8 +60,6 @@ public class StagingService {
                 new BigDecimal("10.75"),
                 new BigDecimal("11.00")
             ),
-
-            // Metra: Zone 1 to Zone 2, Adult One-Way
             new ConfigurationChangeView(
                 "METRA",
                 GridMode.ZONAL,
@@ -75,8 +70,6 @@ public class StagingService {
                 new BigDecimal("4.00"),
                 new BigDecimal("4.50")
             ),
-
-            // Unchanged example for filter testing
             new ConfigurationChangeView(
                 "NYW_SANDBOX",
                 GridMode.OD,
@@ -90,52 +83,42 @@ public class StagingService {
         );
     }
 
-    // Returns staged Epic 3 availability changes from PostgreSQL if present, otherwise default sample rows
     public List<ScheduleChangeView> getScheduleChanges() {
-        List<FareDraft> stagedDrafts = fareDraftRepository.findByStatus("STAGED");
-        if (!stagedDrafts.isEmpty()) {
-            return stagedDrafts.stream()
-                .filter(d -> "AVAILABILITY_TOGGLE".equals(d.getChangeType()))
+        List<FareDraft> pendingDrafts = fareDraftRepository.findByDraftStatus(DraftStatus.PENDING);
+        if (!pendingDrafts.isEmpty()) {
+            return pendingDrafts.stream()
                 .map(d -> new ScheduleChangeView(
-                    d.getOrigin() + " - " + d.getProductCode(),
+                    d.getOriginIdentifier() + " - " + d.getProductCode(),
                     "Previous State",
-                    d.getSummary()
+                    d.getTargetStatus().name()
                 ))
                 .toList();
         }
 
         return List.of(
-            new ScheduleChangeView(
-                "Weekend Service",
-                "Disabled",
-                "Enabled"
-            ),
-            new ScheduleChangeView(
-                "Monthly Pass Sales Window",
-                "Days 1-5",
-                "Days 1-10"
-            ),
-            new ScheduleChangeView(
-                "Weekday Service Start",
-                "06:00 AM",
-                "06:00 AM"
-            )
+            new ScheduleChangeView("Weekend Service", "Disabled", "Enabled"),
+            new ScheduleChangeView("Monthly Pass Sales Window", "Days 1-5", "Days 1-10"),
+            new ScheduleChangeView("Weekday Service Start", "06:00 AM", "06:00 AM")
         );
     }
 
-    // Persists Epic 3 availability changes to PostgreSQL fare_drafts table
+    // Persists Epic 3 availability changes into the shared PostgreSQL fare_drafts table
     public void stageAvailabilityChange(String tenantCode, AvailabilityRule rule) {
-        String details = (rule.isAvailable() ? "Enabled" : "Disabled");
-        if (rule.getTemporalCondition() != null) {
-            details += " (" + rule.getTemporalCondition().getConditionType() + ")";
-        }
+        FareStatus targetStatus = rule.isAvailable() ? FareStatus.ACTIVE : FareStatus.NOT_SOLD;
 
         FareDraft draft = new FareDraft(
             tenantCode,
-            "AVAILABILITY_TOGGLE",
+            "operator@nyw.com",
+            GridMode.OD,
             rule.getSiteCode(),
+            "ALL",
             rule.getProductCode(),
-            details
+            null,
+            null,
+            null,
+            targetStatus,
+            FareAction.INLINE_EDIT,
+            DraftStatus.PENDING
         );
         fareDraftRepository.save(draft);
     }
