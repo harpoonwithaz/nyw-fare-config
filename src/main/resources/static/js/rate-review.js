@@ -1,35 +1,16 @@
-/*STORY 2.6b: Transaction Review Diff Modal
-Displays staged fare changes before batch submission.
-Currently using sample data until DraftStateManager is integrated.*/
+/* STORY 2.6b: Transaction Review Diff Modal
+   Displays staged in-memory fare changes from DraftStateManager before batch submission. */
 
 (function () {
     "use strict";
 
-    // STORY 2.6b: Temporary sample changes for UI testing.
-    // Replace with DraftStateManager.getPendingChanges() later.
-    const sampleChanges = [
-        {
-            origin: "EDGEWTR",
-            destination: "MIDTOWN",
-            product: "Adult One-Way",
-            originalPrice: 13.25,
-            newPrice: 14.00
-        },
-        {
-            origin: "PORTIMP",
-            destination: "MIDTOWN",
-            product: "10-Trip Pass",
-            originalPrice: 95.00,
-            newPrice: 100.00
-        }
-    ];
-
-    // Format prices consistently.
+    // Format prices consistently as US currency.
     function formatPrice(price) {
-        return "$" + Number(price).toFixed(2);
+        const parsed = Number(price);
+        return Number.isFinite(parsed) ? "$" + parsed.toFixed(2) : "$0.00";
     }
 
-    // Populate the comparison table.
+    // Populate the comparison table with in-memory drafts.
     function renderReviewTable(changes) {
         const tableBody = document.getElementById("rateReviewTableBody");
         const changeCount = document.getElementById("rateReviewChangeCount");
@@ -38,9 +19,7 @@ Currently using sample data until DraftStateManager is integrated.*/
             return;
         }
 
-        //removes previously displayed rows
         tableBody.replaceChildren();
-
         changeCount.textContent = String(changes.length);
 
         if (changes.length === 0) {
@@ -56,21 +35,34 @@ Currently using sample data until DraftStateManager is integrated.*/
             return;
         }
 
-        //create a table row for every pending change.
         changes.forEach(function (change) {
             const row = document.createElement("tr");
+            const originalRate = change.originalValue ?? change.originalPrice;
+            const newRate = change.newValue ?? change.newPrice;
 
             const values = [
                 change.origin,
                 change.destination,
                 change.product,
-                formatPrice(change.originalPrice),
-                formatPrice(change.newPrice)
+                formatPrice(originalRate),
+                formatPrice(newRate)
             ];
 
-            values.forEach(function (value) {
+            values.forEach(function (value, index) {
                 const cell = document.createElement("td");
                 cell.textContent = value;
+
+                // Make the New Rate column have the same visual properties as fare drafts in the fare grid
+                if (index === 4) {
+                    cell.classList.add(
+                        "table-warning",
+                        "cell-draft",
+                        "fw-bold",
+                        "font-monospace",
+                        "text-dark"
+                    );
+                }
+
                 row.appendChild(cell);
             });
 
@@ -94,35 +86,39 @@ Currently using sample data until DraftStateManager is integrated.*/
             errorBanner.textContent = "";
         }
 
-        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+        const modal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
         modal.show();
     }
 
-    // Temporary preview button for development.
-    function initializeReviewPreview() {
+    // Wire the "Save Rate Changes" toolbar button to open the review modal.
+    function initializeRateReview() {
         const saveButton = document.getElementById("saveChangesBtn");
 
         if (!saveButton) {
             return;
         }
 
-        const previewButton = document.createElement("button");
-        previewButton.type = "button";
-        previewButton.id = "previewRateReviewBtn";
-        previewButton.className = "btn btn-outline-primary btn-sm";
-        previewButton.textContent = "Preview Review Modal (Demo)";
+        saveButton.addEventListener("click", function () {
+            // Do not open the review modal if an inline input currently has a validation error.
+            if (document.querySelector(".fare-inline-input.is-invalid")) {
+                return;
+            }
 
-        previewButton.addEventListener("click", function () {
-            openReviewModal(sampleChanges);
+            const pendingChanges = window.DraftStateManager
+                ? window.DraftStateManager.getPendingChanges()
+                : [];
+
+            if (pendingChanges.length === 0) {
+                return;
+            }
+
+            openReviewModal(pendingChanges);
         });
-
-        // Keep the existing Save button disabled and unchanged.
-        saveButton.parentElement.appendChild(previewButton);
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
-        // Prototype only: remove this preview when real draft integration is ready.
-        initializeReviewPreview();
-    });
-
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeRateReview);
+    } else {
+        initializeRateReview();
+    }
 })();

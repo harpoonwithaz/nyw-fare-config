@@ -126,6 +126,8 @@
       cell.classList.remove('has-error');
       if (feedbackEl) feedbackEl.remove();
     }
+
+    window.DraftStateManager?.syncToolbarState();
   }
 
   /**
@@ -163,7 +165,18 @@
       return false;
     }
 
+    hideGridFeedback();
+    const originalPrice = normalizePrice(cell.dataset.originalPrice) ?? result.normalized;
     closeInlineEditor(cell, result.normalized);
+
+    window.DraftStateManager?.stageChange({
+      rowKey: cell.dataset.rowKey,
+      colKey: cell.dataset.colKey,
+      originalValue: originalPrice,
+      newValue: result.normalized,
+      cellElement: cell
+    });
+
     return true;
   }
 
@@ -173,6 +186,7 @@
   function cancelEdit(cell) {
     const priorValue = normalizePrice(cell.dataset.value) ?? normalizePrice(cell.dataset.originalPrice) ?? '0.00';
     closeInlineEditor(cell, priorValue);
+    window.DraftStateManager?.syncToolbarState();
   }
 
   /**
@@ -398,6 +412,8 @@
 
     tables.forEach((table) => {
       table.addEventListener('click', (event) => {
+        if (event.target.closest('.fare-cell-revert-btn')) return;
+
         const cell = event.target.closest('td.fare-cell-container');
         if (!cell || !table.contains(cell)) return;
 
