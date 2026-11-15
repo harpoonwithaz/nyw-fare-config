@@ -2,12 +2,16 @@
 Retrieves configuration comparisons from Spring Boot.
  Supports O-D and zonal fare configurations.
 */
-
 (function () {
     "use strict";
 
     const tableBody = document.getElementById("fareChangesTableBody");
     const changedOnlyCheckbox = document.getElementById("showChangedOnly");
+
+    // PR COMMENT #5: Summary counter elements.
+    const totalCountElement = document.getElementById("totalItemsCount");
+    const changedCountElement = document.getElementById("changedItemsCount");
+    const unchangedCountElement = document.getElementById("unchangedItemsCount");
 
     // STORY 5.1: Format currency values.
     function formatPrice(price) {
@@ -30,7 +34,42 @@ Retrieves configuration comparisons from Spring Boot.
         return cell;
     }
 
-    // STORY 5.1: Filter unchanged rows in both tables.
+    // PR COMMENT #5:
+    // Count the API fare records and server-rendered schedule records.
+    function updateSummaryCounters(fareChanges) {
+        const scheduleRows = document.querySelectorAll(
+            "#scheduleChangesTableBody tr[data-changed]"
+        );
+
+        const totalFares = fareChanges.length;
+        const changedFares = fareChanges.filter(
+            change => change.changed === true
+        ).length;
+
+        const totalSchedules = scheduleRows.length;
+        const changedSchedules = Array.from(scheduleRows).filter(
+            row => row.dataset.changed === "true"
+        ).length;
+
+        const total = totalFares + totalSchedules;
+        const changed = changedFares + changedSchedules;
+        const unchanged = total - changed;
+
+        if (totalCountElement) {
+            totalCountElement.textContent = total;
+        }
+
+        if (changedCountElement) {
+            changedCountElement.textContent = changed;
+        }
+
+        if (unchangedCountElement) {
+            unchangedCountElement.textContent = unchanged;
+        }
+    }
+
+    // PR COMMENT #6:
+    // Hide unchanged fare and schedule rows when the filter is checked.
     function applyChangedOnlyFilter() {
         const rows = document.querySelectorAll("tr[data-changed]");
 
@@ -62,6 +101,9 @@ Retrieves configuration comparisons from Spring Boot.
             cell.colSpan = 8;
             row.appendChild(cell);
             tableBody.appendChild(row);
+
+            // PR COMMENT #5: Still count schedule records.
+            updateSummaryCounters(changes);
             return;
         }
 
@@ -69,35 +111,26 @@ Retrieves configuration comparisons from Spring Boot.
             const row = document.createElement("tr");
             row.dataset.changed = String(change.changed);
 
-            // Tenant and grid mode
             row.appendChild(createCell(change.tenantCode));
             row.appendChild(createCell(change.gridMode));
-
-            // Context: origin terminal for O-D, product for zonal
             row.appendChild(createCell(change.selectedContext));
 
-            // O-D: destination; Zonal: origin zone → destination zone
             const location = change.gridMode === "ZONAL"
                 ? change.rowKey + " → " + change.colKey
                 : change.rowKey;
 
             row.appendChild(createCell(location));
-
-            // Ticket product or tier
             row.appendChild(createCell(change.product));
 
-            // Published baseline
             row.appendChild(createCell(
                 formatPrice(change.publishedPrice)
             ));
 
-            // Staged draft, highlighted if changed
             row.appendChild(createCell(
                 formatPrice(change.stagedPrice),
                 change.changed ? "table-warning" : ""
             ));
 
-            // Changed / Unchanged badge
             const statusCell = document.createElement("td");
             const badge = document.createElement("span");
 
@@ -111,32 +144,39 @@ Retrieves configuration comparisons from Spring Boot.
 
             statusCell.appendChild(badge);
             row.appendChild(statusCell);
-
             tableBody.appendChild(row);
         });
 
+        // PR COMMENT #5: Synchronize counters after fetching fares.
+        updateSummaryCounters(changes);
+
+        // PR COMMENT #6: Apply the default filter.
         applyChangedOnlyFilter();
     }
 
-    // STORY 5.1: Retrieve comparisons from Spring Boot.
+    // STORY 5.1: Retrieve tenant-scoped changes from Spring Boot.
     async function loadFareChanges() {
         if (!tableBody) {
             return;
         }
 
         try {
-            const response = await fetch("/api/publishing/pending-changes");
+            const response = await fetch(
+                "/api/publishing/pending-changes"
+            );
 
             if (!response.ok) {
                 throw new Error("HTTP " + response.status);
             }
 
             const changes = await response.json();
-
             renderFareChanges(changes);
 
         } catch (error) {
-            console.error("Failed to load configuration changes:", error);
+            console.error(
+                "Failed to load configuration changes:",
+                error
+            );
 
             tableBody.replaceChildren();
 
@@ -149,20 +189,31 @@ Retrieves configuration comparisons from Spring Boot.
             cell.colSpan = 8;
             row.appendChild(cell);
             tableBody.appendChild(row);
+
+            // Do not display stale counters if the API fails.
+            if (totalCountElement) totalCountElement.textContent = "—";
+            if (changedCountElement) changedCountElement.textContent = "—";
+            if (unchangedCountElement) unchangedCountElement.textContent = "—";
         }
     }
 
-    // STORY 5.1: Initialize the page.
+    // STORY 5.1: Initialize the review page.
     document.addEventListener("DOMContentLoaded", function () {
-        loadFareChanges();
 
+        // PR COMMENT #6: Changed-only is the default.
         if (changedOnlyCheckbox) {
+            changedOnlyCheckbox.checked = true;
+
             changedOnlyCheckbox.addEventListener(
                 "change",
                 applyChangedOnlyFilter
             );
         }
+
+        applyChangedOnlyFilter();
+        loadFareChanges();
     });
 
 })();
+
 

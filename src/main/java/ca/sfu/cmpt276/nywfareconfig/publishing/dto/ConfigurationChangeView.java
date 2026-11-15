@@ -3,6 +3,8 @@ package ca.sfu.cmpt276.nywfareconfig.publishing.dto;
 import java.math.BigDecimal;
 import java.util.Objects;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+
 /**
  * STORY 5.1: Configuration Review
  *
@@ -14,7 +16,7 @@ import java.util.Objects;
  */
 public record ConfigurationChangeView(
     String tenantCode,
-    String gridMode,
+    GridMode gridMode,
     String selectedContext,
     String rowKey,
     String colKey,
