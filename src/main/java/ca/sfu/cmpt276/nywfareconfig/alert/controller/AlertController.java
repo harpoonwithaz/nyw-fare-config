@@ -27,7 +27,7 @@ public class AlertController {
             Model model) {
         // No tenant picked yet: the page shows the "select a tenant" prompt, like the fare grid
         if (tenantContext.getSelectedTenant() == null) {
-            return "alerts/index";
+            return "alerts/alerts";
         }
         String tenantCode = tenantContext.getSelectedTenant().getCode();
 
@@ -37,7 +37,6 @@ public class AlertController {
         model.addAttribute("routeOptions", Map.of());
 
         // Keep the filter values so the form shows what was searched
-        model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("search", search);
         model.addAttribute("status", status);
         model.addAttribute("route", route);

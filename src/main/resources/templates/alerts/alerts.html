@@ -28,7 +28,7 @@
                     <h1 class="h3 mb-1">Service Alerts</h1>
                     <p class="text-muted mb-0">Warnings shown before purchase when a route isn't running.</p>
                 </div>
-                <a th:if="${tenantContext.selectedTenant != null}" class="btn btn-primary">
+                <a th:if="${tenantContext.selectedTenant != null}" th:href="@{/fares/alerts/new}" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-1"></i> New alert
                 </a>
             </div>
@@ -81,21 +81,40 @@
                         <thead class="table-light">
                             <tr>
                                 <th scope="col">Message</th>
+                                <th scope="col">Routes</th>
+                                <th scope="col">Ticket</th>
+                                <th scope="col">Trigger</th>
                                 <th scope="col">Spanish</th>
                                 <th scope="col">Status</th>
                                 <th scope="col" class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Field names follow HS's AlertForm; check them once ServiceAlert is pushed -->
+                            <!-- Field names follow ServiceAlert on feature/alerts-backend-skeleton -->
                             <tr th:each="alert : ${alerts}">
-                                <td class="text-truncate" style="max-width: 360px;" th:text="${alert.messageEn}">Message</td>
+                                <td class="text-truncate" style="max-width: 320px;" th:text="${alert.messageEn}">Message</td>
+                                <td>
+                                    <!-- Route keys are ORIGIN:DESTINATION, e.g. PIER11:HOB14ST -->
+                                    <div th:each="key : ${alert.routeKeys}" class="small text-nowrap"
+                                        th:text="${#strings.replace(key, ':', ' → ')}">PIER11 → HOB14ST</div>
+                                </td>
+                                <td class="small" th:text="${alert.productCode} ?: 'All tickets'">All tickets</td>
+                                <td class="small">
+                                    <span th:text="${alert.triggerType.label}">Weekends</span>
+                                    <span th:if="${alert.startDate != null}" class="text-muted"
+                                        th:text="${#temporals.format(alert.startDate, 'MMM d, yyyy')}">Nov 16, 2026</span>
+                                </td>
                                 <td>
                                     <span th:if="${#strings.isEmpty(alert.messageEs)}" class="badge text-bg-warning">Missing</span>
                                     <i th:unless="${#strings.isEmpty(alert.messageEs)}" class="bi bi-check-lg text-success"
                                         aria-label="Has Spanish"></i>
                                 </td>
-                                <td><span class="badge text-bg-secondary" th:text="${alert.status}">DRAFT</span></td>
+                                <td>
+                                    <span class="badge" th:text="${alert.status.label}"
+                                        th:classappend="${alert.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${alert.status.name() == 'DRAFT'} ? 'text-bg-warning' : 'text-bg-secondary')">Draft</span>
+                                    <div th:if="${alert.replacesAlertId != null}" class="small text-muted"
+                                        th:text="|Replaces #${alert.replacesAlertId}|">Replaces #5</div>
+                                </td>
                                 <td class="text-end">
                                     <a th:href="@{/fares/alerts/{id}/edit(id=${alert.id})}"
                                         class="btn btn-sm btn-outline-primary">Edit</a>
