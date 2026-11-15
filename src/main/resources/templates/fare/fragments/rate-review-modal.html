@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<body>
+
+<!-- PR COMMENT #7: Reusable rate review modal fragment -->
+<div th:fragment="rateReviewModal"
+     class="modal fade"
+     id="rateReviewModal"
+     tabindex="-1"
+     aria-labelledby="rateReviewModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <!-- STORY 2.6b: Modal header -->
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold"
+                        id="rateReviewModalLabel">
+                        <i class="bi bi-list-check me-2"></i>
+                        Review Pending Rate Changes
+                    </h5>
+
+                    <p class="text-muted small mb-0 mt-1">
+                        Verify all staged modifications before
+                        submitting them to the platform.
+                    </p>
+                </div>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close">
+                </button>
+            </div>
+
+            <!-- STORY 2.6b: Modal body -->
+            <div class="modal-body">
+
+                <div class="alert alert-info d-flex align-items-center gap-2"
+                     role="status">
+                    <i class="bi bi-info-circle"></i>
+                    <span>
+                        You have
+                        <strong id="rateReviewChangeCount">0</strong>
+                        pending rate change(s) to review.
+                    </span>
+                </div>
+
+                <!-- Submission error feedback -->
+                <div class="alert alert-danger"
+                     id="rateReviewError"
+                     role="alert"
+                     hidden>
+                </div>
+
+                <!-- STORY 2.6b: Rate comparison table -->
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Origin</th>
+                                <th scope="col">Destination</th>
+                                <th scope="col">Product / Tier</th>
+                                <th scope="col">Original Rate</th>
+                                <th scope="col">New Rate</th>
+                            </tr>
+                        </thead>
+
+                        <!-- Populated by rate-review.js -->
+                        <tbody id="rateReviewTableBody">
+                            <tr>
+                                <td colspan="5"
+                                    class="text-center text-muted py-4">
+                                    No pending rate changes to display.
+                                </td>
+                            </tr>
+                        </tbody>
+
+                    </table>
+                </div>
+
+                <p class="text-muted small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Review interface prototype.
+                    Platform submission is not yet enabled.
+                </p>
+
+            </div>
+
+            <!-- STORY 2.6b: Modal footer -->
+            <div class="modal-footer">
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        data-bs-dismiss="modal">
+                    Cancel
+                </button>
+
+                <!-- Publishing remains disabled -->
+                <button type="button"
+                        class="btn btn-success"
+                        id="confirmRateChangesBtn"
+                        disabled>
+                    <i class="bi bi-check2-circle me-1"></i>
+                    Confirm &amp; Publish
+                </button>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

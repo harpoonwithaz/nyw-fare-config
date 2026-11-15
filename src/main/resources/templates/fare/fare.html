@@ -176,10 +176,23 @@
 
   </div>
 
+  <!-- STORY 2.6b: Transaction Review Diff Modal                  -->
+  <!-- Owner: Rate Grid Batch Review and Submission               -->
+  <!-- Purpose: Show all staged rate changes before API dispatch  -->
+
+  <!-- PR COMMENT #7: Load reusable rate review modal -->
+  <div th:replace="~{fare/fragments/rate-review-modal :: rateReviewModal}"></div>
+
+  <!-- END STORY 2.6b: Transaction Review Diff Modal -->
+
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script th:src="@{/js/fare-grid.js}"></script>
   <script th:src="@{/js/draft-manager.js}"></script>
+
+  <!-- STORY 2.6b: Review modal JavaScript (created in next step) -->
+  <script th:src="@{/js/rate-review.js}"></script>
+
 </body>
 
 </html>
