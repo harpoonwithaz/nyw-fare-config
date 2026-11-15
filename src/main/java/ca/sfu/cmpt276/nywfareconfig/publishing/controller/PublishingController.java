@@ -1,3 +1,4 @@
+
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import java.util.List;
@@ -6,61 +7,85 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ReviewView;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
 @Controller
 public class PublishingController {
 
     private final StagingService stagingService;
+    private final TenantContext tenantContext;
 
-    // Spring Boot automatically provides the service
-    public PublishingController(StagingService stagingService) {
+    //Inject the existing session tenant context.
+    public PublishingController(
+            StagingService stagingService,
+            TenantContext tenantContext) {
+
         this.stagingService = stagingService;
+        this.tenantContext = tenantContext;
     }
 
-    
     @GetMapping("/publishing/review")
-        public String showReviewPage(Model model) {
+    public String showReviewPage(Model model) {
 
-            // Retrieve sample fare changes
-            List<ReviewView> fareChanges =
-                    stagingService.getPendingChanges();
+        // Determine the active tenant.
+        Tenant selectedTenant = tenantContext.getSelectedTenant();
 
-            // Retrieve sample schedule changes
-            List<ScheduleChangeView> scheduleChanges =
-                    stagingService.getScheduleChanges();
+        String tenantCode = selectedTenant != null
+                ? selectedTenant.getCode()
+                : null;
 
-            //Count changed fares
-            long changedFares = fareChanges.stream()
-                    .filter(ReviewView::isChanged)
-                    .count();
-            
-            //Count changed schedules
-            long changedSchedules = scheduleChanges.stream()
-                    .filter(ScheduleChangeView::isChanged)
-                    .count();
+        // Filter mock records by active tenant.
+        // This will later be replaced with the database retrieval.
+        List<ConfigurationChangeView> fareChanges =
+                tenantCode == null
+                    ? List.of()
+                    : stagingService.getConfigurationChanges()
+                        .stream()
+                        .filter(change ->
+                            tenantCode.equalsIgnoreCase(change.tenantCode()))
+                        .toList();
 
-            // Pass data to Thymeleaf
-            model.addAttribute("tenantCode", "NYW_SANDBOX");
+        // Existing mock schedule data.
+        // TODO: Scope schedules by tenant when real schedule data is available.
+        List<ScheduleChangeView> scheduleChanges =
+                tenantCode == null
+                    ? List.of()
+                    : stagingService.getScheduleChanges();
 
-            model.addAttribute("pendingChanges", fareChanges);
-            model.addAttribute("scheduleChanges", scheduleChanges);
+        long changedFares = fareChanges.stream()
+                .filter(ConfigurationChangeView::isChanged)
+                .count();
 
-            // Summary counts across both categories
-            model.addAttribute("totalCount",
-                fareChanges.size() + scheduleChanges.size());
+        long changedSchedules = scheduleChanges.stream()
+                .filter(ScheduleChangeView::isChanged)
+                .count();
 
-            model.addAttribute("changedCount",
-                changedFares + changedSchedules);
+        model.addAttribute("tenantCode", tenantCode);
+        model.addAttribute("pendingChanges", fareChanges);
+        model.addAttribute("scheduleChanges", scheduleChanges);
 
-            model.addAttribute("unchangedCount",
+        model.addAttribute(
+                "totalCount",
                 fareChanges.size() + scheduleChanges.size()
-                - changedFares - changedSchedules);
+        );
 
-            return "publishing/review";
-        }
+        model.addAttribute(
+                "changedCount",
+                changedFares + changedSchedules
+        );
 
+        model.addAttribute(
+                "unchangedCount",
+                fareChanges.size() + scheduleChanges.size()
+                    - changedFares - changedSchedules
+        );
+
+        return "publishing/review";
+    }
 }
+
 

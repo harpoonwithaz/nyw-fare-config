@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.fare.model;
+package ca.sfu.cmpt276.nywfareconfig.tenant.model;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;
@@ -47,5 +47,9 @@ public class TenantContext implements Serializable {
 
     public void setSelectedProduct(String selectedProduct) {
         this.selectedProduct = selectedProduct;
+    }
+
+    public boolean isSecondarySelected() {
+        return selectedOrigin != null || selectedProduct != null;
     }
 }

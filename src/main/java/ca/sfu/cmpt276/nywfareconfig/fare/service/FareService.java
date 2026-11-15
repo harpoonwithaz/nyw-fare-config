@@ -2,13 +2,15 @@ package ca.sfu.cmpt276.nywfareconfig.fare.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.*;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
 @Service
 public class FareService {
@@ -16,28 +18,9 @@ public class FareService {
     public FareService() {
     }
 
-    /**
-     * Returns the list of demo tenants supported by the platform[cite: 2, 3].
-     */
-    public List<Tenant> getAvailableTenants() {
-        List<Tenant> tenantList = new ArrayList<>();
-        tenantList.add(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
-        tenantList.add(new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true));
-        return tenantList;
-    }
-
-    /**
-     * Resolves a Tenant instance by its natural tenant code.
-     */
-    public Tenant getTenantByCode(String tenantCode) {
-        if (tenantCode == null) {
-            return null;
-        }
-        return switch (tenantCode.toUpperCase()) {
-            case "NYW_SANDBOX", "NYW" -> new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
-            case "METRA" -> new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true);
-            default -> null;
-        };
+    public Optional<FareRule> getFareRule(String tenantCode, String origin, String dest, String product) {
+        // TODO: Call GET /functions/product-get
+        return Optional.empty();
     }
 
     /**
@@ -49,6 +32,8 @@ public class FareService {
         if (tenantCode == null) {
             return List.of();
         }
+
+        // TODO: Call GET /functions/site-list
         return switch (tenantCode.toUpperCase()) {
             case "NYW_SANDBOX", "NYW" -> List.of("EDGEWTR", "PORTIMP", "MIDTOWN");
             case "METRA" -> List.of("ADULT_ONEWAY", "FULL_10TRIP", "FULL_MONTHLY");
@@ -57,7 +42,7 @@ public class FareService {
     }
 
     /**
-     * Builds the structured 2D FareGrid view-model based on the active mode[cite: 1, 5].
+     * Builds the structured 2D FareGrid view-model based on the active mode.
      */
     public FareGrid buildMockGrid(Tenant tenant, String filterValue) {
         if (tenant == null) {
@@ -70,14 +55,14 @@ public class FareService {
     }
 
     /**
-     * Builds Point-to-Point (O-D) matrix for NY Waterway[cite: 3, 5].
-     * - Rows: Outbound Destination Terminals[cite: 3, 5]
-     * - Columns: Ticket Products[cite: 3, 5]
+     * Builds Point-to-Point (O-D) matrix for NY Waterway.
+     * - Rows: Outbound Destination Terminals
+     * - Columns: Ticket Products
      */
     private FareGrid buildOdGrid(String originSiteCode, Tenant tenant) {
         String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "EDGEWTR";
 
-        // Columns: Products[cite: 3, 5]
+        // Columns: Products
         List<String> colHeaders = List.of(
             "Adult One-Way",
             "Child One-Way",
@@ -86,7 +71,7 @@ public class FareService {
             "Monthly Pass"
         );
 
-        // Rows: Outbound Destination sites[cite: 3, 5]
+        // Rows: Outbound Destination sites
         List<String> rowHeaders = switch (normalizedOrigin) {
             case "PORTIMP" -> List.of("Midtown / W. 39th St", "Brookfield Place", "Pier 11 / Wall St");
             case "MIDTOWN" -> List.of("Edgewater", "Port Imperial", "Hoboken 14th St");
@@ -99,21 +84,21 @@ public class FareService {
         for (String dest : rowHeaders) {
             List<FareCell> rowCells = new ArrayList<>();
             for (String prod : colHeaders) {
-                // NYW discontinued Senior tickets across all terminals -> NOT_SOLD[cite: 3, 10]
+                // NYW discontinued Senior tickets across all terminals -> NOT_SOLD
                 if ("Senior 65+".equals(prod)) {
-                    rowCells.add(new FareCell(FareCell.Status.NOT_SOLD, dest, prod));
+                    rowCells.add(new FareCell(FareStatus.NOT_SOLD, dest, prod));
                 } 
-                // Pier 11 is not directly served from Edgewater -> NA badge[cite: 3, 5]
+                // Pier 11 is not directly served from Edgewater -> NA badge
                 else if ("EDGEWTR".equals(normalizedOrigin) && "Pier 11 / Wall St".equals(dest)) {
-                    rowCells.add(new FareCell(FareCell.Status.NA, dest, prod));
+                    rowCells.add(new FareCell(FareStatus.NA, dest, prod));
                 } 
-                // Standard active pricing[cite: 3, 5]
+                // Standard active pricing
                 else {
                     Double price = resolveOdPrice(dest, prod);
                     rowCells.add(new FareCell(
                         price,
                         String.format("$%.2f", price),
-                        FareCell.Status.ACTIVE,
+                        FareStatus.ACTIVE,
                         true,
                         dest,
                         prod
@@ -134,9 +119,9 @@ public class FareService {
     }
 
     /**
-     * Builds symmetric Zone-to-Zone matrix for Metra Rail[cite: 3, 5].
-     * - Rows: Origin Zones (Zone 1 to 3)[cite: 3, 5]
-     * - Columns: Destination Zones (Zone 1 to 3)[cite: 3, 5]
+     * Builds symmetric Zone-to-Zone matrix for Metra Rail.
+     * - Rows: Origin Zones (Zone 1 to 3)
+     * - Columns: Destination Zones (Zone 1 to 3)
      */
     private FareGrid buildZonalGrid(String productCode, Tenant tenant) {
         String normalizedProduct = productCode != null ? productCode.toUpperCase() : "ADULT_ONEWAY";
@@ -144,7 +129,7 @@ public class FareService {
         List<String> colHeaders = List.of("Zone 1", "Zone 2", "Zone 3");
         List<String> rowHeaders = List.of("Zone 1", "Zone 2", "Zone 3");
 
-        // 3x3 baseline rates matching the system rate schedule[cite: 3, 5]
+        // 3x3 baseline rates matching the system rate schedule
         Double[][] baseRates = switch (normalizedProduct) {
             case "FULL_10TRIP" -> new Double[][] {
                 { 22.50, 36.00, 58.50 },
@@ -177,7 +162,7 @@ public class FareService {
                 rowCells.add(new FareCell(
                     price,
                     String.format("$%.2f", price),
-                    FareCell.Status.ACTIVE,
+                    FareStatus.ACTIVE,
                     true,
                     rowHeaders.get(r),
                     colHeaders.get(c)
@@ -197,7 +182,7 @@ public class FareService {
     }
 
     /**
-     * Helper to mock realistic NYW ticket prices[cite: 3, 5].
+     * Helper to mock realistic NYW ticket prices.
      */
     private Double resolveOdPrice(String dest, String prod) {
         double base = dest.contains("Midtown") ? 13.25 : 15.00;
@@ -205,7 +190,7 @@ public class FareService {
             case "Child One-Way" -> base - 4.25;
             case "10-Trip Pass" -> base * 8.5;
             case "Monthly Pass" -> base * 31.25;
-            default -> base; // Adult One-Way[cite: 3, 5]
+            default -> base; // Adult One-Way
         };
     }
 }

@@ -1,7 +1,5 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
-import java.util.List;
-
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,9 +8,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.Tenant;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.TenantContext;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.*;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.*;
+import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 
 @Controller
 @RequestMapping("/fares")
@@ -20,35 +18,20 @@ public class FareController {
 
     private final TenantContext tenantContext;
     private final FareService fareService;
+    private final TenantService tenantService;
 
-    public FareController(TenantContext tenantContext, FareService fareService) {
+    public FareController(TenantContext tenantContext, FareService fareService, TenantService tenantService) {
         this.tenantContext = tenantContext;
         this.fareService = fareService;
+        this.tenantService = tenantService;
     }
 
     @GetMapping
     public String getFares(
-            @RequestParam(required = false) String tenant,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String product,
             Model model) {
 
-        // Process explicit tenant selection
-        if (tenant != null && !tenant.isBlank()) {
-            boolean isNewTenant = tenantContext.getSelectedTenant() == null ||
-                    !tenantContext.getSelectedTenant().getCode().equalsIgnoreCase(tenant);
-
-            if (isNewTenant) {
-                Tenant resolvedTenant = fareService.getTenantByCode(tenant);
-                tenantContext.setSelectedTenant(resolvedTenant);
-
-                // Clear secondary filter state when switching tenants
-                tenantContext.setSelectedOrigin(null);
-                tenantContext.setSelectedProduct(null);
-            }
-        }
-
-        // Process secondary selections only when a tenant is actively chosen
         Tenant currentTenant = tenantContext.getSelectedTenant();
         if (currentTenant != null) {
             if (currentTenant.getGridMode() == GridMode.OD) {

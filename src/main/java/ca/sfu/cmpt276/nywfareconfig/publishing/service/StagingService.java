@@ -1,30 +1,90 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
-import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ReviewView;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ScheduleChangeView;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 
 @Service
 public class StagingService {
 
-    // Sample fare configuration data
-    public List<ReviewView> getPendingChanges() {
+    /**
+     * STORY 5.1: Mock configuration comparisons.
+     *
+     * Supports multiple origin terminals and zonal configurations.
+     * Later, these records will come from PostgreSQL.
+     */
+    public List<ConfigurationChangeView> getConfigurationChanges() {
 
         return List.of(
-            new ReviewView("Adult One-Way", 9.00, 10.00),
-            new ReviewView("Child One-Way", 5.00, 5.00),
-            new ReviewView("Senior One-Way", 7.00, 7.50),
-            new ReviewView("Adult Round-Trip", 18.00, 20.00)
+            // NY Waterway: Edgewater to Midtown
+            new ConfigurationChangeView(
+                "NYW_SANDBOX",
+                GridMode.OD,
+                "EDGEWTR",
+                "Midtown / W. 39th St",
+                "Adult One-Way",
+                "Adult One-Way",
+                new BigDecimal("13.25"),
+                new BigDecimal("14.00")
+            ),
+
+            // NY Waterway: Port Imperial to Midtown
+            new ConfigurationChangeView(
+                "NYW_SANDBOX",
+                GridMode.OD,
+                "PORTIMP",
+                "Midtown / W. 39th St",
+                "10-Trip Pass",
+                "10-Trip Pass",
+                new BigDecimal("112.63"),
+                new BigDecimal("115.00")
+            ),
+
+            // NY Waterway: Midtown to Edgewater
+            new ConfigurationChangeView(
+                "NYW_SANDBOX",
+                GridMode.OD,
+                "MIDTOWN",
+                "Edgewater",
+                "Child One-Way",
+                "Child One-Way",
+                new BigDecimal("10.75"),
+                new BigDecimal("11.00")
+            ),
+
+            // Metra: Zone 1 to Zone 2, Adult One-Way
+            new ConfigurationChangeView(
+                "METRA",
+                GridMode.ZONAL,
+                "ADULT_ONEWAY",
+                "Zone 1",
+                "Zone 2",
+                "Adult One-Way",
+                new BigDecimal("4.00"),
+                new BigDecimal("4.50")
+            ),
+
+            // Unchanged example for filter testing
+            new ConfigurationChangeView(
+                "NYW_SANDBOX",
+                GridMode.OD,
+                "EDGEWTR",
+                "Brookfield Place",
+                "Adult One-Way",
+                "Adult One-Way",
+                new BigDecimal("15.00"),
+                new BigDecimal("15.00")
+            )
         );
     }
 
-    // Sample schedule and availability configuration data
+    // Existing schedule data retained for the current Thymeleaf page.
     public List<ScheduleChangeView> getScheduleChanges() {
-
         return List.of(
             new ScheduleChangeView(
                 "Weekend Service",
@@ -43,11 +103,7 @@ public class StagingService {
             )
         );
     }
-
-    // Staging method invoked by Epic 3 AvailabilityService
-    public void stageAvailabilityChange(String tenantCode, AvailabilityRule rule) {
-        System.out.println("Staging availability toggle for tenant " + tenantCode 
-            + ": Product [" + rule.getProductCode() + "] at Site [" + rule.getSiteCode() 
-            + "] -> Available: " + rule.isAvailable());
-    }
 }
+
+
+
