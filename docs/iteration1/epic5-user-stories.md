@@ -4,75 +4,108 @@
 
 - **GitHub Issue Title:** `[Epic 5] View Pending Configuration Changes`
 
-- **Iteration:** `3`
+- **Iteration:** `2` 🟦 [UPDATED]
 
 - **Story Points:** `3`
 
-- **Story Description:** As a **NY Waterway Operator**, I want to **review pending ticket configuration changes alongside the currently published configurations**, so that **I can identify and verify proposed modifications before they are published to ticket vending machines**.
+- **Story Description:** 🟦 [UPDATED]  
+  As a **NY Waterway Operator**, I want to **review pending fare configuration changes alongside their original values**, so that **I can identify and verify proposed modifications before they are published to ticket vending machines**.
 
 - **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`).
 
-- **Preconditions & Triggers:**
-  - *Precondition:* The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
-  - *Precondition:* The current `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
-  - *Precondition:* A reliable previously published configuration baseline is available through a supported publication endpoint or an application-maintained snapshot.
-  - *Trigger:* The user navigates to the Configuration Review page (`GET /review`).
+#### Preconditions & Triggers
 
-- **Actions / Postconditions:**
-  - *Action:* The Spring Boot application retrieves the current sandbox configuration through the Java `CaracalApiClient`, using supported endpoints such as `price-simulate` and `availability-simulate`.
-  - *Action:* The application retrieves the previously published configuration baseline through `CaracalApiClient` or an application-maintained snapshot.
-  - *Action:* The Java `ValidationService` compares the published and proposed configurations to identify changes in ticket prices and availability.
-  - *Action:* The application displays published and proposed values side by side, highlighting modified entries.
-  - *Postcondition:* The user can review pending configuration changes without modifying or publishing any data.
-  - *Postcondition:* If no differences exist, the application displays a message indicating that no changes are pending.
+- **Precondition:** The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
+- 🟦 **[UPDATED] Precondition:** The application can retrieve pending fare drafts for the currently selected tenant from PostgreSQL.
+- 🟦 **[UPDATED] Precondition:** Original fare values are available in the saved draft records for comparison.
+- **Trigger:** The user navigates to the Configuration Review page (`GET /review`).
+
+#### Actions / Postconditions
+
+- 🟦 **[UPDATED] Action:** The Spring Boot application retrieves pending fare drafts using `FareDraftService.getPendingDrafts(tenantCode)`.
+- 🟩 **[NEW] Action:** The backend converts the retrieved drafts into `ConfigurationChangeView` objects.
+- 🟦 **[UPDATED] Action:** The application displays original and proposed fare values side by side, highlighting modified entries.
+- 🟩 **[NEW] Action:** The review interface supports both origin-destination (O-D) and zonal fare configurations.
+- 🟩 **[NEW] Action:** The interface retrieves pending fare changes across multiple origin terminals.
+- **Postcondition:** Users can review pending changes without modifying or publishing configuration data.
+- **Postcondition:** If no pending changes exist, the application displays an appropriate empty-state message.
 
 #### Acceptance Criteria
 
 1. Both `OPERATOR` and `CLIENT_SERVICES` users can access the Configuration Review page. Unauthenticated users must log in before accessing it.
-2. The application displays the current `NYW_SANDBOX` configuration alongside the previously published configuration.
-3. Each identified change includes the affected origin terminal, destination route, ticket type, published value, and proposed value.
-4. Changes in ticket prices and availability are visually highlighted, with unchanged entries clearly distinguishable.
-5. If no differences exist, the application displays a message indicating that there are no pending changes.
-6. If the Caracal API or published baseline cannot be retrieved, the application displays an appropriate error message rather than presenting incomplete comparison results.
-7. Configuration retrieval and comparison are performed server-side through Java services. JavaScript is responsible only for frontend display and user interactions.
-8. The comparison uses a reliable published baseline. The `publication-diff` endpoint is not used for direct draft-versus-published comparison because it compares the last two publications.
+2. 🟦 **[UPDATED]** The application retrieves pending fare drafts from PostgreSQL for the selected tenant.
+3. 🟦 **[UPDATED]** Each identified fare change includes the relevant origin, destination, ticket product, original value, and proposed value.
+4. 🟦 **[UPDATED]** Modified fare values are visually highlighted, allowing operators to distinguish pending changes.
+5. If no pending changes exist, the application displays a message indicating that no changes are pending.
+6. 🟩 **[NEW]** The review interface supports changes across multiple origin terminals.
+7. 🟩 **[NEW]** Both O-D and zonal fare configurations are supported.
+8. 🟦 **[UPDATED]** Fare draft retrieval and mapping are performed server-side through Java services. JavaScript handles frontend display and interactions.
 9. Viewing pending changes does not modify or publish configuration data.
+10. 🟩 **[NEW]** Pending drafts are retrieved using the selected tenant context to prevent displaying changes belonging to another tenant.
 
 #### UI Mockup
 
-Example of the Configuration Review page:
+Configuration Review - NYW_SANDBOX
 
-    Configuration Review - NYW_SANDBOX
+| Origin | Destination | Ticket Type | Original | Proposed | Status |
+|---|---|---|---|---|---|
+| EDGEWTR | MIDTOWN | Adult | $13.25 | $14.00 | Changed |
+| EDGEWTR | MIDTOWN | Child | $7.00 | $7.50 | Changed |
+| MIDTOWN | EDGEWTR | Senior | $8.00 | $9.00 | Changed |
 
-    Origin    Destination   Ticket Type   Published   Proposed   Status
-    -------------------------------------------------------------------
-    EDGEWTR   MIDTOWN       Adult         $13.25      $14.00     Changed
-    EDGEWTR   MIDTOWN       Child         $7.00       $7.00      Unchanged
-    MIDTOWN   EDGEWTR       Senior        Sellable    Not Sold   Changed
+🟦 **[UPDATED]** The interface displays pending fare drafts with original and proposed values rather than requiring a live comparison against a previously published Caracal snapshot.
 
-    [Changed entries are visually highlighted]
+🟩 **[NEW]** A changed-only filter allows operators to focus on modified entries.
 
 #### Test Scenarios
 
-- **Manual (Success):** Log in as an `OPERATOR` and modify an adult ticket price in `NYW_SANDBOX` from $13.25 to $14.00. Open the Configuration Review page and verify that the published and proposed prices appear side by side, with the difference highlighted.
-- **Manual (No Changes):** Open the Configuration Review page when the sandbox matches the published baseline. Verify that the application displays a message indicating that no changes are pending.
-- **Manual (Failure / Edge Case):** Simulate an unavailable Caracal API or missing published baseline. Verify that the application displays an appropriate error message without crashing or showing misleading results.
-- **Manual (Access Control):** Verify that both `OPERATOR` and `CLIENT_SERVICES` users can access the page. Attempt to access the page without authentication and verify that login is required.
-- **Automated (Spring MVC Slice Test):** Use JUnit, `@WebMvcTest`, and `MockMvc` to verify that an authenticated `OPERATOR` or `CLIENT_SERVICES` request to `GET /review` returns HTTP 200 and includes the configuration comparison model attribute. Mock the comparison service with known published and proposed values. Verify that unauthenticated requests are rejected or redirected according to the Spring Security configuration.
-- **Automated (JUnit Service Test):** Test `ValidationService` using known published and draft configurations. Verify that modified prices and availability statuses are identified correctly and matching values produce no pending differences.
+- **Manual (Success):** 🟦 [UPDATED]  
+  Log in as an `OPERATOR`, modify an adult ticket price, and save it as a draft. Open the Configuration Review page and verify that the original and proposed values appear side by side.
+
+- **Manual (No Changes):** 🟦 [UPDATED]  
+  Open the Configuration Review page when no pending fare drafts exist. Verify that the application displays an appropriate empty-state message.
+
+- **Manual (Multi-Origin):** 🟩 [NEW]  
+  Save fare drafts for multiple origin terminals and verify that all pending changes appear correctly in the review interface.
+
+- **Manual (Zonal):** 🟩 [NEW]  
+  Save a zonal fare draft and verify that the correct origin zone, destination zone, ticket product, and price values are displayed.
+
+- **Manual (Persistence):** 🟩 [NEW]  
+  Save a fare draft, refresh the Configuration Review page, and verify that the pending change remains visible.
+
+- **Manual (Access Control):**  
+  Verify that authorized users can access the review page and unauthenticated users are required to log in.
+
+- **Automated (Spring MVC Slice Test):** 🟦 [UPDATED]  
+  Use JUnit, `@WebMvcTest`, and `MockMvc` to verify pending draft retrieval, tenant isolation, multi-origin changes, zonal mapping, and authentication requirements.
+
+- **Automated (Tenant Isolation):** 🟩 [NEW]  
+  Verify that the pending changes endpoint returns only drafts associated with the selected tenant.
 
 #### Actionable Sub-tasks
 
-- [ ] Create the Configuration Review page using HTML, CSS, and the application's frontend template system.
-- [ ] Implement a Spring Boot controller endpoint for `GET /review`.
-- [ ] Extend `CaracalApiClient` to retrieve current `NYW_SANDBOX` pricing and availability through `price-simulate` and `availability-simulate`.
-- [ ] Retrieve the previously published configuration through a supported publication endpoint, such as `publication-payload-get` if its response contains the required data, or maintain a reliable application-side snapshot.
-- [ ] Implement server-side Java comparison logic in `ValidationService` to identify differences between published and proposed configurations.
-- [ ] Ensure comparisons use matching terminal, route, ticket type, and time contexts, including relevant weekday, weekend, and monthly availability conditions.
-- [ ] Display published and proposed values side by side, with visual highlighting for modified entries.
-- [ ] Enforce access for authenticated `OPERATOR` and `CLIENT_SERVICES` users through Spring Security.
-- [ ] Handle missing baselines, empty comparisons, and backend retrieval failures.
-- [ ] Implement automated JUnit and MockMvc tests for comparison results and access control.
+- [x] Create the Configuration Review page using HTML, CSS, and the application's frontend template system.
+- [x] Implement the Spring Boot controller for the Configuration Review page.
+- [x] 🟦 [UPDATED] Connect `GET /api/publishing/pending-changes` to the persistent fare draft backend.
+- [x] 🟩 [NEW] Retrieve pending fare drafts using `FareDraftService`.
+- [x] 🟩 [NEW] Map pending drafts into `ConfigurationChangeView` objects.
+- [x] 🟦 [UPDATED] Display original and proposed fare values side by side with visual highlighting.
+- [x] 🟩 [NEW] Support multi-origin fare draft review.
+- [x] 🟩 [NEW] Support O-D and zonal fare configurations.
+- [x] Handle empty pending-change results.
+- [x] 🟩 [NEW] Implement automated tests covering tenant isolation, multi-origin support, and zonal mapping.
+- [x] 🟩 [NEW] Verify the complete fare editing, draft saving, and configuration review workflow.
+
+#### Deferred Requirements
+
+- 🟧 **[DEFERRED]** Retrieve a verified published configuration baseline through `CaracalApiClient` or an application-maintained snapshot.
+- 🟧 **[DEFERRED]** Compare the current sandbox configuration against the previously published configuration.
+- 🟧 **[DEFERRED]** Retrieve pricing and availability data through `price-simulate` and `availability-simulate`.
+- 🟧 **[DEFERRED]** Implement published-versus-proposed configuration comparison through `ValidationService`.
+- 🟧 **[DEFERRED]** Handle unavailable Caracal APIs or missing published baselines.
+- 🟧 **[DEFERRED]** Support additional availability comparisons, including weekday, weekend, and monthly conditions.
+- 🟧 **[DEFERRED]** Implement configuration validation, publishing, and publication history in subsequent Epic 5 stories.
 
 ---
 

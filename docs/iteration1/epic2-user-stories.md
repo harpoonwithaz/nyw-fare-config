@@ -485,44 +485,69 @@ This document defines the formal user stories and sub-stories for Epic 2 of the 
 
 ---
 
-### Story 2.6b: Transaction Review Diff Modal & Batch API Dispatch
+### Story 2.6b: Transaction Review Diff Modal & Draft Persistence 🟦 [UPDATED]
 
 - **GitHub Issue Title:** `[Rate Grid] Transaction Review Diff Modal & Batch API Dispatch`
 
-- **Iteration:** `3`
+- **Iteration:** `2` 🟦 [UPDATED]
 
 - **Story Points:** `3`
 
-- **Story Description:** As an authenticated operator, I want to review an itemized diff of all staged changes before batch-submitting them, so that I can verify accuracy and persist valid updates to the platform API under my audit identity.
+- **Story Description:** 🟦 [UPDATED]  
+  As an authenticated operator, I want to review an itemized diff of all staged fare changes before saving them as drafts, so that I can verify accuracy and preserve proposed updates without immediately publishing them to the Caracal platform.
 
-- **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`)
+- **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`).
 
-- **Preconditions & Triggers:** 
-  - *Precondition:* One or more cells are in draft state.
-  - *Trigger:* The operator clicks the "Save Rate Changes" button.
+#### Preconditions & Triggers
+- **Precondition:** One or more fare cells are in draft state.
+- **Trigger:** The operator clicks the "Save Rate Changes" button.
 
-- **Actions / Postconditions:** 
-  - *Action:* A confirmation diff modal lists each change (Pair, Product/Tier, Old Rate, New Rate). Clicking "Confirm & Publish" initiates batch persistence.
-  - *Postcondition:* The Spring Boot backend dispatches a batch request to `/functions/od-matrix-set` with the operator's `X-Actor` header and clears the draft state.
+#### Actions / Postconditions
+- 🟦 **[UPDATED] Action:** A confirmation diff modal lists each pending change, including the origin-destination pair, ticket product, original rate, and proposed rate.
+- 🟦 **[UPDATED] Action:** Clicking "Confirm & Save Drafts" submits the staged changes to the Spring Boot backend through `POST /fares/drafts`.
+- 🟩 **[NEW] Action:** The backend persists the pending fare changes in PostgreSQL.
+- 🟦 **[UPDATED] Postcondition:** The changes are saved as drafts without modifying the published configuration.
+- 🟩 **[NEW] Postcondition:** Saved drafts remain available for subsequent review through the Configuration Review page.
 
 #### Acceptance Criteria
 
-1. Diff modal displays an itemized list of all pending changes with Old vs. New rates.
-2. Backend DTO validates currency fields with `@DecimalMin("0.00")` and `@Digits(fraction=2)`.
-3. Outgoing platform request carries `X-Actor: operator:<email>`.
-4. On HTTP 200 from the platform, draft state clears and a success banner displays the rules written count.
-5. If the platform is unreachable or returns an error, draft state is retained and an error banner is displayed.
+1. The diff modal displays an itemized list of all pending fare changes with original and proposed rates.
+2. 🟦 **[UPDATED]** The operator can review staged fare changes before submitting them as drafts rather than immediately publishing them.
+3. 🟦 **[UPDATED]** Clicking "Confirm & Save Drafts" submits the changes as a batch to `POST /fares/drafts`.
+4. 🟩 **[NEW]** The backend persists pending fare drafts in PostgreSQL.
+5. 🟦 **[UPDATED]** After successful submission, the application confirms that the drafts were saved.
+6. 🟦 **[UPDATED]** If draft persistence fails, an appropriate error message is displayed and unsaved changes are retained.
+7. 🟩 **[NEW]** Saved fare drafts remain available for review after refreshing the application.
+8. 🟩 **[NEW]** The workflow supports staged fare changes across multiple origin terminals.
 
 #### Test Scenarios
 
-- **Manual (Success):** Click "Save Rate Changes" $\to$ review diff modal $\to$ confirm. Verify success toast appears ("X price rules updated") and amber styling clears from cells.
-- **Manual (Failure / Edge Case):** In the diff review modal, click "Confirm & Publish" while the platform backend is offline or returns an error (HTTP 500 / 400). Verify an error banner displays ("Failed to persist changes to platform: upstream service error"), the modal remains open or preserves the staged list, and all amber draft borders remain on the grid so unsaved edits are not lost.
-- **Automated (Unit / Slice / Integration):** WireMock integration test asserting `/functions/od-matrix-set` receives the expected payload and `X-Actor` header, returning HTTP 200; simulate HTTP 500 from `/functions/od-matrix-set` asserting the controller catches the failure, returns an error status to the client, and retains draft state.
+- **Manual (Success):** 🟦 [UPDATED]  
+  Modify one or more fare cells, click "Save Rate Changes", and review the original and proposed rates in the diff modal. Select "Confirm & Save Drafts" and verify that the changes are successfully persisted.
+
+- **Manual (Failure / Edge Case):** 🟦 [UPDATED]  
+  Simulate an unsuccessful draft-saving request. Verify that the application displays an error and retains unsaved changes so the operator can retry.
+
+- **Manual (Multi-Origin):** 🟩 [NEW]  
+  Modify fares across multiple origin terminals and verify that staged changes are preserved when switching between origins.
+
+- **Manual (Persistence):** 🟩 [NEW]  
+  Save fare drafts, refresh the Configuration Review page, and verify that the saved changes remain visible.
+
+- **Automated (Unit / Slice / Integration):** 🟦 [UPDATED]  
+  Verify that the backend accepts fare draft batches, persists the changes, and retrieves pending drafts for the appropriate tenant.
 
 #### Actionable Sub-tasks
 
-- [ ] Build Bootstrap diff review modal displaying staged item changes.
-- [ ] Implement Spring Boot `RateBatchUpdateDto` with Bean Validation annotations.
-- [ ] Implement `CaracalApiClient.setOdMatrix()` passing `X-Actor` header.
-- [ ] Connect frontend "Confirm & Publish" button to controller batch POST endpoint.
-- [ ] Write WireMock tests covering success and HTTP 500 error handling.
+- [x] Build Bootstrap diff review modal displaying staged fare changes.
+- [x] 🟦 [UPDATED] Connect the "Confirm & Save Drafts" button to `POST /fares/drafts`.
+- [x] 🟩 [NEW] Integrate PostgreSQL-backed fare draft persistence.
+- [x] 🟩 [NEW] Support staged changes across multiple origin terminals.
+- [x] 🟩 [NEW] Verify the end-to-end fare editing, draft saving, and review workflow.
+- [x] 🟩 [NEW] Verify saved drafts remain accessible after refreshing.
+
+#### Deferred Requirements
+
+- 🟧 **[DEFERRED]** Implement direct batch publishing through `/functions/od-matrix-set`.
+- 🟧 **[DEFERRED]** Include the authenticated operator's `X-Actor` audit header in outgoing Caracal platform requests.
+- 🟧 **[DEFERRED]** Implement platform publication success/failure handling and corresponding WireMock tests.
