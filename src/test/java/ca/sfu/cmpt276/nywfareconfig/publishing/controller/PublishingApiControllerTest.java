@@ -211,6 +211,41 @@ class PublishingApiControllerTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
     }
+
+
+    @Test
+    void shouldMapZonalDraftCorrectly() throws Exception {
+
+        Tenant tenant = mock(Tenant.class);
+
+        when(tenant.getCode()).thenReturn("METRA");
+        when(tenantContext.getSelectedTenant()).thenReturn(tenant);
+
+        FareDraft draft = new FareDraft();
+        draft.setTenantCode("METRA");
+        draft.setGridMode(GridMode.ZONAL);
+        draft.setOriginIdentifier("ZONE_1");
+        draft.setDestIdentifier("ZONE_2");
+        draft.setProductCode("ADULT_ONEWAY");
+        draft.setOriginalPrice(new BigDecimal("4.00"));
+        draft.setDraftPrice(new BigDecimal("4.50"));
+
+        when(fareDraftService.getPendingDrafts("METRA"))
+                .thenReturn(List.of(draft));
+
+        mockMvc.perform(get("/api/publishing/pending-changes")
+                .with(user("testoperator").roles("OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].gridMode").value("ZONAL"))
+            .andExpect(jsonPath("$[0].selectedContext")
+                    .value("ADULT_ONEWAY"))
+            .andExpect(jsonPath("$[0].rowKey").value("ZONE_1"))
+            .andExpect(jsonPath("$[0].colKey").value("ZONE_2"))
+            .andExpect(jsonPath("$[0].publishedPrice").value(4.00))
+            .andExpect(jsonPath("$[0].stagedPrice").value(4.50))
+            .andExpect(jsonPath("$[0].changed").value(true));
+    }
+
 }
 
 
