@@ -160,11 +160,18 @@ document.addEventListener("DOMContentLoaded", function () {
             btnSave.classList.add("disabled");
             btnSave.setAttribute("disabled", "true");
 
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute("content");
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute("content");
+            const headers = {
+                "Content-Type": "application/json"
+            };
+            if (csrfToken && csrfHeader) {
+                headers[csrfHeader] = csrfToken;
+            }
+
             fetch("/availability/api/stage", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: headers,
                 body: JSON.stringify(payload)
             })
             .then(response => {
@@ -175,7 +182,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 stagedAvailabilityDrafts.isDirty = false;
                 stagedAvailabilityDrafts.drafts = {};
 
-                if (alertText) alertText.textContent = data.message || "availability drafts staged!";
+                if (alertText) alertText.textContent = data.message || "availability rules saved!";
                 if (alertBanner) {
                     alertBanner.className = "alert alert-success alert-dismissible fade show mb-4 shadow-sm";
                 }
@@ -184,7 +191,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 document.querySelectorAll(".staged-badge").forEach(badge => {
                     if (badge.textContent.includes("STAGED")) {
                         badge.className = "badge bg-info-subtle text-info border staged-badge";
-                        badge.innerHTML = `<i class="bi bi-clock-fill me-1"></i>STAGED IN DB`;
+                        badge.innerHTML = `<i class="bi bi-clock-fill me-1"></i>SAVED IN DB`;
                     }
                 });
             })
@@ -195,7 +202,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (alertBanner) {
                     alertBanner.className = "alert alert-danger alert-dismissible fade show mb-4 shadow-sm";
                 }
-                if (alertText) alertText.textContent = "error staging availability changes. try again.";
+                if (alertText) alertText.textContent = "error saving availability changes. try again.";
             });
         });
     }

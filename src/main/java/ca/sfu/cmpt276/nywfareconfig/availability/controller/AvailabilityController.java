@@ -27,11 +27,7 @@ public class AvailabilityController {
     @GetMapping
     public String showAvailabilityPage(@RequestParam(value = "site", defaultValue = "MIDTOWN") String siteCode,
                                        Model model) {
-        ProductAvailabilityView view = availabilityService.getProductAvailability(siteCode);
-
         model.addAttribute("siteCode", siteCode);
-        model.addAttribute("availabilityView", view);
-
         model.addAttribute("terminals", List.of(
             Map.of("code", "MIDTOWN", "name", "Midtown / W. 39th St"),
             Map.of("code", "PIER11", "name", "Pier 11 / Wall St"),
@@ -39,17 +35,30 @@ public class AvailabilityController {
             Map.of("code", "EDGEWTR", "name", "Edgewater Ferry Landing")
         ));
 
+        if (tenantContext.getSelectedTenant() != null) {
+            String tenantCode = tenantContext.getSelectedTenant().getCode();
+            ProductAvailabilityView view = availabilityService.getProductAvailability(tenantCode, siteCode);
+            model.addAttribute("availabilityView", view);
+        }
+
         return "availability/availability";
     }
 
     @PostMapping("/api/stage")
     @ResponseBody
     public ResponseEntity<?> stageAvailabilityDrafts(@RequestBody List<AvailabilityDraftDTO> drafts) {
-        String tenantCode = (tenantContext != null && tenantContext.getSelectedTenant() != null)
-                ? tenantContext.getSelectedTenant().getCode()
-                : "NYW";
+        if (tenantContext.getSelectedTenant() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERROR",
+                "message", "No active tenant selected."
+            ));
+        }
 
+        String tenantCode = tenantContext.getSelectedTenant().getCode();
         availabilityService.stageAvailabilityDrafts(tenantCode, drafts);
-        return ResponseEntity.ok(Map.of("status", "SUCCESS", "message", drafts.size() + " availability drafts saved to DB."));
+        return ResponseEntity.ok(Map.of(
+            "status", "SUCCESS",
+            "message", drafts.size() + " availability rules saved to DB."
+        ));
     }
 }

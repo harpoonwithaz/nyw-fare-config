@@ -15,24 +15,22 @@
         </thead>
         <tbody>
             <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
-                <!-- Product Category Name -->
                 <td class="ps-4 fw-semibold text-dark">
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-ticket-perforated-fill text-primary fs-5"></i>
-                        <span th:text="${prod}">ADULT</span>
+                        <span th:text="${prod}">ADULT_ONEWAY</span>
                     </div>
                 </td>
 
-                <!-- Switch Toggle -->
                 <td>
                     <div class="form-check form-switch custom-switch">
-                        <input class="form-check-input availability-toggle" 
-                               type="checkbox" 
-                               role="switch" 
+                        <input class="form-check-input availability-toggle"
+                               type="checkbox"
+                               role="switch"
                                th:id="${'toggle-' + prod}"
                                th:checked="${availabilityView.isProductAvailable(prod)}"
                                th:data-product="${prod}">
-                        <label class="form-check-label fw-medium ms-2 status-label" 
+                        <label class="form-check-label fw-medium ms-2 status-label"
                                th:for="${'toggle-' + prod}"
                                th:text="${availabilityView.isProductAvailable(prod) ? 'Available' : 'Unavailable'}">
                             Available
@@ -40,27 +38,26 @@
                     </div>
                 </td>
 
-                <!-- Disabled Days / Temporal Rule Display -->
                 <td>
                     <div class="temporal-condition-badge-container d-flex align-items-center gap-2">
-                        <span class="badge bg-secondary-subtle text-secondary border condition-badge">
-                            <i class="bi bi-clock-history me-1"></i>All Days Active
+                        <span class="badge border condition-badge"
+                              th:classappend="${availabilityView.getConditionForProduct(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info' : 'bg-secondary-subtle text-secondary'">
+                            <i class="bi bi-clock-history me-1"></i>
+                            <span th:text="${availabilityView.getConditionSummary(prod)}">All Days Active</span>
                         </span>
                     </div>
                 </td>
 
-                <!-- Staged Status Indicator -->
                 <td>
                     <span class="badge bg-success-subtle text-success border staged-badge">
                         <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
                     </span>
                 </td>
 
-                <!-- Action Menu -->
                 <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-outline-secondary btn-configure-rule" 
+                    <button class="btn btn-sm btn-outline-secondary btn-configure-rule"
                             th:data-product="${prod}"
-                            data-bs-toggle="modal" 
+                            data-bs-toggle="modal"
                             data-bs-target="#conditionBuilderModal"
                             title="Configure Condition">
                         <i class="bi bi-gear-fill"></i>

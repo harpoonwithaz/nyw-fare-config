@@ -4,8 +4,10 @@ import ca.sfu.cmpt276.nywfareconfig.availability.dto.AvailabilityDraftDTO;
 import ca.sfu.cmpt276.nywfareconfig.availability.dto.ProductAvailabilityView;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.TemporalCondition;
-import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
+import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
+import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -14,56 +16,82 @@ import java.util.*;
 @Service
 public class AvailabilityService {
 
-    private final StagingService stagingService;
+    private final AvailabilityRuleRepository availabilityRuleRepository;
+    private final ActorService actorService;
 
-    // Default products for prototype fallback
-    private static final List<String> DEFAULT_PRODUCTS = List.of("ADULT", "SENIOR", "YOUTH", "CHILD");
+    public static final List<String> CANONICAL_PRODUCTS = List.of(
+        "ADULT_ONEWAY",
+        "CHILD_ONEWAY",
+        "SENIOR_ONEWAY",
+        "FULL_10TRIP",
+        "FULL_MONTHLY"
+    );
 
-    public AvailabilityService(StagingService stagingService) {
-        this.stagingService = stagingService;
+    public AvailabilityService(AvailabilityRuleRepository availabilityRuleRepository, ActorService actorService) {
+        this.availabilityRuleRepository = availabilityRuleRepository;
+        this.actorService = actorService;
     }
 
-    public ProductAvailabilityView getProductAvailability(String siteCode) {
-        Map<String, Boolean> toggles = new HashMap<>();
-        for (String prod : DEFAULT_PRODUCTS) {
+    public ProductAvailabilityView getProductAvailability(String tenantCode, String siteCode) {
+        Map<String, Boolean> toggles = new LinkedHashMap<>();
+        Map<String, TemporalCondition> conditions = new HashMap<>();
+
+        for (String prod : CANONICAL_PRODUCTS) {
             toggles.put(prod, true);
         }
-        return new ProductAvailabilityView(siteCode, DEFAULT_PRODUCTS, toggles);
+
+        if (tenantCode != null && !tenantCode.isBlank()) {
+            List<AvailabilityRule> savedRules = availabilityRuleRepository.findByTenantCodeAndSiteCode(tenantCode, siteCode);
+            for (AvailabilityRule rule : savedRules) {
+                toggles.put(rule.getProductCode(), rule.isAvailable());
+                if (rule.getTemporalCondition() != null) {
+                    conditions.put(rule.getProductCode(), rule.getTemporalCondition());
+                }
+            }
+        }
+
+        return new ProductAvailabilityView(siteCode, CANONICAL_PRODUCTS, toggles, conditions);
     }
 
+    @Transactional
     public void stageAvailabilityDrafts(String tenantCode, List<AvailabilityDraftDTO> drafts) {
+        // Ensure an authenticated actor is present for audit integrity
+        actorService.currentActorHeader();
+
         for (AvailabilityDraftDTO draft : drafts) {
-            AvailabilityRule rule = new AvailabilityRule(
-                tenantCode,
-                draft.getSiteCode(),
-                draft.getProductCode(),
-                draft.isAvailable()
-            );
+            AvailabilityRule rule = availabilityRuleRepository
+                .findByTenantCodeAndSiteCodeAndProductCode(tenantCode, draft.getSiteCode(), draft.getProductCode())
+                .orElseGet(() -> new AvailabilityRule(
+                    tenantCode,
+                    draft.getSiteCode(),
+                    draft.getProductCode(),
+                    draft.isAvailable()
+                ));
+
+            rule.setAvailable(draft.isAvailable());
 
             if (draft.getConditionType() != null && !draft.getConditionType().isEmpty()) {
-                TemporalCondition condition = new TemporalCondition();
+                TemporalCondition condition = rule.getTemporalCondition() != null
+                    ? rule.getTemporalCondition()
+                    : new TemporalCondition();
+
                 condition.setName(draft.getProductCode() + " Availability Rule");
                 condition.setConditionType(draft.getConditionType());
                 condition.setDaysOfWeek(draft.getDaysOfWeek());
 
-                if (draft.getStartTime() != null && !draft.getStartTime().isEmpty()) {
-                    condition.setStartTime(LocalTime.parse(draft.getStartTime()));
-                }
-                if (draft.getEndTime() != null && !draft.getEndTime().isEmpty()) {
-                    condition.setEndTime(LocalTime.parse(draft.getEndTime()));
-                }
-                if (draft.getStartDate() != null && !draft.getStartDate().isEmpty()) {
-                    condition.setStartDate(LocalDate.parse(draft.getStartDate()));
-                }
-                if (draft.getEndDate() != null && !draft.getEndDate().isEmpty()) {
-                    condition.setEndDate(LocalDate.parse(draft.getEndDate()));
-                }
+                condition.setStartTime(draft.getStartTime() != null && !draft.getStartTime().isEmpty()
+                    ? LocalTime.parse(draft.getStartTime()) : null);
+                condition.setEndTime(draft.getEndTime() != null && !draft.getEndTime().isEmpty()
+                    ? LocalTime.parse(draft.getEndTime()) : null);
+                condition.setStartDate(draft.getStartDate() != null && !draft.getStartDate().isEmpty()
+                    ? LocalDate.parse(draft.getStartDate()) : null);
+                condition.setEndDate(draft.getEndDate() != null && !draft.getEndDate().isEmpty()
+                    ? LocalDate.parse(draft.getEndDate()) : null);
 
                 rule.setTemporalCondition(condition);
             }
 
-            // Persist to shared staging PostgreSQL table with change_type = 'AVAILABILITY_TOGGLE'
-            stagingService.stageAvailabilityChange(tenantCode, rule);
+            availabilityRuleRepository.save(rule);
         }
     }
 }
