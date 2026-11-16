@@ -1,4 +1,3 @@
-
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import java.util.List;
@@ -8,8 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
-import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
@@ -17,40 +18,79 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 @RequestMapping("/api/publishing")
 public class PublishingApiController {
 
-    private final StagingService stagingService;
+    private final FareDraftService fareDraftService;
     private final TenantContext tenantContext;
 
-    //Use the existing session tenant context.
     public PublishingApiController(
-            StagingService stagingService,
+            FareDraftService fareDraftService,
             TenantContext tenantContext) {
 
-        this.stagingService = stagingService;
+        this.fareDraftService = fareDraftService;
         this.tenantContext = tenantContext;
     }
 
+    // STORY 5.1: Retrieve pending fare drafts for the selected tenant.
     @GetMapping("/pending-changes")
     public ResponseEntity<List<ConfigurationChangeView>> getPendingChanges() {
 
-        //Retrieve the active tenant.
         Tenant selectedTenant = tenantContext.getSelectedTenant();
 
+        // No selected tenant means no pending changes to display.
         if (selectedTenant == null) {
             return ResponseEntity.ok(List.of());
         }
 
         String tenantCode = selectedTenant.getCode();
 
-        //Only return changes for the active tenant.
-        List<ConfigurationChangeView> changes =
-                stagingService.getConfigurationChanges()
-                    .stream()
-                    .filter(change ->
-                        tenantCode.equalsIgnoreCase(change.tenantCode()))
-                    .toList();
+        // Retrieve saved pending drafts from PostgreSQL.
+        // The backend teammate is implementing this service method.
+        List<FareDraft> drafts =
+                fareDraftService.getPendingDrafts(tenantCode);
+
+        // Convert FareDraft entities into the existing review DTO.
+        List<ConfigurationChangeView> changes = drafts.stream()
+                .map(draft -> {
+
+                    boolean isZonal =
+                            draft.getGridMode() == GridMode.ZONAL;
+
+                    return new ConfigurationChangeView(
+                            draft.getTenantCode(),
+                            draft.getGridMode(),
+
+                            // OD: origin terminal
+                            // ZONAL: selected fare product
+                            isZonal
+                                    ? draft.getProductCode()
+                                    : draft.getOriginIdentifier(),
+
+                            // OD: destination terminal
+                            // ZONAL: origin zone
+                            isZonal
+                                    ? draft.getOriginIdentifier()
+                                    : draft.getDestIdentifier(),
+
+                            // OD: fare product
+                            // ZONAL: destination zone
+                            isZonal
+                                    ? draft.getDestIdentifier()
+                                    : draft.getProductCode(),
+
+                            // Product display value
+                            draft.getProductCode(),
+
+                            // Original published price
+                            draft.getOriginalPrice(),
+
+                            // New pending draft price
+                            draft.getDraftPrice()
+                    );
+                })
+                .toList();
 
         return ResponseEntity.ok(changes);
     }
 }
+
 
 

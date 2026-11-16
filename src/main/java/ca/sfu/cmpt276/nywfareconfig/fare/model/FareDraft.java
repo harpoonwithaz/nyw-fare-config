@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -20,7 +21,12 @@ import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
 // Supports both O-D inline edits and Zonal rate-tier operations (tierCode, targetStatus, actionType),
 // while keeping actorEmail and originalPrice server-controlled for review diffs and Caracal's X-Actor audit header.
 @Entity
-@Table(name = "fare_drafts")
+@Table(
+    name = "fare_drafts",
+    indexes = {
+        @Index(name = "idx_fare_drafts_tenant_status", columnList = "tenant_code, draft_status")
+    }
+)
 public class FareDraft {
 
     @Id
@@ -61,7 +67,7 @@ public class FareDraft {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "target_status", nullable = false, length = 30)
-    private FareStatus targetStatus;
+    private FareStatus targetStatus = FareStatus.ACTIVE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action_type", nullable = false, length = 30)
@@ -108,6 +114,12 @@ public class FareDraft {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
+        if (this.draftStatus == null) {
+            this.draftStatus = DraftStatus.PENDING;
+        }
+        if (this.targetStatus == null) {
+            this.targetStatus = FareStatus.ACTIVE;
+        }
     }
 
     @PreUpdate
