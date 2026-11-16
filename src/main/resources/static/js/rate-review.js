@@ -1,124 +1,300 @@
 /* STORY 2.6b: Transaction Review Diff Modal
    Displays staged in-memory fare changes from DraftStateManager before batch submission. */
 
-(function () {
-    "use strict";
+   (function () {
+  "use strict";
 
-    // Format prices consistently as US currency.
-    function formatPrice(price) {
-        const parsed = Number(price);
-        return Number.isFinite(parsed) ? "$" + parsed.toFixed(2) : "$0.00";
+  // Backend endpoint for saving pending fare changes as drafts.
+  const DRAFT_ENDPOINT = "/fares/drafts";
+
+  // Format a numeric fare as a currency string for the review table.
+  function formatPrice(price) {
+    const parsed = Number(price);
+    return Number.isFinite(parsed) ? "$" + parsed.toFixed(2) : "$0.00";
+  }
+
+  // Populate the review modal with all currently staged fare changes.
+  function renderReviewTable(changes) {
+    const tableBody = document.getElementById("rateReviewTableBody");
+    const changeCount = document.getElementById("rateReviewChangeCount");
+
+    if (!tableBody || !changeCount) return;
+
+    tableBody.replaceChildren();
+    changeCount.textContent = String(changes.length);
+
+    // Display an empty state when no changes are pending.
+    if (changes.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+
+      cell.colSpan = 5;
+      cell.className = "text-center text-muted py-4";
+      cell.textContent = "No pending rate changes to display.";
+
+      row.appendChild(cell);
+      tableBody.appendChild(row);
+      return;
     }
 
-    // Populate the comparison table with in-memory drafts.
-    function renderReviewTable(changes) {
-        const tableBody = document.getElementById("rateReviewTableBody");
-        const changeCount = document.getElementById("rateReviewChangeCount");
+    // Create one comparison row for each staged change.
+    changes.forEach(function (change) {
+      const row = document.createElement("tr");
 
-        if (!tableBody || !changeCount) {
-            return;
+      const values = [
+        change.origin,
+        change.destination,
+        change.product,
+        formatPrice(change.originalValue ?? change.originalPrice),
+        formatPrice(change.newValue ?? change.newPrice)
+      ];
+
+      values.forEach(function (value, index) {
+        const cell = document.createElement("td");
+        cell.textContent = value ?? "";
+
+        // Highlight the proposed new fare.
+        if (index === 4) {
+          cell.classList.add(
+            "table-warning",
+            "cell-draft",
+            "fw-bold",
+            "font-monospace",
+            "text-dark"
+          );
         }
 
-        tableBody.replaceChildren();
-        changeCount.textContent = String(changes.length);
+        row.appendChild(cell);
+      });
 
-        if (changes.length === 0) {
-            const row = document.createElement("tr");
-            const cell = document.createElement("td");
+      tableBody.appendChild(row);
+    });
+  }
 
-            cell.colSpan = 5;
-            cell.className = "text-center text-muted py-4";
-            cell.textContent = "No pending rate changes to display.";
+  // Display a submission error inside the review modal.
+  function showModalError(message) {
+    const errorBanner = document.getElementById("rateReviewError");
+    if (!errorBanner) return;
 
-            row.appendChild(cell);
-            tableBody.appendChild(row);
-            return;
-        }
+    errorBanner.textContent = message;
+    errorBanner.hidden = false;
+  }
 
-        changes.forEach(function (change) {
-            const row = document.createElement("tr");
-            const originalRate = change.originalValue ?? change.originalPrice;
-            const newRate = change.newValue ?? change.newPrice;
+  // Clear any previous submission error.
+  function hideModalError() {
+    const errorBanner = document.getElementById("rateReviewError");
+    if (!errorBanner) return;
 
-            const values = [
-                change.origin,
-                change.destination,
-                change.product,
-                formatPrice(originalRate),
-                formatPrice(newRate)
-            ];
+    errorBanner.textContent = "";
+    errorBanner.hidden = true;
+  }
 
-            values.forEach(function (value, index) {
-                const cell = document.createElement("td");
-                cell.textContent = value;
+  // Display a feedback message using the existing fare grid feedback cards.
+  function showGridFeedback(message, level) {
+    const container = document.getElementById("grid-feedback-container");
+    if (!container) return;
 
-                // Make the New Rate column have the same visual properties as fare drafts in the fare grid
-                if (index === 4) {
-                    cell.classList.add(
-                        "table-warning",
-                        "cell-draft",
-                        "fw-bold",
-                        "font-monospace",
-                        "text-dark"
-                    );
-                }
+    container.querySelectorAll(".grid-feedback-slot").forEach(function (slot) {
+      const isTarget = slot.dataset.feedbackLevel === level;
+      slot.hidden = !isTarget;
 
-                row.appendChild(cell);
-            });
+      if (isTarget) {
+        const text = slot.querySelector(".feedback-card-text");
+        if (text) text.textContent = message;
+      }
+    });
+  }
 
-            tableBody.appendChild(row);
-        });
+  // Retrieve the CSRF token generated by Spring Security.
+  // The token must be included in POST requests to protected endpoints.
+  function getCsrfHeaders() {
+    const token = document.querySelector('meta[name="_csrf"]')?.content;
+    const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+    if (!token || !header) {
+      throw new Error(
+        "Security token is missing. Refresh the page and try again."
+      );
     }
 
-    // Open the Bootstrap review modal.
-    function openReviewModal(changes) {
-        const modalElement = document.getElementById("rateReviewModal");
+    return { [header]: token };
+  }
 
-        if (!modalElement || !window.bootstrap) {
-            return;
-        }
+  // Convert staged frontend changes into FareChangeRequest objects.
+  // The backend expects a JSON array containing one request per changed fare.
+  function buildDraftPayload(changes) {
+    const table = document.querySelector(".fare-matrix-table");
 
-        renderReviewTable(changes);
-
-        const errorBanner = document.getElementById("rateReviewError");
-        if (errorBanner) {
-            errorBanner.hidden = true;
-            errorBanner.textContent = "";
-        }
-
-        const modal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
-        modal.show();
+    if (!table) {
+      throw new Error("Fare grid is unavailable.");
     }
 
-    // Wire the "Save Rate Changes" toolbar button to open the review modal.
-    function initializeRateReview() {
-        const saveButton = document.getElementById("saveChangesBtn");
+    // Read the current tenant, grid mode, and selected origin.
+    const tenantCode = table.dataset.tenant;
+    const gridMode = table.dataset.gridMode;
+    const originIdentifier = table.dataset.filterValue;
 
-        if (!saveButton) {
-            return;
-        }
-
-        saveButton.addEventListener("click", function () {
-            // Do not open the review modal if an inline input currently has a validation error.
-            if (document.querySelector(".fare-inline-input.is-invalid")) {
-                return;
-            }
-
-            const pendingChanges = window.DraftStateManager
-                ? window.DraftStateManager.getPendingChanges()
-                : [];
-
-            if (pendingChanges.length === 0) {
-                return;
-            }
-
-            openReviewModal(pendingChanges);
-        });
+    // Inline fare editing currently supports O-D mode only.
+    if (!tenantCode || gridMode !== "OD" || !originIdentifier) {
+      throw new Error("Valid O-D fare grid context is required.");
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initializeRateReview);
-    } else {
-        initializeRateReview();
+    return changes.map(function (change) {
+
+      // Locate the original grid cell using its unique draft key.
+      // This allows us to retrieve backend identifiers rather than UI labels.
+      const cell = Array.from(
+        table.querySelectorAll("td.fare-cell-container")
+      ).find(function (candidate) {
+        return candidate.dataset.rowKey + "::" +
+          candidate.dataset.colKey === change.cellKey;
+      });
+
+      if (!cell) {
+        throw new Error("A changed fare cell could not be found.");
+      }
+
+      const destIdentifier = cell.dataset.rowKey;
+      const productCode = cell.dataset.colKey;
+      const newPrice = Number(change.newValue);
+
+      // Prevent invalid fare information from being submitted.
+      if (
+        !destIdentifier ||
+        !productCode ||
+        cell.dataset.status !== "ACTIVE" ||
+        !Number.isFinite(newPrice) ||
+        newPrice < 0 ||
+        newPrice > 9999.99
+      ) {
+        throw new Error("A pending fare contains invalid information.");
+      }
+
+      // Match the fields defined in the backend FareChangeRequest DTO.
+      return {
+        tenantCode: tenantCode,
+        gridMode: gridMode,
+        originIdentifier: originIdentifier,
+        destIdentifier: destIdentifier,
+        productCode: productCode,
+        newPrice: newPrice,
+        targetStatus: "ACTIVE",
+        actionType: "INLINE_EDIT",
+        tierCode: null
+      };
+    });
+  }
+
+  // Open the Bootstrap review modal and display the pending changes.
+  function openReviewModal(changes) {
+    const modalElement = document.getElementById("rateReviewModal");
+    if (!modalElement || !window.bootstrap) return;
+
+    renderReviewTable(changes);
+    hideModalError();
+
+    const modal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
+    modal.show();
+  }
+
+  // Submit pending changes to the backend and handle the server response.
+  async function submitDrafts() {
+    const confirmButton = document.getElementById("confirmRateChangesBtn");
+    const draftManager = window.DraftStateManager;
+
+    if (!confirmButton || !draftManager) return;
+
+    const changes = draftManager.getPendingChanges();
+
+    if (changes.length === 0) {
+      showModalError("There are no pending changes to save.");
+      return;
     }
+
+    hideModalError();
+
+    // Disable the button to prevent duplicate submissions.
+    confirmButton.disabled = true;
+
+    const originalLabel = confirmButton.innerHTML;
+    confirmButton.textContent = "Saving drafts...";
+
+    try {
+      // Build the request body using the current staged changes.
+      const payload = buildDraftPayload(changes);
+
+      // Send the draft changes as JSON to the Spring Boot controller.
+      const response = await fetch(DRAFT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...getCsrfHeaders()
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(payload)
+      });
+
+      // Treat non-success HTTP responses as failed submissions.
+      if (!response.ok) {
+        throw new Error(
+          "Draft submission failed (HTTP " + response.status + ")."
+        );
+      }
+
+      // Clear local drafts only after the backend confirms success.
+      draftManager.discardAll();
+
+      // Close the review modal after successful submission.
+      const modalElement = document.getElementById("rateReviewModal");
+      window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+
+      // Inform the user that the drafts were saved.
+      showGridFeedback("Fare drafts saved successfully.", "info");
+
+    } catch (error) {
+      // Keep all staged changes so the user can retry the submission.
+      showModalError(
+        error.message || "Unable to save drafts. Please try again."
+      );
+
+    } finally {
+      // Restore the confirmation button regardless of the outcome.
+      confirmButton.disabled = false;
+      confirmButton.innerHTML = originalLabel;
+    }
+  }
+
+  // Register event handlers for opening the modal and saving drafts.
+  function initializeRateReview() {
+    const saveButton = document.getElementById("saveChangesBtn");
+    const confirmButton = document.getElementById("confirmRateChangesBtn");
+
+    if (saveButton) {
+      saveButton.addEventListener("click", function () {
+
+        // Do not open the review modal while a fare input is invalid.
+        if (document.querySelector(".fare-inline-input.is-invalid")) return;
+
+        const changes = window.DraftStateManager
+          ? window.DraftStateManager.getPendingChanges()
+          : [];
+
+        if (changes.length === 0) return;
+
+        openReviewModal(changes);
+      });
+    }
+
+    if (confirmButton) {
+      confirmButton.addEventListener("click", submitDrafts);
+    }
+  }
+
+  // Initialize once the DOM is ready.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeRateReview);
+  } else {
+    initializeRateReview();
+  }
 })();
