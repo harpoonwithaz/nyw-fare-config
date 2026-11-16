@@ -6,7 +6,7 @@
 
   // Backend endpoint for saving pending fare changes as drafts.
   const DRAFT_ENDPOINT = "/fares/drafts";
-  const SAVED_FEEDBACK_KEY = "nyw_staged_Toast";
+  const SAVED_FEEDBACK_KEY = "staged_Toast";
 
   // Format a numeric fare as a currency string for the review table.
   function formatPrice(price) {
