@@ -6,6 +6,7 @@
 
   // Backend endpoint for saving pending fare changes as drafts.
   const DRAFT_ENDPOINT = "/fares/drafts";
+  const SAVED_FEEDBACK_KEY = "staged_Toast";
 
   // Format a numeric fare as a currency string for the review table.
   function formatPrice(price) {
@@ -247,9 +248,15 @@
 
       // Persist feedback message across the page reload.
       sessionStorage.setItem(
-        "staged_Toast",
+        SAVED_FEEDBACK_KEY,
         "Fare drafts saved and staged for publishing."
       );
+
+      // Close the review modal before refreshing the grid.
+      const modalElement = document.getElementById("rateReviewModal");
+      if (modalElement && window.bootstrap) {
+        window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+      }
 
       // Refresh the rate grid from the server so staged cells render from PostgreSQL.
       window.location.reload();
@@ -269,9 +276,9 @@
 
   // Register event handlers for opening the modal and saving drafts.
   function initializeRateReview() {
-    const savedNotice = sessionStorage.getItem("nyw_staged_Toast");
+    const savedNotice = sessionStorage.getItem(SAVED_FEEDBACK_KEY);
     if (savedNotice) {
-      sessionStorage.removeItem("staged_Toast");
+      sessionStorage.removeItem(SAVED_FEEDBACK_KEY);
       showGridFeedback(savedNotice, "info");
     }
 
