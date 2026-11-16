@@ -78,6 +78,31 @@
   font-weight: 600;
 }
 
+/* Staged database draft state (subtle cool tint + left accent bar) */
+.fare-cell-container.cell-staged {
+  background-color: #f0f7ff;
+  box-shadow: inset 3px 0 0 #0d6efd;
+}
+
+.fare-cell-container.cell-staged[data-inline-editable="true"]:hover {
+  background-color: #e0effe;
+}
+
+/* Subtle top-left indicator dot for staged cells */
+.fare-cell-staged-dot {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #0d6efd;
+}
+
+.fare-cell-container.is-editing .fare-cell-staged-dot {
+  display: none;
+}
+
 /* Draft state highlight */
 .fare-cell-container.cell-draft,
 .table td.cell-draft {

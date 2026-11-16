@@ -232,7 +232,7 @@
           ...getCsrfHeaders()
         },
         credentials: "same-origin",
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ changes: payload })
       });
 
       // Treat non-success HTTP responses as failed submissions.
@@ -245,12 +245,14 @@
       // Clear local drafts only after the backend confirms success.
       draftManager.discardAll();
 
-      // Close the review modal after successful submission.
-      const modalElement = document.getElementById("rateReviewModal");
-      window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+      // Persist feedback message across the page reload.
+      sessionStorage.setItem(
+        "staged_Toast",
+        "Fare drafts saved and staged for publishing."
+      );
 
-      // Inform the user that the drafts were saved.
-      showGridFeedback("Fare drafts saved successfully.", "info");
+      // Refresh the rate grid from the server so staged cells render from PostgreSQL.
+      window.location.reload();
 
     } catch (error) {
       // Keep all staged changes so the user can retry the submission.
@@ -267,6 +269,12 @@
 
   // Register event handlers for opening the modal and saving drafts.
   function initializeRateReview() {
+    const savedNotice = sessionStorage.getItem("nyw_staged_Toast");
+    if (savedNotice) {
+      sessionStorage.removeItem("staged_Toast");
+      showGridFeedback(savedNotice, "info");
+    }
+
     const saveButton = document.getElementById("saveChangesBtn");
     const confirmButton = document.getElementById("confirmRateChangesBtn");
 

@@ -4,7 +4,7 @@ import fareGrid from '../../main/resources/static/js/fare-grid.js';
 
 const { validateFareInput } = fareGrid;
 
-describe('Story 2.2 Keystroke & Currency Validation Rules', () => {
+describe('Keystroke & Currency Validation Rules', () => {
   it('accepts standard positive currency values', () => {
     assert.equal(validateFareInput('14.00').valid, true);
     assert.equal(validateFareInput('13.25').normalized, '13.25');
