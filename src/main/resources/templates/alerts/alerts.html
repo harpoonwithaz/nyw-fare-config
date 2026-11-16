@@ -106,9 +106,9 @@
                                     <div th:each="key : ${alert.routeKeys}" class="small text-nowrap"
                                         th:text="${#strings.replace(key, ':', ' → ')}">PIER11 → HOB14ST</div>
                                 </td>
-                                <td class="small" th:text="${alert.productCode} ?: 'All tickets'">All tickets</td>
+                                <td class="small" th:text="${#strings.isEmpty(alert.productCode)} ? 'All tickets' : ${alert.productCode}">All tickets</td>
                                 <td class="small">
-                                    <span th:text="${alert.triggerType.label}">Weekends</span>
+                                    <span th:text="${alert.triggerType?.label}">Weekends</span>
                                     <span th:if="${alert.startDate != null}" class="text-muted"
                                         th:text="${#temporals.format(alert.startDate, 'MMM d, yyyy')}">Nov 16, 2026</span>
                                 </td>
@@ -118,7 +118,7 @@
                                         aria-label="Has Spanish"></i>
                                 </td>
                                 <td>
-                                    <span class="badge" th:text="${alert.status.label}"
+                                    <span class="badge" th:text="${alert.status?.label}"
                                         th:classappend="${alert.status.name() == 'ACTIVE'} ? 'text-bg-success' : (${alert.status.name() == 'DRAFT'} ? 'text-bg-warning' : 'text-bg-secondary')">Draft</span>
                                     <div th:if="${alert.replacesAlertId != null}" class="small text-muted"
                                         th:text="|Replaces #${alert.replacesAlertId}|">Replaces #5</div>
@@ -127,6 +127,12 @@
                                     <a th:unless="${alert.status.name() == 'ARCHIVED'}"
                                         th:href="@{/fares/alerts/{id}/edit(id=${alert.id})}"
                                         class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <!-- Alerts stay in our database, so a draft goes live from here instead of Epic 5 -->
+                                    <form th:if="${alert.status?.name() == 'DRAFT'}" class="d-inline"
+                                        th:action="@{/fares/alerts/{id}/activate(id=${alert.id})}" method="post"
+                                        onsubmit="return confirm('Make this alert active? It replaces any live alert it was copied from.');">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Make active</button>
+                                    </form>
                                     <!-- Delete drafts / archive live alerts: Client Services only -->
                                     <th:block th:if="${currentUser.role.name() == 'CLIENT_SERVICES'}">
                                         <form th:if="${alert.status.name() == 'DRAFT'}" class="d-inline"
