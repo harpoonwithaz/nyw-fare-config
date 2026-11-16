@@ -7,14 +7,14 @@ import jakarta.validation.constraints.NotEmpty;
 
 public class FareDraftBatchRequest {
     
-    @Valid 
     @NotEmpty 
-    private List<FareChangeRequest> changes;
+    private List<@Valid FareChangeRequest> changes;
 
     public FareDraftBatchRequest() {
     }
     
-    public FareDraftBatchRequest(@Valid @NotEmpty List<FareChangeRequest> changes) {
+    public FareDraftBatchRequest(
+        @NotEmpty List<@Valid FareChangeRequest> changes) {
         this.changes = changes;
     }
 
