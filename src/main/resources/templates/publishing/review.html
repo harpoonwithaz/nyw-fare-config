@@ -17,16 +17,17 @@
 
     <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-width: 0;">
 
-        <!-- Shared tenant navbar from main -->
+        <!-- Shared tenant navbar -->
         <div th:replace="~{fragments/navbar :: top-navbar}"></div>
 
         <main class="flex-grow-1 p-4 overflow-y-auto" style="min-width: 0;">
             <div class="container-fluid">
 
+                <!-- Page heading -->
                 <div class="mb-4">
                     <h1 class="h3">Configuration Review</h1>
                     <p class="text-muted">
-                        Compare published baseline configurations with staged changes.
+                        Review pending configuration changes before publication.
                     </p>
                 </div>
 
@@ -51,57 +52,31 @@
                     </div>
                 </div>
 
-                <!-- STORY 5.1: Summary Counters -->
+                <!-- Pending Change Summary -->
                 <div class="row g-3 mb-4">
 
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h6 class="text-muted">Total Items</h6>
-                                <h2 id="totalItemsCount"
-                                    class="mb-0"
-                                    th:text="${totalCount}">0</h2>
+                                <h6 class="text-muted">Total Pending Changes</h6>
+                                <h2 id="totalItemsCount" class="mb-0">—</h2>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h6 class="text-muted">Changed</h6>
+                                <h6 class="text-muted">Fare Changes</h6>
                                 <h2 id="changedItemsCount"
-                                    class="text-warning mb-0"
-                                    th:text="${changedCount}">0</h2>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card shadow-sm h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted">Unchanged</h6>
-                                <h2 id="unchangedItemsCount"
-                                    class="text-success mb-0"
-                                    th:text="${unchangedCount}">0</h2>
+                                    class="text-warning mb-0">—</h2>
                             </div>
                         </div>
                     </div>
 
                 </div>
 
-                <!-- Shared Changed-Only Filter -->
-                <div class="form-check mb-4">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           id="showChangedOnly"
-                           checked>
-
-                    <label class="form-check-label" for="showChangedOnly">
-                        Show Changed Only
-                    </label>
-                </div>
-
-                <!-- STORY 5.1: API-Powered Fare Configuration Review -->
+                <!-- Fare Configuration Review -->
                 <div class="card shadow-sm mb-4">
 
                     <div class="card-header bg-white">
@@ -120,7 +95,7 @@
                                         <th>Origin / Context</th>
                                         <th>Destination / Zone</th>
                                         <th>Product / Tier</th>
-                                        <th>Published Baseline</th>
+                                        <th>Original Rate</th>
                                         <th>Staged Draft</th>
                                         <th>Status</th>
                                     </tr>
@@ -131,7 +106,7 @@
                                     <tr>
                                         <td colspan="8"
                                             class="text-center text-muted py-3">
-                                            Loading fare configurations...
+                                            Loading pending fare changes...
                                         </td>
                                     </tr>
                                 </tbody>
@@ -141,7 +116,7 @@
                     </div>
                 </div>
 
-                <!-- Schedule & Availability Changes -->
+                <!-- Schedule & Availability Review -->
                 <div class="card shadow-sm mb-4">
 
                     <div class="card-header bg-white">
@@ -151,53 +126,17 @@
                     </div>
 
                     <div class="card-body">
-                        <div class="table-responsive">
 
-                            <table class="table table-bordered table-hover align-middle">
-
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Setting</th>
-                                        <th>Published Baseline</th>
-                                        <th>Staged Draft</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody id="scheduleChangesTableBody">
-                                    <tr th:each="schedule : ${scheduleChanges}"
-                                        th:attr="data-changed=${schedule.isChanged()}">
-
-                                        <td th:text="${schedule.settingName()}">
-                                            Weekend Service
-                                        </td>
-
-                                        <td th:text="${schedule.baselineValue()}">
-                                            Disabled
-                                        </td>
-
-                                        <td th:text="${schedule.stagedValue()}"
-                                            th:classappend="${schedule.isChanged()} ? 'table-warning' : ''">
-                                            Enabled
-                                        </td>
-
-                                        <td>
-                                            <span class="badge"
-                                                  th:classappend="${schedule.isChanged()} ? 'bg-warning text-dark' : 'bg-success'"
-                                                  th:text="${schedule.isChanged()} ? 'Changed' : 'Unchanged'">
-                                                Changed
-                                            </span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-
-                            </table>
-                        </div>
-
-                        <p class="text-muted text-center"
-                           th:if="${#lists.isEmpty(scheduleChanges)}">
-                            No schedule configurations available for review.
+                        <!--
+                            Schedule and availability draft integration
+                            is not yet connected to this review page.
+                            Do not display hardcoded mock records.
+                        -->
+                        <p class="text-muted text-center mb-0 py-3">
+                            Schedule and availability draft review
+                            is not yet available.
                         </p>
+
                     </div>
                 </div>
 
@@ -223,15 +162,15 @@
                             <li class="list-group-item">
                                 <strong>Review Pending Changes</strong>
                                 <div class="text-muted small">
-                                    Examine all proposed fare and schedule updates.
+                                    Examine all proposed fare updates.
                                 </div>
                             </li>
 
                             <li class="list-group-item">
-                                <strong>Compare Against Published Baseline</strong>
+                                <strong>Compare Original and Proposed Values</strong>
                                 <div class="text-muted small">
-                                    Verify the differences between currently published
-                                    values and staged draft values.
+                                    Verify the differences between original
+                                    fare values and staged draft values.
                                 </div>
                             </li>
 
@@ -239,7 +178,7 @@
                                 <strong>Verify Configuration Accuracy</strong>
                                 <div class="text-muted small">
                                     Confirm that the proposed changes are correct
-                                    and ready for publication.
+                                    and ready for validation.
                                 </div>
                             </li>
 
@@ -247,7 +186,7 @@
                                 <strong>Publish Verified Configuration</strong>
                                 <div class="text-muted small">
                                     Proceed with publication only after
-                                    verification is complete.
+                                    validation and verification are complete.
                                 </div>
                             </li>
 
@@ -256,7 +195,7 @@
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
 
                             <span class="badge bg-secondary">
-                                Prototype - Publication Unavailable
+                                Publication Unavailable
                             </span>
 
                             <button type="button"
@@ -270,10 +209,12 @@
                     </div>
                 </div>
 
-                <!-- Prototype Notice -->
+                <!-- Current Functionality Notice -->
                 <p class="text-muted small">
-                    Prototype only: all fare and schedule values are illustrative.
-                    No actual configuration changes or publishing operations are performed.
+                    Pending fare changes are retrieved from saved drafts
+                    in PostgreSQL. Schedule and availability draft review
+                    is not yet integrated. Publishing is not available
+                    in this version.
                 </p>
 
             </div>
@@ -283,8 +224,9 @@
     <!-- Bootstrap JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- STORY 5.1: Loads fare changes and handles the shared filter -->
+    <!-- Loads pending fare changes -->
     <script th:src="@{/js/publishing-review.js}"></script>
 
 </body>
 </html>
+

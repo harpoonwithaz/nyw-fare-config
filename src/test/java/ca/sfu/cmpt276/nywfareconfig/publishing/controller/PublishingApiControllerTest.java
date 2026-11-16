@@ -1,9 +1,9 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -11,22 +11,22 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.security.test.context.support.WithAnonymousUser;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
-import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
+import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
+import ca.sfu.cmpt276.nywfareconfig.security.config.SecurityConfig;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 import ca.sfu.cmpt276.nywfareconfig.security.controller.GlobalUserModelAdvice;
-import ca.sfu.cmpt276.nywfareconfig.security.config.SecurityConfig;
 
 @WebMvcTest(
     controllers = PublishingApiController.class,
@@ -43,7 +43,7 @@ class PublishingApiControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private FareDraftService fareDraftService;
+    private StagingService stagingService;
 
     @MockitoBean
     private TenantContext tenantContext;
@@ -51,29 +51,30 @@ class PublishingApiControllerTest {
     @MockitoBean
     private TenantService tenantService;
 
-    // Creates a test draft without connecting to PostgreSQL.
-    private FareDraft createDraft(
+    // Create a review DTO without connecting to PostgreSQL.
+    private ConfigurationChangeView createChange(
             String tenantCode,
-            String origin,
-            String destination,
+            GridMode gridMode,
+            String selectedContext,
+            String rowKey,
+            String colKey,
             String product,
             String originalPrice,
             String draftPrice) {
 
-        FareDraft draft = new FareDraft();
-
-        draft.setTenantCode(tenantCode);
-        draft.setGridMode(GridMode.OD);
-        draft.setOriginIdentifier(origin);
-        draft.setDestIdentifier(destination);
-        draft.setProductCode(product);
-        draft.setOriginalPrice(new BigDecimal(originalPrice));
-        draft.setDraftPrice(new BigDecimal(draftPrice));
-
-        return draft;
+        return new ConfigurationChangeView(
+            tenantCode,
+            gridMode,
+            selectedContext,
+            rowKey,
+            colKey,
+            product,
+            new BigDecimal(originalPrice),
+            new BigDecimal(draftPrice)
+        );
     }
 
-    // Verify that the endpoint retrieves drafts for the selected tenant.
+    // Verify that the endpoint retrieves changes for the selected tenant.
     @Test
     void shouldReturnPendingDraftsForSelectedTenant() throws Exception {
 
@@ -82,17 +83,19 @@ class PublishingApiControllerTest {
         when(tenant.getCode()).thenReturn("NYW_SANDBOX");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        FareDraft draft = createDraft(
+        ConfigurationChangeView change = createChange(
             "NYW_SANDBOX",
+            GridMode.OD,
             "EDGEWTR",
             "MIDTOWN",
+            "ADULT_ONEWAY",
             "ADULT_ONEWAY",
             "13.25",
             "14.00"
         );
 
-        when(fareDraftService.getPendingDrafts("NYW_SANDBOX"))
-            .thenReturn(List.of(draft));
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of(change));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
                 .with(user("testoperator").roles("OPERATOR")))
@@ -116,10 +119,11 @@ class PublishingApiControllerTest {
             .andExpect(jsonPath("$[0].stagedPrice")
                 .value(14.00));
 
-        verify(fareDraftService).getPendingDrafts("NYW_SANDBOX");
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
     }
 
-    // Verify that drafts from different origins appear together.
+    // Verify that changes from different origins appear together.
     @Test
     void shouldReturnDraftsAcrossMultipleOrigins() throws Exception {
 
@@ -128,26 +132,30 @@ class PublishingApiControllerTest {
         when(tenant.getCode()).thenReturn("NYW_SANDBOX");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        FareDraft firstDraft = createDraft(
+        ConfigurationChangeView firstChange = createChange(
             "NYW_SANDBOX",
+            GridMode.OD,
             "EDGEWTR",
             "MIDTOWN",
+            "ADULT_ONEWAY",
             "ADULT_ONEWAY",
             "13.25",
             "14.00"
         );
 
-        FareDraft secondDraft = createDraft(
+        ConfigurationChangeView secondChange = createChange(
             "NYW_SANDBOX",
+            GridMode.OD,
             "PORT_IMPERIAL",
             "MIDTOWN",
+            "FULL_10TRIP",
             "FULL_10TRIP",
             "112.63",
             "115.00"
         );
 
-        when(fareDraftService.getPendingDrafts("NYW_SANDBOX"))
-            .thenReturn(List.of(firstDraft, secondDraft));
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of(firstChange, secondChange));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
                 .with(user("testoperator").roles("OPERATOR")))
@@ -158,10 +166,11 @@ class PublishingApiControllerTest {
             .andExpect(jsonPath("$[1].selectedContext")
                 .value("PORT_IMPERIAL"));
 
-        verify(fareDraftService).getPendingDrafts("NYW_SANDBOX");
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
     }
 
-    // Verify that no drafts are retrieved without a selected tenant.
+    // Verify that no changes are retrieved without a selected tenant.
     @Test
     void shouldReturnEmptyListWhenNoTenantSelected() throws Exception {
 
@@ -172,7 +181,7 @@ class PublishingApiControllerTest {
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
 
-        verifyNoInteractions(fareDraftService);
+        verifyNoInteractions(stagingService);
     }
 
     // Verify that the changed property is serialized for the frontend.
@@ -184,17 +193,19 @@ class PublishingApiControllerTest {
         when(tenant.getCode()).thenReturn("NYW_SANDBOX");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        FareDraft draft = createDraft(
+        ConfigurationChangeView change = createChange(
             "NYW_SANDBOX",
+            GridMode.OD,
             "EDGEWTR",
             "MIDTOWN",
+            "ADULT_ONEWAY",
             "ADULT_ONEWAY",
             "13.25",
             "14.00"
         );
 
-        when(fareDraftService.getPendingDrafts("NYW_SANDBOX"))
-            .thenReturn(List.of(draft));
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of(change));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
                 .with(user("testoperator").roles("OPERATOR")))
@@ -202,7 +213,7 @@ class PublishingApiControllerTest {
             .andExpect(jsonPath("$[0].changed").value(true));
     }
 
-    // Verify that unauthenticated users cannot access pending drafts.
+    // Verify that unauthenticated users cannot access pending changes.
     @Test
     @WithAnonymousUser
     void shouldRequireAuthentication() throws Exception {
@@ -212,7 +223,7 @@ class PublishingApiControllerTest {
             .andExpect(redirectedUrl("/login"));
     }
 
-
+    // Verify that zonal configuration fields are mapped correctly.
     @Test
     void shouldMapZonalDraftCorrectly() throws Exception {
 
@@ -221,24 +232,26 @@ class PublishingApiControllerTest {
         when(tenant.getCode()).thenReturn("METRA");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        FareDraft draft = new FareDraft();
-        draft.setTenantCode("METRA");
-        draft.setGridMode(GridMode.ZONAL);
-        draft.setOriginIdentifier("ZONE_1");
-        draft.setDestIdentifier("ZONE_2");
-        draft.setProductCode("ADULT_ONEWAY");
-        draft.setOriginalPrice(new BigDecimal("4.00"));
-        draft.setDraftPrice(new BigDecimal("4.50"));
+        ConfigurationChangeView change = createChange(
+            "METRA",
+            GridMode.ZONAL,
+            "ADULT_ONEWAY",
+            "ZONE_1",
+            "ZONE_2",
+            "ADULT_ONEWAY",
+            "4.00",
+            "4.50"
+        );
 
-        when(fareDraftService.getPendingDrafts("METRA"))
-                .thenReturn(List.of(draft));
+        when(stagingService.getConfigurationChanges("METRA"))
+            .thenReturn(List.of(change));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
                 .with(user("testoperator").roles("OPERATOR")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].gridMode").value("ZONAL"))
             .andExpect(jsonPath("$[0].selectedContext")
-                    .value("ADULT_ONEWAY"))
+                .value("ADULT_ONEWAY"))
             .andExpect(jsonPath("$[0].rowKey").value("ZONE_1"))
             .andExpect(jsonPath("$[0].colKey").value("ZONE_2"))
             .andExpect(jsonPath("$[0].publishedPrice").value(4.00))
@@ -246,7 +259,28 @@ class PublishingApiControllerTest {
             .andExpect(jsonPath("$[0].changed").value(true));
     }
 
+    // Verify that the API returns an empty list when no changes exist.
+    @Test
+    void shouldReturnEmptyListWhenNoChangesExist() throws Exception {
+
+        Tenant tenant = mock(Tenant.class);
+
+        when(tenant.getCode()).thenReturn("NYW_SANDBOX");
+        when(tenantContext.getSelectedTenant()).thenReturn(tenant);
+
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/publishing/pending-changes")
+                .with(user("testoperator").roles("OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(content().json("[]"));
+
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
+    }
 }
+
 
 
 
