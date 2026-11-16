@@ -1,0 +1,57 @@
+name: Build Requirements PDF
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/requirements/**'
+      - 'docs/templates/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/requirements/**'
+      - 'docs/templates/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-docs:
+    name: Validate & Compile Requirements PDF
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc and WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc weasyprint
+
+      - name: Make build script executable
+        run: chmod +x docs/templates/build-pdf.sh
+
+      - name: Compile Requirements PDF
+        run: ./docs/templates/build-pdf.sh
+
+      - name: Upload PDF Preview Artifact (PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: requirements-iteration2-preview
+          path: docs/releases/requirements-iteration2.pdf
+          retention-days: 7
+
+      - name: Commit Compiled PDF to main (On Merge)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/releases/requirements-iteration2.pdf
+          if git diff --staged --quiet; then
+            echo "No changes to compiled PDF."
+          else
+            git commit -m "docs: auto-compile requirements-iteration2.pdf [skip ci]"
+            git push
+          fi
