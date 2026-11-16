@@ -1,4 +1,3 @@
-
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import java.util.List;
@@ -8,8 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
-import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
@@ -17,22 +17,21 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 @RequestMapping("/api/publishing")
 public class PublishingApiController {
 
-    private final StagingService stagingService;
+    private final FareDraftService fareDraftService;
     private final TenantContext tenantContext;
 
-    //Use the existing session tenant context.
     public PublishingApiController(
-            StagingService stagingService,
+            FareDraftService fareDraftService,
             TenantContext tenantContext) {
 
-        this.stagingService = stagingService;
+        this.fareDraftService = fareDraftService;
         this.tenantContext = tenantContext;
     }
 
     @GetMapping("/pending-changes")
     public ResponseEntity<List<ConfigurationChangeView>> getPendingChanges() {
 
-        //Retrieve the active tenant.
+        // Retrieve the currently selected tenant from the session.
         Tenant selectedTenant = tenantContext.getSelectedTenant();
 
         if (selectedTenant == null) {
@@ -41,13 +40,23 @@ public class PublishingApiController {
 
         String tenantCode = selectedTenant.getCode();
 
-        //Only return changes for the active tenant.
-        List<ConfigurationChangeView> changes =
-                stagingService.getConfigurationChanges()
-                    .stream()
-                    .filter(change ->
-                        tenantCode.equalsIgnoreCase(change.tenantCode()))
-                    .toList();
+        // Retrieve all pending drafts for the selected tenant.
+        List<FareDraft> drafts =
+                fareDraftService.getPendingDrafts(tenantCode);
+
+        // Convert database entities into the existing review DTO.
+        List<ConfigurationChangeView> changes = drafts.stream()
+                .map(draft -> new ConfigurationChangeView(
+                        draft.getTenantCode(),
+                        draft.getGridMode(),
+                        draft.getOriginIdentifier(),
+                        draft.getDestIdentifier(),
+                        draft.getProductCode(),
+                        draft.getProductCode(),
+                        draft.getOriginalPrice(),
+                        draft.getDraftPrice()
+                ))
+                .toList();
 
         return ResponseEntity.ok(changes);
     }
