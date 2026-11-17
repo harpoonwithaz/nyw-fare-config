@@ -1,107 +1,115 @@
 ## Epic 5: Configuration Review, Validation, and Publishing
 
+::: {.it2-added}
 ### Story 5.1: View Pending Configuration Changes
+:::
 
 - **GitHub Issue Title:** `[Epic 5] View Pending Configuration Changes`
-
-- **Iteration:** `3`
-
+- **Iteration:** <span class="it2-modified">2 (Fare-draft review implemented; published-baseline and availability comparison deferred to Iteration 3)</span>
 - **Story Points:** `3`
-
-- **Story Description:** As a **NY Waterway Operator**, I want to **review pending ticket configuration changes alongside the currently published configurations**, so that **I can identify and verify proposed modifications before they are published to ticket vending machines**.
-
+- **Story Description:** <span class="it2-modified">As an authenticated NY Waterway Operator, I want to review pending fare configuration drafts before publication, so that I can verify proposed price changes without modifying the published catalog.</span>
 - **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`).
 
-- **Preconditions & Triggers:**
-  - *Precondition:* The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
-  - *Precondition:* The current `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
-  - *Precondition:* A reliable previously published configuration baseline is available through a supported publication endpoint or an application-maintained snapshot.
-  - *Trigger:* The user navigates to the Configuration Review page (`GET /review`).
+#### Preconditions & Triggers
 
-- **Actions / Postconditions:**
-  - *Action:* The Spring Boot application retrieves the current sandbox configuration through the Java `CaracalApiClient`, using supported endpoints such as `price-simulate` and `availability-simulate`.
-  - *Action:* The application retrieves the previously published configuration baseline through `CaracalApiClient` or an application-maintained snapshot.
-  - *Action:* The Java `ValidationService` compares the published and proposed configurations to identify changes in ticket prices and availability.
-  - *Action:* The application displays published and proposed values side by side, highlighting modified entries.
-  - *Postcondition:* The user can review pending configuration changes without modifying or publishing any data.
-  - *Postcondition:* If no differences exist, the application displays a message indicating that no changes are pending.
+- **Precondition:** The user is authenticated and has access to the Review & Publish page.
+- **Precondition:** Pending fare drafts, if any, are stored in the application's PostgreSQL database for the selected tenant.
+- **Trigger:** <span class="it2-modified">The user opens the Review & Publish page (`GET /publishing/review`).</span>
+
+#### Actions / Postconditions
+
+- **Action:** <span class="it2-added">The Spring Boot backend retrieves tenant-specific pending drafts using `FareDraftService` and prepares the review data through `StagingService`.</span>
+- **Action:** <span class="it2-added">The page displays changed fare entries, including origin, destination, product, original rate, staged draft rate, and status.</span>
+- **Action:** <span class="it2-added">Both multi-origin and zonal fare drafts are supported.</span>
+- **Action:** <span class="it2-added">The pending-changes API (`GET /api/publishing/pending-changes`) supplies review data to the frontend.</span>
+- **Postcondition:** The user can inspect pending changes without publishing them.
+- **Postcondition:** If no changed drafts exist, the page displays an empty-state message.
+- **Postcondition:** <span class="it2-modified">Publication remains disabled in Iteration 2. The original price stored with a draft is not claimed to be a verified Caracal published baseline.</span>
 
 #### Acceptance Criteria
 
-1. Both `OPERATOR` and `CLIENT_SERVICES` users can access the Configuration Review page. Unauthenticated users must log in before accessing it.
-2. The application displays the current `NYW_SANDBOX` configuration alongside the previously published configuration.
-3. Each identified change includes the affected origin terminal, destination route, ticket type, published value, and proposed value.
-4. Changes in ticket prices and availability are visually highlighted, with unchanged entries clearly distinguishable.
-5. If no differences exist, the application displays a message indicating that there are no pending changes.
-6. If the Caracal API or published baseline cannot be retrieved, the application displays an appropriate error message rather than presenting incomplete comparison results.
-7. Configuration retrieval and comparison are performed server-side through Java services. JavaScript is responsible only for frontend display and user interactions.
-8. The comparison uses a reliable published baseline. The `publication-diff` endpoint is not used for direct draft-versus-published comparison because it compares the last two publications.
-9. Viewing pending changes does not modify or publish configuration data.
+1. Authenticated users with the appropriate roles can access the Review & Publish page. Unauthenticated users must log in before accessing it.
+2. <span class="it2-added">The review lists pending fare changes for the selected tenant from locally staged PostgreSQL records.</span>
+3. <span class="it2-added">Each changed fare row displays the tenant, fare mode, origin, destination, product, original rate, staged draft rate, and status, as applicable.</span>
+4. <span class="it2-modified">Only changed fare drafts are displayed, with no "Show Changed Only" toggle.</span>
+5. <span class="it2-added">Both multi-origin and zonal fare drafts are represented correctly.</span>
+6. If no pending changed fares exist, the application displays an appropriate empty-state message.
+7. Configuration retrieval and preparation are performed server-side through Java services. JavaScript handles frontend rendering and interactions.
+8. Viewing pending changes does not modify drafts or publish configuration data.
+9. <span class="it2-modified">Schedule and availability draft review is not yet available. The page displays a placeholder instead of mock configuration changes.</span>
+10. <span class="it2-modified">Direct comparison with a reliable published Caracal baseline, broader availability comparison, and publication remain deferred to Iteration 3.</span>
 
 #### UI Mockup
 
-Example of the Configuration Review page:
+```text
+Review & Publish - NYW_SANDBOX
 
-    Configuration Review - NYW_SANDBOX
+Total Pending Changes: 2
+Fare Changes: 2
 
-    Origin    Destination   Ticket Type   Published   Proposed   Status
-    -------------------------------------------------------------------
-    EDGEWTR   MIDTOWN       Adult         $13.25      $14.00     Changed
-    EDGEWTR   MIDTOWN       Child         $7.00       $7.00      Unchanged
-    MIDTOWN   EDGEWTR       Senior        Sellable    Not Sold   Changed
+Tenant       Mode    Origin    Destination  Product  Original Rate  Staged Draft  Status
+---------------------------------------------------------------------------------------
+NYW_SANDBOX  OD      EDGEWTR   MIDTOWN      Adult    $13.25         $14.00        Changed
+NYW_SANDBOX  ZONAL   -         -            Pass     $25.00         $27.00        Changed
 
-    [Changed entries are visually highlighted]
+Schedule & Availability:
+Draft review is not yet available.
+
+Publishing: Disabled
+```
+
+*Illustrative values only; not actual database records.*
 
 #### Test Scenarios
 
-- **Manual (Success):** Log in as an `OPERATOR` and modify an adult ticket price in `NYW_SANDBOX` from $13.25 to $14.00. Open the Configuration Review page and verify that the published and proposed prices appear side by side, with the difference highlighted.
-- **Manual (No Changes):** Open the Configuration Review page when the sandbox matches the published baseline. Verify that the application displays a message indicating that no changes are pending.
-- **Manual (Failure / Edge Case):** Simulate an unavailable Caracal API or missing published baseline. Verify that the application displays an appropriate error message without crashing or showing misleading results.
-- **Manual (Access Control):** Verify that both `OPERATOR` and `CLIENT_SERVICES` users can access the page. Attempt to access the page without authentication and verify that login is required.
-- **Automated (Spring MVC Slice Test):** Use JUnit, `@WebMvcTest`, and `MockMvc` to verify that an authenticated `OPERATOR` or `CLIENT_SERVICES` request to `GET /review` returns HTTP 200 and includes the configuration comparison model attribute. Mock the comparison service with known published and proposed values. Verify that unauthenticated requests are rejected or redirected according to the Spring Security configuration.
-- **Automated (JUnit Service Test):** Test `ValidationService` using known published and draft configurations. Verify that modified prices and availability statuses are identified correctly and matching values produce no pending differences.
+- **Manual (Success):** Stage a changed fare draft, open the Review & Publish page, and verify that the original and staged prices appear side by side.
+- **Manual (Multi-origin / Zonal):** Stage both fare modes and verify that each appears with the correct fields.
+- **Manual (No Changes):** Open the Review & Publish page with no changed pending drafts for the selected tenant. Verify that the appropriate empty-state message appears.
+- **Manual (Read-only):** Open the review page and confirm that viewing pending changes does not modify or publish configuration data.
+- **Manual (Access Control):** Verify that authenticated users with the appropriate roles can access the page and unauthenticated users must log in.
+- **Automated (Spring MVC Test):** Use JUnit and `MockMvc` to verify that the pending-changes API returns the expected data using a mocked `StagingService`. Verify authentication behavior.
+- **Automated (Backend Service Test):** Verify that `StagingService` maps pending drafts correctly and excludes unchanged entries.
 
 #### Actionable Sub-tasks
 
-- [ ] Create the Configuration Review page using HTML, CSS, and the application's frontend template system.
-- [ ] Implement a Spring Boot controller endpoint for `GET /review`.
-- [ ] Extend `CaracalApiClient` to retrieve current `NYW_SANDBOX` pricing and availability through `price-simulate` and `availability-simulate`.
-- [ ] Retrieve the previously published configuration through a supported publication endpoint, such as `publication-payload-get` if its response contains the required data, or maintain a reliable application-side snapshot.
-- [ ] Implement server-side Java comparison logic in `ValidationService` to identify differences between published and proposed configurations.
-- [ ] Ensure comparisons use matching terminal, route, ticket type, and time contexts, including relevant weekday, weekend, and monthly availability conditions.
-- [ ] Display published and proposed values side by side, with visual highlighting for modified entries.
-- [ ] Enforce access for authenticated `OPERATOR` and `CLIENT_SERVICES` users through Spring Security.
-- [ ] Handle missing baselines, empty comparisons, and backend retrieval failures.
-- [ ] Implement automated JUnit and MockMvc tests for comparison results and access control.
+- [x] Create the Review & Publish page using HTML, CSS, and the application's frontend template system.
+- [x] Retrieve locally staged fare drafts through `FareDraftService` and `StagingService`.
+- [x] Display original and staged fare prices side by side.
+- [x] Display only changed fare entries.
+- [x] Support multi-origin and zonal fare draft review.
+- [x] Implement the tenant-specific pending-changes API.
+- [x] Implement automated controller tests for pending-changes retrieval.
+- [x] Remove mock schedule changes and display an appropriate placeholder.
+- [ ] <span class="it2-modified">Iteration 3: Retrieve and verify the actual published Caracal baseline for comparison.</span>
+- [ ] <span class="it2-modified">Iteration 3: Extend review functionality to availability and schedule changes.</span>
+- [ ] <span class="it2-modified">Iteration 3: Integrate configuration review with validation and publishing safeguards.</span>
 
 ---
 
 ### Story 5.2: Validate Configuration Discrepancies
 
 - **GitHub Issue Title:** `[Epic 5] Validate Configuration Discrepancies`
-
 - **Iteration:** `3`
-
 - **Story Points:** `3`
-
 - **Story Description:** As a **NY Waterway Operator**, I want to **validate the sandbox ticket configurations against the provided reference dataset**, so that **I can identify incorrect settings and ensure all known discrepancies are resolved before publication**.
-
 - **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`).
 
-- **Preconditions & Triggers:**
-  - *Precondition:* The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
-  - *Precondition:* The `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
-  - *Precondition:* The reference dataset (`student-kit/data/nyw-sheet-2026-09-25.json`) is available to the Spring Boot application.
-  - *Trigger:* The user navigates to the Configuration Validation page and clicks the "Run Validation" button.
+#### Preconditions & Triggers
 
-- **Actions / Postconditions:**
-  - *Action:* The Spring Boot application retrieves current sandbox ticket prices and availability through the Java `CaracalApiClient`, using supported endpoints such as `price-simulate` and `availability-simulate`.
-  - *Action:* The Java `ValidationService.validateAgainstSheet()` compares the sandbox configuration against the expected values in `nyw-sheet-2026-09-25.json`.
-  - *Action:* The service identifies discrepancies in ticket prices, ticket availability, and monthly pass sale windows.
-  - *Action:* The application displays the detected discrepancies, their expected and actual values, and the total number of remaining issues.
-  - *Postcondition:* Users can identify incorrect configurations and use the appropriate editing features to correct them before publication.
-  - *Postcondition:* Users can rerun validation after configuration changes to obtain updated results.
-  - *Postcondition:* When all known discrepancies are resolved, the application displays a message indicating that no differences remain.
+- **Precondition:** The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
+- **Precondition:** The `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
+- **Precondition:** The reference dataset (`student-kit/data/nyw-sheet-2026-09-25.json`) is available to the Spring Boot application.
+- **Trigger:** The user navigates to the Configuration Validation page and clicks the "Run Validation" button.
+
+#### Actions / Postconditions
+
+- **Action:** The Spring Boot application retrieves current sandbox ticket prices and availability through the Java `CaracalApiClient`, using supported endpoints such as `price-simulate` and `availability-simulate`.
+- **Action:** The Java `ValidationService.validateAgainstSheet()` compares the sandbox configuration against the expected values in `nyw-sheet-2026-09-25.json`.
+- **Action:** The service identifies discrepancies in ticket prices, ticket availability, and monthly pass sale windows.
+- **Action:** The application displays detected discrepancies, their expected and actual values, and the total number of remaining issues.
+- **Postcondition:** Users can identify incorrect configurations and use the appropriate editing features to correct them before publication.
+- **Postcondition:** Users can rerun validation after configuration changes to obtain updated results.
+- **Postcondition:** When all known discrepancies are resolved, the application displays a message indicating that no differences remain.
 
 #### Acceptance Criteria
 
@@ -121,17 +129,11 @@ Example of the Configuration Review page:
 #### Test Scenarios
 
 - **Manual (Success):** Log in as an `OPERATOR`, open the Configuration Validation page, and click "Run Validation" against a freshly seeded `NYW_SANDBOX` configuration. Verify that the application reports 50 discrepancies: 30 incorrect prices, 15 tickets incorrectly available, 4 missing tickets, and 1 incorrect monthly sale window.
-
 - **Manual (Partially Resolved):** Correct one or more known discrepancies using the configuration editing features, then rerun validation. Verify that the updated results reflect the corrected values and that the remaining discrepancy count decreases appropriately.
-
 - **Manual (No Discrepancies):** Run validation after all known discrepancies have been corrected. Verify that the application displays a message indicating that no differences remain.
-
 - **Manual (Failure / Edge Case):** Simulate an unavailable Caracal API, missing reference JSON file, or malformed reference data. Verify that the application displays an appropriate error message without crashing or presenting incomplete results as valid.
-
 - **Manual (Access Control):** Verify that both `OPERATOR` and `CLIENT_SERVICES` users can initiate validation. Attempt to access the page without authentication and verify that login is required.
-
 - **Automated (JUnit Service Test):** Use JUnit to test `ValidationService.validateAgainstSheet()` with a known reference dataset and mocked Caracal responses. Verify that an incorrect ticket price and an incorrectly available ticket are reported with the correct category, expected value, and actual value. Verify that matching values produce no discrepancies.
-
 - **Automated (Spring MVC Slice Test):** Use `@WebMvcTest` and `MockMvc` to verify that authenticated `OPERATOR` and `CLIENT_SERVICES` users can access the validation page and initiate validation successfully. Verify that unauthenticated requests are rejected or redirected according to the Spring Security configuration.
 
 #### Actionable Sub-tasks
@@ -156,30 +158,28 @@ Example of the Configuration Review page:
 ### Story 5.3: Publish Verified Configurations
 
 - **GitHub Issue Title:** `[Epic 5] Publish Verified Configurations`
-
 - **Iteration:** `3`
-
 - **Story Points:** `2`
-
 - **Story Description:** As a **Caracal Administrator**, I want to **publish reviewed and validated NY Waterway ticket configurations**, so that **updated ticket prices and availability settings can be safely released for use by ticket vending machines**.
-
 - **Actors / Personas:** Caracal Administrator (`CLIENT_SERVICES`), Authenticated Operator (`OPERATOR`) with view-only access.
 
-- **Preconditions & Triggers:**
-  - *Precondition:* The user is authenticated with the `CLIENT_SERVICES` role to publish configurations.
-  - *Precondition:* The current `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
-  - *Precondition:* The proposed configuration changes have been reviewed through the Configuration Review page from Story 5.1.
-  - *Precondition:* Configuration validation from Story 5.2 has completed successfully with zero remaining discrepancies, and the validated configuration has not changed since validation.
-  - *Trigger:* An authorized administrator clicks the "Publish Configuration" button and confirms the publication.
+#### Preconditions & Triggers
 
-- **Actions / Postconditions:**
-  - *Action:* The Spring Boot application verifies that the current configuration has been reviewed and successfully validated before allowing publication.
-  - *Action:* The application presents a confirmation prompt describing the configuration being published.
-  - *Action:* After confirmation, the Spring Boot backend sends a POST request to `/functions/catalog-publish` through the Java `CaracalApiClient`, with `tenantCode` set to `NYW_SANDBOX` and the required `X-Actor` header.
-  - *Action:* The application retrieves publication records using `/functions/publication-list` to verify the new publication.
-  - *Postcondition:* If publication succeeds and the new record is verified, the application displays a success message with the available publication details.
-  - *Postcondition:* If publication fails or its result cannot be verified, the application displays an appropriate error or unverified-status message without falsely reporting a successful release.
-  - *Postcondition:* The published configuration is recorded in the backend publication history.
+- **Precondition:** The user is authenticated with the `CLIENT_SERVICES` role to publish configurations.
+- **Precondition:** The current `NYW_SANDBOX` configuration is accessible through the Caracal backend API.
+- **Precondition:** The proposed configuration changes have been reviewed through the Configuration Review page from Story 5.1.
+- **Precondition:** Configuration validation from Story 5.2 has completed successfully with zero remaining discrepancies, and the validated configuration has not changed since validation.
+- **Trigger:** An authorized administrator clicks the "Publish Configuration" button and confirms the publication.
+
+#### Actions / Postconditions
+
+- **Action:** The Spring Boot application verifies that the current configuration has been reviewed and successfully validated before allowing publication.
+- **Action:** The application presents a confirmation prompt describing the configuration being published.
+- **Action:** After confirmation, the Spring Boot backend sends a POST request to `/functions/catalog-publish` through the Java `CaracalApiClient`, with `tenantCode` set to `NYW_SANDBOX` and the required `X-Actor` header.
+- **Action:** The application retrieves publication records using `/functions/publication-list` to verify the new publication.
+- **Postcondition:** If publication succeeds and the new record is verified, the application displays a success message with the available publication details.
+- **Postcondition:** If publication fails or its result cannot be verified, the application displays an appropriate error or unverified-status message without falsely reporting a successful release.
+- **Postcondition:** The published configuration is recorded in the backend publication history.
 
 #### Acceptance Criteria
 
@@ -199,21 +199,13 @@ Example of the Configuration Review page:
 #### Test Scenarios
 
 - **Manual (Success):** Log in as a `CLIENT_SERVICES` administrator, review the proposed configuration, and complete validation with zero remaining discrepancies. Click "Publish Configuration", confirm the action, and verify that publication succeeds and a new record appears in the publication history.
-
 - **Manual (Validation Failure):** Attempt to publish while unresolved configuration discrepancies remain. Verify that the application blocks publication and displays a message requiring successful validation.
-
 - **Manual (Configuration Changed):** Complete validation successfully, then modify the sandbox configuration before publishing. Verify that publication is blocked until the current configuration is validated again.
-
 - **Manual (Cancellation):** Click "Publish Configuration" but cancel the confirmation prompt. Verify that no publication request is submitted.
-
 - **Manual (Failure / Edge Case):** Simulate an unavailable Caracal API, a failed publication request, or an inability to verify the publication record. Verify that the application displays an appropriate error or unverified-status message without falsely reporting success.
-
 - **Manual (Duplicate Request):** Click the Publish Configuration button multiple times while publication is processing. Verify that only one request is submitted.
-
 - **Manual (Access Control):** Log in as an `OPERATOR` and verify that the Publish Configuration button is disabled. Attempt to submit a direct publication request and verify HTTP 403. Verify that unauthenticated users cannot publish.
-
 - **Automated (WireMock Integration Test):** Use JUnit and WireMock to mock the Caracal backend. Verify that an authorized publication request sends `POST /functions/catalog-publish` with `{"tenantCode":"NYW_SANDBOX"}` and the required `X-Actor` header. Mock a successful publication response and a matching record from `GET /functions/publication-list?tenant=NYW_SANDBOX`, then verify that the application's publication endpoint returns HTTP 200.
-
 - **Automated (Spring Security / MockMvc Test):** Use `MockMvc` to verify that `CLIENT_SERVICES` can initiate publication after review and validation, while `OPERATOR` receives HTTP 403. Verify that failed validation prevents the publishing service from being called.
 
 #### Actionable Sub-tasks
@@ -236,27 +228,25 @@ Example of the Configuration Review page:
 ### Story 5.4: View Configuration Change and Publication History
 
 - **GitHub Issue Title:** `[Epic 5] View Configuration Change and Publication History`
-
 - **Iteration:** `3`
-
 - **Story Points:** `2`
-
 - **Story Description:** As a **NY Waterway Operator**, I want to **view the history of ticket configuration changes and publications**, so that **I can track who made changes, when they were made, and maintain accountability for configuration updates**.
-
 - **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`).
 
-- **Preconditions & Triggers:**
-  - *Precondition:* The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
-  - *Precondition:* The `NYW_SANDBOX` environment is accessible through the Caracal backend API.
-  - *Trigger:* The user navigates to the Configuration History page (`GET /history`).
+#### Preconditions & Triggers
 
-- **Actions / Postconditions:**
-  - *Action:* The Spring Boot application retrieves configuration change records using `/functions/audit-log-get` through the Java `CaracalApiClient`.
-  - *Action:* The application retrieves publication records using `/functions/publication-list` through `CaracalApiClient`.
-  - *Action:* The application displays configuration activity, including the operation performed, responsible actor, timestamp, and additional details where available.
-  - *Action:* The application displays publication history using the information returned by the backend.
-  - *Postcondition:* Users can review previous configuration changes and publication records without modifying existing configuration data.
-  - *Postcondition:* If no history records are available, the application displays an appropriate empty-state message.
+- **Precondition:** The user is authenticated with either the `OPERATOR` or `CLIENT_SERVICES` role.
+- **Precondition:** The `NYW_SANDBOX` environment is accessible through the Caracal backend API.
+- **Trigger:** The user navigates to the Configuration History page (`GET /history`).
+
+#### Actions / Postconditions
+
+- **Action:** The Spring Boot application retrieves configuration change records using `/functions/audit-log-get` through the Java `CaracalApiClient`.
+- **Action:** The application retrieves publication records using `/functions/publication-list` through `CaracalApiClient`.
+- **Action:** The application displays configuration activity, including the operation performed, responsible actor, timestamp, and additional details where available.
+- **Action:** The application displays publication history using the information returned by the backend.
+- **Postcondition:** Users can review previous configuration changes and publication records without modifying existing configuration data.
+- **Postcondition:** If no history records are available, the application displays an appropriate empty-state message.
 
 #### Acceptance Criteria
 
@@ -275,17 +265,11 @@ Example of the Configuration Review page:
 #### Test Scenarios
 
 - **Manual (Success):** Log in as an `OPERATOR` or `CLIENT_SERVICES` user after a ticket price has been modified in `NYW_SANDBOX`. Open the Configuration History page and verify that the corresponding audit record displays the operation, responsible actor, timestamp, and available change details.
-
 - **Manual (Publication History):** Publish a verified configuration through `catalog-publish`. Open the Configuration History page and verify that the new publication appears in the publication history with the available publication details.
-
 - **Manual (No History):** Open the Configuration History page when the backend returns empty audit and publication record collections. Verify that the application displays a message indicating that no history is available.
-
 - **Manual (Failure / Edge Case):** Simulate an unavailable Caracal API or a failed history retrieval request. Verify that the application displays an appropriate error message without crashing or presenting incomplete results as complete history.
-
 - **Manual (Access Control):** Verify that both `OPERATOR` and `CLIENT_SERVICES` users can access the Configuration History page. Attempt to access the page without authentication and verify that login is required.
-
 - **Automated (Spring MVC Slice Test):** Use JUnit, `@WebMvcTest`, and `MockMvc` to verify that authenticated `OPERATOR` and `CLIENT_SERVICES` requests to `GET /history` return HTTP 200 and include the expected audit and publication history model attributes. Mock the Java history service to return sample records originating from `audit-log-get` and `publication-list`. Verify that unauthenticated requests are redirected or rejected according to the Spring Security configuration.
-
 - **Automated (JUnit Service Test):** Test the Java history service using mocked `CaracalApiClient` responses. Verify that audit and publication records are mapped correctly, empty responses produce an empty history state, and backend failures are handled appropriately.
 
 #### Actionable Sub-tasks

@@ -26,4 +26,9 @@
 * <span class="it2-added">**Story 4.11: End Date and "Showing Now" View (`2 pts`).** Alerts can expire on their own, and one page lists which alerts riders see right now on each route.</span>
 * <span class="it2-added">**Real Routes and Languages:** Load each tenant's real route list and one message box per supported locale (for example Polish and Chinese for Metra).</span>
 
-### Epic 5: Configuration Staging, Auditing & Publication
+### Epic 5: Configuration Review, Validation, and Publishing
+
+* <span class="it2-modified">**Story 5.1 – Published Configuration Comparison (Deferred to Iteration 3):** Extend the existing fare draft review to compare staged changes against a reliable published Caracal baseline and support schedule and availability changes.</span>
+* <span class="it2-modified">**Story 5.2 – Validate Configuration Discrepancies (`3 pts`):** Implement server-side validation against the NY Waterway reference dataset to detect incorrect ticket prices, availability settings, and monthly pass sale windows.</span>
+* <span class="it2-modified">**Story 5.3 – Publish Verified Configurations (`2 pts`):** Enable authorized administrators to publish reviewed and validated configurations through the Caracal API, with confirmation and appropriate error handling.</span>
+* <span class="it2-modified">**Story 5.4 – Configuration Change and Publication History (`2 pts`):** Display read-only configuration changes and publication records, including responsible actors, timestamps, and operation details.</span>
