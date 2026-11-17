@@ -1,6 +1,6 @@
 ## Epic 1: Authentication and Access Control
 
-This epic provides the functionality for staff members to sign in to the fare configuration application with a username or email and a password. After login, each user sees a landing page tailored to their role (`OPERATOR` vs. `CLIENT_SERVICES`). Operators receive standard access and can change their own password. Caracal Administrators (`CLIENT_SERVICES`) can create accounts, modify roles, and view all registered users. Accounts are provisioned administratively with no public sign-up. Passwords are encrypted as BCrypt hashes, sessions are persisted in PostgreSQL, and all protected endpoints require authentication. Google Single Sign-On and the Caracal API identity header are slated for Iteration 2.
+This epic provides the functionality for staff members to sign in to the fare configuration application with a username or email and a password. After login, each user sees a landing page tailored to their role (`OPERATOR` vs. `CLIENT_SERVICES`). Operators receive standard access and can change their own password. Caracal Administrators (`CLIENT_SERVICES`) can create accounts, modify roles, and view all registered users. Accounts are provisioned administratively with no public sign-up. Passwords are encrypted as BCrypt hashes, sessions are persisted in PostgreSQL, and all protected endpoints require authentication. <span class="it2-removed">Google Single Sign-On</span> and the Caracal API identity header are slated for Iteration 2.
 
 ---
 
@@ -339,10 +339,11 @@ This epic provides the functionality for staff members to sign in to the fare co
 #### Acceptance Criteria
 
 1. Every user row except the currently logged-in administrator's contains a role selection dropdown and a "Save" button.
-2. The active administrator's row displays their role as static text labeled with `(you)` and no dropdown.
+2. The admin's own row shows "Not available" under Change role, and "(you)" beside the username.
 3. The server rejects self-role modification attempts with the error message "You cannot change your own role."
 4. Submitting an invalid role value displays "Please choose a valid role." Submitting for a non-existent user displays "That user no longer exists."
 5. On success, an alert displays "Role updated. The user is signed out and receives the new role at their next login."
+6. The last remaining Client Services account cannot be changed to Operator: "At least one Client Services account must remain."
 
 #### Test Scenarios
 
@@ -589,6 +590,7 @@ This epic provides the functionality for staff members to sign in to the fare co
 
 ---
 
+
 ### Story 1.14: Google Login
 
 - **GitHub Title:** `[Auth] Google Login`
@@ -611,66 +613,125 @@ This epic provides the functionality for staff members to sign in to the fare co
   - *Action:* The user authenticates with Google, and the application matches the verified email claim to an existing `app_users` record.
   - *Postcondition:* The user is redirected to the role-based dashboard matching their database permissions.
 
-#### Acceptance Criteria
+Story 1.14: Google Login (Removed: the client does not require it, confirmed at the Nov 6 sync)
 
-1. The `/login` page offers a "Sign in with Google" button alongside the standard username/password form.
-2. Authentication succeeds only if the Google email already exists in `app_users`; system roles are resolved from the local database, never from external IdP claims.
-3. Authenticating with an unrecognized Google account displays an access denied message ("Your Google account is not authorized to access this system") and creates no database record.
-4. Session timeout, inactivity handling, and logout behavior function identically to password-based sessions.
+**Reason:** At the Nov 6 client sync, Eldon confirmed that Google login is not required. Staff keep signing in with a username or email and password, using accounts created by a Client Services admin (Stories 1.1 and 1.9).
+**Impact:** Nothing else changes. Roles, sessions, automatic logout and the X-Actor header (Story 1.15) do not depend on Google login.
+**GitHub issue:** Closed as not planned. It does not count toward velocity.
 
-#### Test Scenarios
 
-- **Manual (Success):** Click "Sign in with Google" using an authorized email present in `app_users`. Verify the application signs in and displays the expected role landing page.
-- **Manual (Failure / Edge Case):** Sign in with an unauthorized Google email not present in `app_users`. Verify authentication is rejected and the not-authorized error banner appears.
-- **Automated (Unit / Slice / Integration):** Unit test of OAuth2 user mapping service: mocked repository resolving a known email constructs an authorized `AppUserDetails` principal; an unknown email throws `OAuth2AuthenticationException`.
+### **Story 1.15: Operator Identity on Caracal API Requests**
 
-#### Actionable Sub-tasks
+* **GitHub Title:** `[Epic 1] Send operator identity in X-Actor header`
+* **Iteration:** `2 (actor identity implemented in Iteration 2)`
+* **Story Points:** `2`
+* **Story Description:** As a Client Services Admin, I want every action taken in the tool to be recorded with the signed-in operator's email, and that identity sent to the Caracal platform in the X-Actor header, so that each configuration change can be traced to a person.
+* **Actors / Personas:** Operator (`OPERATOR`), Caracal Client Services Admin (`CLIENT_SERVICES`)
+* **Preconditions & Triggers:**
+  * *Precondition:* The user is signed in and uses a feature that changes data, such as saving a fare change or a service alert.
+  * *Trigger:* The user saves, publishes or archives something.
+* **Actions / Postconditions:**
+  * *Action:* ActorService reads the signed-in user's account from the server-side session and returns the user's email. The feature that saves the change passes that email on.
+  * *Postcondition:* The change is traceable to the person: service alerts store the email in their created, updated, published and archived fields. When the REST client calls the Caracal API, the X-Actor header is the word `operator`, a colon and that email (planned, see the sub-tasks).
 
-- [ ] Add `spring-boot-starter-oauth2-client` dependency.
-- [ ] Configure Google OAuth2 client properties in `application.properties`.
-- [ ] Implement `CustomOAuth2UserService` mapping external email claims to local `app_users` records.
-- [ ] Add Google sign-in button to `login.html`.
-- [ ] Write automated lookup tests for authorized and unauthorized Google identities.
+#### **Acceptance Criteria**
+
+1. ActorService returns the email stored on the signed-in account, for example `admin@caracal.com`, and nothing else. The operator prefix is added only where the value is sent to Caracal (criterion 6).
+2. The value always comes from the server-side session and never from user input.
+3. ActorService refuses to produce a value when nobody is signed in, so no anonymous change is attributed to anyone.
+4. Service alerts keep who changed them: AlertService stores the email it is given in the created-by, updated-by, published-by and archived-by fields.
+5. Both roles produce the same format. The role does not change the value.
+6. Planned: every request sent to the Caracal API carries the header `X-Actor` with the value `operator:` followed by the signed-in user's email, for example `operator:admin@caracal.com`.
+
+#### **Test Scenarios**
+
+* **Manual (Success):** Log in as admin and save a service alert, then check that its updated-by value is the admin's email. Log in as operator, edit the same alert and check that the value is now the operator's email.
+* **Manual (Failure / Edge Case):** Log out and open a save address directly. The login page appears and no record is created or changed.
+* **Automated (Unit / Slice / Integration):** A JUnit test of `ActorService.currentActorHeader()` with a security context holding an `AppUserDetails` returns exactly the user's email, and throws `IllegalStateException` with no authentication. A JUnit and Mockito test of `AlertService.save` asserts that the created-by and updated-by values equal the email passed in. A WireMock test (planned) asserts that the outgoing Caracal request header equals `operator:` followed by the email.
+
+#### **Actionable Sub-tasks**
+
+- [x] ActorService returns the signed-in user's email (changed in PR 108 so audit trails store the plain email).
+- [x] AlertService stores the actor email in the created-by, updated-by, published-by and archived-by fields.
+- [ ] Alert controllers pass the ActorService value as the actor.
+- [ ] REST client sends X-Actor as `operator:` followed by the email on every Caracal API request.
+- [ ] Rename currentActorHeader() to a name that says it returns an email, and update the test that still mocks the old prefixed value.
+- [ ] Automated tests for ActorService, alert audit fields and the outgoing header.
 
 ---
 
-### Story 1.15: Operator Identity on Caracal API Requests
+### **Story 1.16: Search the User List**
 
-- **GitHub Title:** `[Auth] Send Operator Identity in X-Actor Header`
+* **GitHub Title:** `[Epic 1] Search the user list`
+* **Iteration:** `2`
+* **Story Points:** `2`
+* **Story Description:** As a Client Services Admin, I want to search the user list by username or email and see how many users there are, so that I can find an account quickly.
+* **Actors / Personas:** Caracal Client Services Admin (`CLIENT_SERVICES`)
+* **Preconditions & Triggers:**
+  * *Precondition:* The admin is signed in and at least one account exists.
+  * *Trigger:* The admin types in the search box on Manage users and clicks Search.
+* **Actions / Postconditions:**
+  * *Action:* The system finds accounts whose username or email contains the typed text, ignoring capital letters.
+  * *Postcondition:* The table shows only the matching accounts, sorted by username, with a summary line of counts. Clear returns to the full list.
 
-- **Iteration:** `2`
+#### **Acceptance Criteria**
 
-- **Story Points:** `2`
+1. The Manage users page has a search box labeled "Search by username or email" and a Search button. A Clear button appears only while a search is active.
+2. A search matches any part of the username or email, ignoring capital letters. Spaces at the start and end are ignored, and an empty search shows everyone.
+3. Results are sorted by username.
+4. A summary line reads "Showing X of Y users. Client Services: A. Operators: B."
+5. When nothing matches, the table shows "No users match your search."
+6. Operators cannot open this page (see Story 1.6).
 
-- **Story Description:** As a Caracal administrator, I want every mutating request sent to Caracal's platform API to include the authenticated operator's email in the `X-Actor` header, so that all configuration changes are attributable in the platform audit log.
+#### **Test Scenarios**
 
-- **Actors / Personas:** Authenticated Operator (`OPERATOR`), Caracal Administrator (`CLIENT_SERVICES`)
+* **Manual (Success):** Log in as admin, open Manage users and search for "ope". Only the operator accounts appear and the summary line shows the smaller count. Click Clear and the full list returns.
+* **Manual (Failure / Edge Case):** Search for "zzz" and check that "No users match your search." appears while the summary still shows the full total. Log in as operator and type the Manage users address into the browser: Access denied appears.
+* **Automated (Unit / Slice / Integration):** A JUnit and Mockito test of UserService.listUsers: a blank query returns all users sorted by username, and a query with spaces around it is trimmed before the repository search. A MockMvc test of a search request as an admin asserts the users, shownCount, totalUsers, adminCount and operatorCount model attributes.
 
-- **Preconditions & Triggers:**
+#### **Actionable Sub-tasks**
 
-  - *Precondition:* The user is logged in and an active application module prepares an HTTP request to Caracal's API.
-  - *Trigger:* The user performs a mutating action (e.g., updating a fare matrix or saving an alert).
+- [x] Repository search by username or email, ignoring case, with sorting.
+- [x] UserService.listUsers(query) and the count methods.
+- [x] Search form, summary line and empty-result row on the Manage users page.
+- [ ] Automated service and controller tests.
 
-- **Actions / Postconditions:**
+---
 
-  - *Action:* The application's HTTP client intercepts the outgoing request and attaches `X-Actor: operator:<email>`.
-  - *Postcondition:* Caracal's platform API processes the request and writes the operator's email into the platform audit trail.
+### **Story 1.17: Delete a User Account**
 
-#### Acceptance Criteria
+* **GitHub Title:** `[Epic 1] Delete a user account`
+* **Iteration:** `2`
+* **Story Points:** `3`
+* **Story Description:** As a Client Services Admin, I want to delete an account that should no longer have access, after a confirmation step, so that former staff cannot log in and the user list stays accurate.
+* **Actors / Personas:** Caracal Client Services Admin (`CLIENT_SERVICES`)
+* **Preconditions & Triggers:**
+  * *Precondition:* The admin is signed in and the target account exists and is not the admin's own account.
+  * *Trigger:* The admin clicks Delete on a user's row in Manage users.
+* **Actions / Postconditions:**
+  * *Action:* A confirmation page shows the username and email. The admin clicks Delete account to confirm or Cancel to go back. The system deletes the account and ends its active sessions.
+  * *Postcondition:* The user is removed from the list with the message "User deleted. Any active sessions for that account have ended." The person can no longer log in, and if they were signed in elsewhere, their next click returns them to the login page.
 
-1. The outgoing request header is formatted as `X-Actor: operator:<email>`, where `<email>` is the verified email of the authenticated session.
-2. The header value is derived server-side from the security context and cannot be spoofed by client input.
-3. Any API request initiated without an authenticated session context is aborted before reaching the network.
+#### **Acceptance Criteria**
 
-#### Test Scenarios
+1. Every row has a Delete button except the admin's own row, which shows "Not available".
+2. The confirmation page is titled "Delete account?", shows the username and email, and says the deletion is permanent. Cancel returns to Manage users without deleting.
+3. Opening the delete address only shows the confirmation. The deletion itself is a form submission with a CSRF token.
+4. An admin cannot delete their own account, and the server enforces this too: "You cannot change or delete your own account."
+5. The last remaining Client Services account cannot be deleted: "At least one Client Services account must remain."
+6. Deleting an account that no longer exists shows "That user no longer exists."
+7. Operators cannot reach the delete pages (see Story 1.6).
 
-- **Manual (Success):** Log in as `operator@nywaterway.com`, perform a rate change, and verify via network inspection/audit log that the outgoing API call carries `X-Actor: operator:operator@nywaterway.com`.
-- **Manual (Failure / Edge Case):** Attempt to invoke the API client service without an active security context. Verify an `IllegalStateException` is thrown and no external network request is dispatched.
-- **Automated (Unit / Slice / Integration):** JUnit test of `ActorService.currentActorHeader()`: asserting it returns `operator:<email>` when an authenticated principal exists and throws `IllegalStateException` when unauthenticated. WireMock test asserting the `X-Actor` header is present on outgoing REST calls.
+#### **Test Scenarios**
 
-#### Actionable Sub-tasks
+* **Manual (Success):** Create a throwaway account, click Delete on its row, then click Delete account on the confirmation page. The list shows the success message and the account is gone. Logging in as that account fails with "Invalid email/username or password."
+* **Manual (Failure / Edge Case):** Look at your own row: there is no Delete button. Click Cancel on a confirmation page: nothing is deleted. Keep a throwaway account signed in in another browser window, delete it, then click a link in that window: it goes to the login page. As operator, type a delete address into the browser: Access denied appears.
+* **Automated (Unit / Slice / Integration):** JUnit and Mockito tests of UserService.deleteUser: deleting yourself returns "self" and never deletes, an unknown id returns "notfound", the only remaining Client Services account returns "lastadmin", and a valid delete removes the account. A MockMvc test asserts that a delete as OPERATOR returns 403 and as CLIENT_SERVICES redirects to the user list with the deleted message.
 
-- [ ] Implement `ActorService.currentActorHeader()` resolving email from `SecurityContextHolder`.
-- [ ] Configure `WebClient` / `RestTemplate` interceptor injecting `X-Actor` on outgoing Caracal requests.
-- [ ] Write unit tests for `ActorService` under authenticated and unauthenticated states.
-- [ ] Write WireMock integration tests verifying header attachment on simulated API calls.
+#### **Actionable Sub-tasks**
+
+- [x] UserService.deleteUser with self-delete and last-admin guards.
+- [x] End the deleted user's active sessions through the session repository.
+- [x] AdminController confirmation page and delete routes.
+- [x] Confirmation page and Delete column on the Manage users page.
+- [ ] Automated service and controller tests.
