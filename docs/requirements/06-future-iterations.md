@@ -14,6 +14,12 @@
 * <span class="it2-modified">**Story 2.5 — Station-to-Zone Topology Mapping Side Panel (`3 pts`):** *(Deferred from Iteration 2)* Add a slide-out offcanvas drawer in Zonal Mode to search and reassign stations to zone dimensions (`site-dimension-bind`).</span>
 
 ### Epic 3: Ticket Availability & Product Lifecycle Management
+### Epic 3: Ticket Availability & Product Lifecycle Management
+
+- <span class="it2-modified">**Story 3.2 — Permanent Phase-Out Handling & Local Persistence (`2 pts`):** *(Deferred from Iteration 2)* Add `isPhasedOut` lifecycle flags with confirmation modals and `CLIENT_SERVICES`-only reactivation guardrails.</span>
+- **Story 3.4 — Backend REST API Integration for Availability & When-Conditions (`3 pts`):** Dispatch persisted `AvailabilityRule` and `TemporalCondition` records to Caracal's `/functions/rate-assignment-update` and `/functions/when-condition-create` endpoints with `X-Actor` headers.
+- **Story 3.5 — Expanded Temporal Evaluator & WireMock Testing (`2 pts`):** Add boundary unit tests for `TemporalCondition.isActiveAt()` and WireMock tests for Caracal API serialization.
+- **Story 3.6 — Operator & Developer Availability Guide (`1 pt`):** Document terminal availability workflows and Caracal API mappings in `docs/availability-guide.md`.
 
 ### Epic 4: Service Alerts & Pre-Purchase Notices
 
