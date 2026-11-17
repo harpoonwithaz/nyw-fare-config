@@ -6,11 +6,6 @@ on:
     paths:
       - 'docs/requirements/**'
       - 'docs/templates/**'
-  push:
-    branches: [ main ]
-    paths:
-      - 'docs/requirements/**'
-      - 'docs/templates/**'
 
 permissions:
   contents: write
@@ -21,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Install Pandoc and WeasyPrint
         run: |
@@ -35,23 +32,21 @@ jobs:
       - name: Compile Requirements PDF
         run: ./docs/templates/build-pdf.sh
 
-      - name: Upload PDF Preview Artifact (PRs)
-        if: github.event_name == 'pull_request'
+      - name: Upload PDF Preview Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: requirements-iteration2-preview
+          name: requirements-iteration2-pdf
           path: docs/releases/requirements-iteration2.pdf
-          retention-days: 7
+          retention-days: 14
 
-      - name: Commit Compiled PDF to main (On Merge)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Commit Compiled PDF to PR Branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/releases/requirements-iteration2.pdf
           if git diff --staged --quiet; then
-            echo "No changes to compiled PDF."
+            echo "PDF is already up to date."
           else
             git commit -m "docs: auto-compile requirements-iteration2.pdf [skip ci]"
-            git push
+            git push origin HEAD:${{ github.head_ref }}
           fi
