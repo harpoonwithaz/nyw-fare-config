@@ -1,6 +1,6 @@
 ## Epic 1: Authentication and Access Control
 
-This epic provides the functionality for staff members to sign in to the fare configuration application with a username or email and a password. After login, each user sees a landing page tailored to their role (`OPERATOR` vs. `CLIENT_SERVICES`). Operators receive standard access and can change their own password. Caracal Administrators (`CLIENT_SERVICES`) can create accounts, modify roles, and view all registered users. Accounts are provisioned administratively with no public sign-up. Passwords are encrypted as BCrypt hashes, sessions are persisted in PostgreSQL, and all protected endpoints require authentication. Google Single Sign-On and the Caracal API identity header are slated for Iteration 2.
+This epic provides the functionality for staff members to sign in to the fare configuration application with a username or email and a password. After login, each user sees a landing page tailored to their role (`OPERATOR` vs. `CLIENT_SERVICES`). Operators receive standard access and can change their own password. Caracal Administrators (`CLIENT_SERVICES`) can create accounts, modify roles, and view all registered users. Accounts are provisioned administratively with no public sign-up. Passwords are encrypted as BCrypt hashes, sessions are persisted in PostgreSQL, and all protected endpoints require authentication. <span class="it2-removed">Google Single Sign-On</span> and the Caracal API identity header are slated for Iteration 2.
 
 ---
 
@@ -590,6 +590,7 @@ This epic provides the functionality for staff members to sign in to the fare co
 
 ---
 
+::: {.it2-removed}
 ### Story 1.14: Google Login
 
 - **GitHub Title:** `[Auth] Google Login`
@@ -617,7 +618,7 @@ Story 1.14: Google Login (Removed: the client does not require it, confirmed at 
 **Reason:** At the Nov 6 client sync, Eldon confirmed that Google login is not required. Staff keep signing in with a username or email and password, using accounts created by a Client Services admin (Stories 1.1 and 1.9).
 **Impact:** Nothing else changes. Roles, sessions, automatic logout and the X-Actor header (Story 1.15) do not depend on Google login.
 **GitHub issue:** Closed as not planned. It does not count toward velocity.
-
+:::
 
 
 ### Story 1.15: Operator Identity on Caracal API Requests
