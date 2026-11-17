@@ -1,6 +1,10 @@
 ## Epic 3: Ticket Availability and Product Lifecycle Management
 
-This document defines the formal user stories and technical tasks for Epic 3 of the NY Waterway Fare Configuration Tool. Each story adheres strictly to the CMPT 276 agile project specification, INVEST criteria, and standardized persona definitions. <span class="it2-added">In Iteration 2, Stories 3.1 and 3.3 were implemented with local PostgreSQL persistence (`availability_rules` and `temporal_conditions` tables), canonical product identifiers (`ADULT_ONEWAY`, `CHILD_ONEWAY`, `SENIOR_ONEWAY`, `FULL_10TRIP`, `FULL_MONTHLY`), CSRF-protected batch staging (`POST /availability/api/stage`), and automated MockMvc test coverage, while Story 3.2 (Permanent Phase-Outs) and live Caracal REST API synchronization (Stories 3.4–3.6) are scheduled for Iteration 3.</span>
+This document defines the formal user stories and technical tasks for Epic 3 of the NY Waterway Fare Configuration Tool. Each story adheres strictly to the CMPT 276 agile project specification, INVEST criteria, and standardized persona definitions.
+
+::: {.it2-added}
+**Iteration 2 Architectural Update:** Stories **3.1** and **3.3** were delivered in Iteration 2 using dedicated PostgreSQL tables (`availability_rules` and `temporal_conditions`), canonical product codes (`ADULT_ONEWAY`, `CHILD_ONEWAY`, `SENIOR_ONEWAY`, `FULL_10TRIP`, `FULL_MONTHLY`), CSRF-protected batch staging (`POST /availability/api/stage`), and automated MockMvc integration tests (`AvailabilityControllerMockMvcTests`). Story **3.2** (Permanent Phase-Outs) and live Caracal REST API synchronization (Stories **3.4–3.6**) are scheduled for Iteration 3.
+:::
 
 ---
 
@@ -22,19 +26,19 @@ This document defines the formal user stories and technical tasks for Epic 3 of 
 
 - **Actions / Postconditions:**
   - *Action:* The operator clicks a toggle switch corresponding to a ticket class.
-  - *Postcondition:* The switch updates its visual state, changes the row status label to `Available` or `Unavailable` with a `STAGED MODIFICATION` badge, and registers the modification in the client-side staging buffer (`stagedAvailabilityDrafts`) <span class="it2-added">until persisted via `POST /availability/api/stage`</span>.
+  - *Postcondition:* The switch updates its visual state, changes the row status label to `Available` or `Unavailable` with a `STAGED MODIFICATION` badge, and registers the modification in the client-side staging buffer (`stagedAvailabilityDrafts`) <span class="it2-added">before batch persistence to PostgreSQL via `POST /availability/api/stage`</span>.
 
 #### Acceptance Criteria
 
 1. Each canonical ticket class (`ADULT_ONEWAY`, `CHILD_ONEWAY`, `SENIOR_ONEWAY`, `FULL_10TRIP`, `FULL_MONTHLY`) per terminal displays an active/inactive toggle switch.
 2. Disabling a ticket class instantly updates its visual status on the table (displaying `Unavailable` and a `STAGED MODIFICATION` badge).
 3. Availability changes are captured as pending draft modifications before batch persistence to PostgreSQL (`availability_rules`), surviving page refreshes.
-4. <span class="it2-modified">Accessing `/availability` without an active tenant displays the standard `"No Tenant Selected"` guidance card, and unauthenticated or CSRF-missing `POST /availability/api/stage` requests are rejected (`403 Forbidden`).</span>
+4. <span class="it2-modified">Accessing `/availability` without an active tenant renders the `"No Tenant Selected"` guidance card, and unauthenticated or CSRF-missing `POST /availability/api/stage` requests are rejected (`403 Forbidden`).</span>
 
 #### Test Scenarios
 
 - **Manual (Success):** Select tenant `NYW_SANDBOX`, navigate to `/availability?site=EDGEWTR`, locate `SENIOR_ONEWAY`, flip its toggle to "Off", and click **Save Availability Drafts**. Refresh the page and verify `SENIOR_ONEWAY` remains `Unavailable`.
-- **Manual (Failure / Edge Case):** Navigate to `/availability` with no tenant selected in the global navbar. Verify the `"No Tenant Selected"` feedback card is displayed and product controls remain hidden.
+- **Manual (Failure / Edge Case):** <span class="it2-modified">Navigate to `/availability` with no tenant selected in the global navbar. Verify the `"No Tenant Selected"` feedback card displays and product controls remain hidden.</span>
 - **Automated (Unit / Slice / Integration):** <span class="it2-modified">`AvailabilityControllerMockMvcTests` (`@SpringBootTest` + `@AutoConfigureMockMvc` with H2) asserting `GET /availability` shows `"No Tenant Selected"` when no tenant is bound, `POST /availability/api/stage` without CSRF returns `403 Forbidden`, and valid submissions persist to `AvailabilityRuleRepository` and hydrate on reload.</span>
 
 #### Actionable Sub-tasks
@@ -51,7 +55,7 @@ This document defines the formal user stories and technical tasks for Epic 3 of 
 
 - **GitHub Issue Title:** `[Availability] Permanent Phase-Out Handling & Local Persistence`
 
-- **Iteration:** <span class="it2-modified">`3` *(Deferred from Iteration 2)*</span>
+- **Iteration:** <span class="it2-modified">3 (Deferred from Iteration 2)</span>
 
 - **Story Points:** `2`
 
@@ -119,7 +123,7 @@ This document defines the formal user stories and technical tasks for Epic 3 of 
 #### Test Scenarios
 
 - **Manual (Success):** Open the condition modal for `ADULT_ONEWAY`, select `Recurring Weekly`, check Mon–Fri (`1–5`), set `06:00` to `22:00`, apply, and save. Refresh `/availability` and verify the row badge displays `5 Days (06:00-22:00)`.
-- **Manual (Failure / Edge Case):** Switch the condition radio button to `Temporary Promo` and verify day-of-week/time inputs hide while calendar date pickers appear cleanly.
+- **Manual (Failure / Edge Case):** <span class="it2-modified">Switch the condition radio button to `Temporary Promo` and verify day-of-week/time inputs hide while calendar date pickers appear cleanly.</span>
 - **Automated (Unit / Slice / Integration):** <span class="it2-modified">`AvailabilityControllerMockMvcTests` verifying `POST /availability/api/stage` with a `RECURRING_WEEKLY` payload persists `TemporalCondition` (`daysOfWeek = [1, 2, 3, 4, 5]`) and renders the saved constraint summary on subsequent `GET /availability` requests.</span>
 
 #### Actionable Sub-tasks
