@@ -1,9 +1,9 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -11,25 +11,23 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.security.test.context.support.WithAnonymousUser;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
+import ca.sfu.cmpt276.nywfareconfig.security.config.SecurityConfig;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 import ca.sfu.cmpt276.nywfareconfig.security.controller.GlobalUserModelAdvice;
-import ca.sfu.cmpt276.nywfareconfig.security.config.SecurityConfig;
 
-
-// PR Comment #4: Test the real MVC endpoint without unrelated view-model advice.
 @WebMvcTest(
     controllers = PublishingApiController.class,
     excludeFilters = @ComponentScan.Filter(
@@ -53,45 +51,54 @@ class PublishingApiControllerTest {
     @MockitoBean
     private TenantService tenantService;
 
-    // PR COMMENT #4:
-    // Verify tenant filtering through the real HTTP endpoint.
+    // Create a review DTO without connecting to PostgreSQL.
+    private ConfigurationChangeView createChange(
+            String tenantCode,
+            GridMode gridMode,
+            String selectedContext,
+            String rowKey,
+            String colKey,
+            String product,
+            String originalPrice,
+            String draftPrice) {
+
+        return new ConfigurationChangeView(
+            tenantCode,
+            gridMode,
+            selectedContext,
+            rowKey,
+            colKey,
+            product,
+            new BigDecimal(originalPrice),
+            new BigDecimal(draftPrice)
+        );
+    }
+
+    // Verify that the endpoint retrieves changes for the selected tenant.
     @Test
-    void shouldReturnOnlyChangesForSelectedTenant() throws Exception {
+    void shouldReturnPendingDraftsForSelectedTenant() throws Exception {
 
         Tenant tenant = mock(Tenant.class);
 
         when(tenant.getCode()).thenReturn("NYW_SANDBOX");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        ConfigurationChangeView nywChange =
-            new ConfigurationChangeView(
-                "NYW_SANDBOX",
-                GridMode.OD,
-                "EDGEWTR",
-                "Midtown / W. 39th St",
-                "Adult One-Way",
-                "Adult One-Way",
-                new BigDecimal("13.25"),
-                new BigDecimal("14.00")
-            );
+        ConfigurationChangeView change = createChange(
+            "NYW_SANDBOX",
+            GridMode.OD,
+            "EDGEWTR",
+            "MIDTOWN",
+            "ADULT_ONEWAY",
+            "ADULT_ONEWAY",
+            "13.25",
+            "14.00"
+        );
 
-        ConfigurationChangeView metraChange =
-            new ConfigurationChangeView(
-                "METRA",
-                GridMode.ZONAL,
-                "ADULT_ONEWAY",
-                "Zone 1",
-                "Zone 2",
-                "Adult One-Way",
-                new BigDecimal("4.00"),
-                new BigDecimal("4.50")
-            );
-
-        when(stagingService.getConfigurationChanges())
-            .thenReturn(List.of(nywChange, metraChange));
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of(change));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
-        .with(user("testoperator").roles("OPERATOR")))
+                .with(user("testoperator").roles("OPERATOR")))
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith(
                 "application/json"
@@ -103,28 +110,81 @@ class PublishingApiControllerTest {
                 .value("OD"))
             .andExpect(jsonPath("$[0].selectedContext")
                 .value("EDGEWTR"))
+            .andExpect(jsonPath("$[0].rowKey")
+                .value("MIDTOWN"))
+            .andExpect(jsonPath("$[0].colKey")
+                .value("ADULT_ONEWAY"))
+            .andExpect(jsonPath("$[0].publishedPrice")
+                .value(13.25))
             .andExpect(jsonPath("$[0].stagedPrice")
                 .value(14.00));
+
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
     }
 
-    // PR COMMENT #4:
-    // Verify the endpoint returns an empty JSON array without a tenant.
+    // Verify that changes from different origins appear together.
     @Test
-    void shouldReturnEmptyListWhenNoTenantSelected()
-            throws Exception {
+    void shouldReturnDraftsAcrossMultipleOrigins() throws Exception {
+
+        Tenant tenant = mock(Tenant.class);
+
+        when(tenant.getCode()).thenReturn("NYW_SANDBOX");
+        when(tenantContext.getSelectedTenant()).thenReturn(tenant);
+
+        ConfigurationChangeView firstChange = createChange(
+            "NYW_SANDBOX",
+            GridMode.OD,
+            "EDGEWTR",
+            "MIDTOWN",
+            "ADULT_ONEWAY",
+            "ADULT_ONEWAY",
+            "13.25",
+            "14.00"
+        );
+
+        ConfigurationChangeView secondChange = createChange(
+            "NYW_SANDBOX",
+            GridMode.OD,
+            "PORT_IMPERIAL",
+            "MIDTOWN",
+            "FULL_10TRIP",
+            "FULL_10TRIP",
+            "112.63",
+            "115.00"
+        );
+
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of(firstChange, secondChange));
+
+        mockMvc.perform(get("/api/publishing/pending-changes")
+                .with(user("testoperator").roles("OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].selectedContext")
+                .value("EDGEWTR"))
+            .andExpect(jsonPath("$[1].selectedContext")
+                .value("PORT_IMPERIAL"));
+
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
+    }
+
+    // Verify that no changes are retrieved without a selected tenant.
+    @Test
+    void shouldReturnEmptyListWhenNoTenantSelected() throws Exception {
 
         when(tenantContext.getSelectedTenant()).thenReturn(null);
 
         mockMvc.perform(get("/api/publishing/pending-changes")
-        .with(user("testoperator").roles("OPERATOR")))
+                .with(user("testoperator").roles("OPERATOR")))
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
 
         verifyNoInteractions(stagingService);
     }
 
-    // PR COMMENT #4:
-    // Verify Jackson serializes the change status as "changed".
+    // Verify that the changed property is serialized for the frontend.
     @Test
     void shouldSerializeChangedProperty() throws Exception {
 
@@ -133,35 +193,94 @@ class PublishingApiControllerTest {
         when(tenant.getCode()).thenReturn("NYW_SANDBOX");
         when(tenantContext.getSelectedTenant()).thenReturn(tenant);
 
-        ConfigurationChangeView change =
-            new ConfigurationChangeView(
-                "NYW_SANDBOX",
-                GridMode.OD,
-                "EDGEWTR",
-                "MIDTOWN",
-                "Adult One-Way",
-                "Adult One-Way",
-                new BigDecimal("13.25"),
-                new BigDecimal("14.00")
-            );
+        ConfigurationChangeView change = createChange(
+            "NYW_SANDBOX",
+            GridMode.OD,
+            "EDGEWTR",
+            "MIDTOWN",
+            "ADULT_ONEWAY",
+            "ADULT_ONEWAY",
+            "13.25",
+            "14.00"
+        );
 
-        when(stagingService.getConfigurationChanges())
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
             .thenReturn(List.of(change));
 
         mockMvc.perform(get("/api/publishing/pending-changes")
-        .with(user("testoperator").roles("OPERATOR")))
+                .with(user("testoperator").roles("OPERATOR")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].changed").value(true));
     }
 
+    // Verify that unauthenticated users cannot access pending changes.
     @Test
     @WithAnonymousUser
     void shouldRequireAuthentication() throws Exception {
+
         mockMvc.perform(get("/api/publishing/pending-changes"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
     }
+
+    // Verify that zonal configuration fields are mapped correctly.
+    @Test
+    void shouldMapZonalDraftCorrectly() throws Exception {
+
+        Tenant tenant = mock(Tenant.class);
+
+        when(tenant.getCode()).thenReturn("METRA");
+        when(tenantContext.getSelectedTenant()).thenReturn(tenant);
+
+        ConfigurationChangeView change = createChange(
+            "METRA",
+            GridMode.ZONAL,
+            "ADULT_ONEWAY",
+            "ZONE_1",
+            "ZONE_2",
+            "ADULT_ONEWAY",
+            "4.00",
+            "4.50"
+        );
+
+        when(stagingService.getConfigurationChanges("METRA"))
+            .thenReturn(List.of(change));
+
+        mockMvc.perform(get("/api/publishing/pending-changes")
+                .with(user("testoperator").roles("OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].gridMode").value("ZONAL"))
+            .andExpect(jsonPath("$[0].selectedContext")
+                .value("ADULT_ONEWAY"))
+            .andExpect(jsonPath("$[0].rowKey").value("ZONE_1"))
+            .andExpect(jsonPath("$[0].colKey").value("ZONE_2"))
+            .andExpect(jsonPath("$[0].publishedPrice").value(4.00))
+            .andExpect(jsonPath("$[0].stagedPrice").value(4.50))
+            .andExpect(jsonPath("$[0].changed").value(true));
+    }
+
+    // Verify that the API returns an empty list when no changes exist.
+    @Test
+    void shouldReturnEmptyListWhenNoChangesExist() throws Exception {
+
+        Tenant tenant = mock(Tenant.class);
+
+        when(tenant.getCode()).thenReturn("NYW_SANDBOX");
+        when(tenantContext.getSelectedTenant()).thenReturn(tenant);
+
+        when(stagingService.getConfigurationChanges("NYW_SANDBOX"))
+            .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/publishing/pending-changes")
+                .with(user("testoperator").roles("OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(content().json("[]"));
+
+        verify(stagingService)
+            .getConfigurationChanges("NYW_SANDBOX");
+    }
 }
+
 
 
 

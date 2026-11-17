@@ -11,7 +11,7 @@ public class ActorService {
     public String currentActorHeader() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AppUserDetails user) {
-            return "operator:" + user.getEmail();
+            return user.getEmail();
         }
         throw new IllegalStateException("No authenticated operator");
     }

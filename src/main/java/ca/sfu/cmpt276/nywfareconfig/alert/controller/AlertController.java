@@ -109,7 +109,25 @@ public class AlertController {
             ServiceAlert alert = id == null ? null : alertService.get(tenantCode, id).orElse(null);
             return showForm(model, tenantCode, alert, form, errors);
         }
-        redirect.addFlashAttribute("success", "Alert saved as a draft. It goes live once it is published.");
+        redirect.addFlashAttribute("success", "Alert saved as a draft. Click Make active when it is ready to go live.");
+        return LIST;
+    }
+
+    // Draft -> Active. Alerts are stored locally, so this skips the Epic 5 publish flow.
+    // A draft copy of a live alert replaces it, and the old one is archived.
+    @PostMapping("/fares/alerts/{id}/activate")
+    public String activate(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
+            RedirectAttributes redirect) {
+        String tenantCode = tenantCode();
+        if (tenantCode == null) {
+            return LIST;
+        }
+        List<String> errors = alertService.publish(tenantCode, List.of(id), user.getEmail());
+        if (errors.isEmpty()) {
+            redirect.addFlashAttribute("success", "Alert is now active.");
+        } else {
+            redirect.addFlashAttribute("error", String.join(" ", errors));
+        }
         return LIST;
     }
 

@@ -6,14 +6,13 @@ Retrieves configuration comparisons from Spring Boot.
     "use strict";
 
     const tableBody = document.getElementById("fareChangesTableBody");
-    const changedOnlyCheckbox = document.getElementById("showChangedOnly");
 
-    // PR COMMENT #5: Summary counter elements.
+    // Summary counter elements.
     const totalCountElement = document.getElementById("totalItemsCount");
     const changedCountElement = document.getElementById("changedItemsCount");
     const unchangedCountElement = document.getElementById("unchangedItemsCount");
 
-    // STORY 5.1: Format currency values.
+    // Format currency values.
     function formatPrice(price) {
         if (price === null || price === undefined) {
             return "N/A";
@@ -22,7 +21,7 @@ Retrieves configuration comparisons from Spring Boot.
         return "$" + Number(price).toFixed(2);
     }
 
-    // STORY 5.1: Safely create a table cell.
+    // Safely create a table cell.
     function createCell(value, className = "") {
         const cell = document.createElement("td");
         cell.textContent = value ?? "";
@@ -34,56 +33,28 @@ Retrieves configuration comparisons from Spring Boot.
         return cell;
     }
 
-    // PR COMMENT #5:
-    // Count the API fare records and server-rendered schedule records.
+    // Update summary counters using actual pending fare changes.
     function updateSummaryCounters(fareChanges) {
-        const scheduleRows = document.querySelectorAll(
-            "#scheduleChangesTableBody tr[data-changed]"
-        );
-
-        const totalFares = fareChanges.length;
         const changedFares = fareChanges.filter(
             change => change.changed === true
         ).length;
 
-        const totalSchedules = scheduleRows.length;
-        const changedSchedules = Array.from(scheduleRows).filter(
-            row => row.dataset.changed === "true"
-        ).length;
-
-        const total = totalFares + totalSchedules;
-        const changed = changedFares + changedSchedules;
-        const unchanged = total - changed;
+        const total = changedFares;
 
         if (totalCountElement) {
             totalCountElement.textContent = total;
         }
 
         if (changedCountElement) {
-            changedCountElement.textContent = changed;
+            changedCountElement.textContent = changedFares;
         }
 
         if (unchangedCountElement) {
-            unchangedCountElement.textContent = unchanged;
+            unchangedCountElement.textContent = 0;
         }
     }
 
-    // PR COMMENT #6:
-    // Hide unchanged fare and schedule rows when the filter is checked.
-    function applyChangedOnlyFilter() {
-        const rows = document.querySelectorAll("tr[data-changed]");
-
-        rows.forEach(function (row) {
-            const isChanged = row.dataset.changed === "true";
-
-            row.style.display =
-                changedOnlyCheckbox?.checked && !isChanged
-                    ? "none"
-                    : "";
-        });
-    }
-
-    // STORY 5.1: Render configuration changes from the API.
+    // Render only changed fare drafts.
     function renderFareChanges(changes) {
         if (!tableBody) {
             return;
@@ -91,10 +62,14 @@ Retrieves configuration comparisons from Spring Boot.
 
         tableBody.replaceChildren();
 
-        if (changes.length === 0) {
+        const changedFares = changes.filter(
+            change => change.changed === true
+        );
+
+        if (changedFares.length === 0) {
             const row = document.createElement("tr");
             const cell = createCell(
-                "No fare configurations available for review.",
+                "No pending fare changes.",
                 "text-center text-muted py-3"
             );
 
@@ -102,14 +77,13 @@ Retrieves configuration comparisons from Spring Boot.
             row.appendChild(cell);
             tableBody.appendChild(row);
 
-            // PR COMMENT #5: Still count schedule records.
-            updateSummaryCounters(changes);
+            updateSummaryCounters(changedFares);
             return;
         }
 
-        changes.forEach(function (change) {
+        changedFares.forEach(function (change) {
             const row = document.createElement("tr");
-            row.dataset.changed = String(change.changed);
+            row.dataset.changed = "true";
 
             row.appendChild(createCell(change.tenantCode));
             row.appendChild(createCell(change.gridMode));
@@ -128,33 +102,24 @@ Retrieves configuration comparisons from Spring Boot.
 
             row.appendChild(createCell(
                 formatPrice(change.stagedPrice),
-                change.changed ? "table-warning" : ""
+                "table-warning"
             ));
 
             const statusCell = document.createElement("td");
             const badge = document.createElement("span");
 
-            badge.className = change.changed
-                ? "badge bg-warning text-dark"
-                : "badge bg-success";
-
-            badge.textContent = change.changed
-                ? "Changed"
-                : "Unchanged";
+            badge.className = "badge bg-warning text-dark";
+            badge.textContent = "Changed";
 
             statusCell.appendChild(badge);
             row.appendChild(statusCell);
             tableBody.appendChild(row);
         });
 
-        // PR COMMENT #5: Synchronize counters after fetching fares.
-        updateSummaryCounters(changes);
-
-        // PR COMMENT #6: Apply the default filter.
-        applyChangedOnlyFilter();
+        updateSummaryCounters(changedFares);
     }
 
-    // STORY 5.1: Retrieve tenant-scoped changes from Spring Boot.
+    // Retrieve tenant-scoped pending changes from Spring Boot.
     async function loadFareChanges() {
         if (!tableBody) {
             return;
@@ -190,27 +155,23 @@ Retrieves configuration comparisons from Spring Boot.
             row.appendChild(cell);
             tableBody.appendChild(row);
 
-            // Do not display stale counters if the API fails.
-            if (totalCountElement) totalCountElement.textContent = "—";
-            if (changedCountElement) changedCountElement.textContent = "—";
-            if (unchangedCountElement) unchangedCountElement.textContent = "—";
+            // Avoid displaying stale counters after an API failure.
+            if (totalCountElement) {
+                totalCountElement.textContent = "—";
+            }
+
+            if (changedCountElement) {
+                changedCountElement.textContent = "—";
+            }
+
+            if (unchangedCountElement) {
+                unchangedCountElement.textContent = "—";
+            }
         }
     }
 
-    // STORY 5.1: Initialize the review page.
+    // Initialize the review page.
     document.addEventListener("DOMContentLoaded", function () {
-
-        // PR COMMENT #6: Changed-only is the default.
-        if (changedOnlyCheckbox) {
-            changedOnlyCheckbox.checked = true;
-
-            changedOnlyCheckbox.addEventListener(
-                "change",
-                applyChangedOnlyFilter
-            );
-        }
-
-        applyChangedOnlyFilter();
         loadFareChanges();
     });
 

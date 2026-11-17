@@ -33,7 +33,6 @@
   }
 
   /**
-   * Validates a raw string against Story 2.2 acceptance criteria.
    * Returns { valid: boolean, reason?: string, normalized?: string }
    */
   function validateFareInput(rawString, badInputFlag = false) {

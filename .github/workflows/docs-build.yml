@@ -1,0 +1,33 @@
+name: Build Requirements PDF
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/requirements/**'
+      - 'docs/templates/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/requirements/**'
+      - 'docs/templates/**'
+
+jobs:
+  build-docs:
+    name: Validate & Compile Requirements PDF
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc and WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc weasyprint
+
+      - name: Make build script executable
+        run: chmod +x docs/templates/build-pdf.sh
+
+      - name: Compile Requirements PDF
+        run: ./docs/templates/build-pdf.sh

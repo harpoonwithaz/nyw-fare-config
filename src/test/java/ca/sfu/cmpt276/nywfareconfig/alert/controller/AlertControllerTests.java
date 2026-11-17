@@ -202,4 +202,48 @@ class AlertControllerTests {
 
         assertEquals(AlertStatus.ARCHIVED, alertRepository.findById(draft.getId()).orElseThrow().getStatus());
     }
+
+    // Draft -> Active from the alerts page
+    @Test
+    void makeActiveTurnsDraftActive() throws Exception {
+        ServiceAlert draft = saveDraft("Activate me");
+
+        mockMvc.perform(inTenant(post("/fares/alerts/" + draft.getId() + "/activate"), OPERATOR))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/fares/alerts"));
+
+        assertEquals(AlertStatus.ACTIVE, alertRepository.findById(draft.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void activatingReplacementDraftArchivesOldAlert() throws Exception {
+        ServiceAlert live = saveDraft("Old wording");
+        assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
+
+        // Editing a live alert creates a draft copy that points back to it
+        mockMvc.perform(inTenant(post("/fares/alerts/" + live.getId()), OPERATOR)
+                .param("routeKeys", ROUTE)
+                .param("triggerType", "WEEKENDS")
+                .param("messageEn", "New wording"))
+            .andExpect(status().is3xxRedirection());
+        ServiceAlert replacement = alertService.list(TENANT, "New wording", null, null).get(0);
+        assertEquals(live.getId(), replacement.getReplacesAlertId());
+
+        mockMvc.perform(inTenant(post("/fares/alerts/" + replacement.getId() + "/activate"), OPERATOR))
+            .andExpect(status().is3xxRedirection());
+
+        assertEquals(AlertStatus.ACTIVE, alertRepository.findById(replacement.getId()).orElseThrow().getStatus());
+        assertEquals(AlertStatus.ARCHIVED, alertRepository.findById(live.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void activatingActiveAlertShowsError() throws Exception {
+        ServiceAlert live = saveDraft("Already live");
+        assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
+
+        mockMvc.perform(inTenant(post("/fares/alerts/" + live.getId() + "/activate"), OPERATOR))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                .attributeExists("error"));
+    }
 }
