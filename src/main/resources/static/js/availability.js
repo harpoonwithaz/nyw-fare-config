@@ -64,12 +64,22 @@ document.addEventListener("DOMContentLoaded", function () {
         typePromo.addEventListener("change", updateModalVisibility);
     }
 
+    // top header button defaults cleanly to ADULT_ONEWAY
+    const btnOpenConditionModal = document.getElementById("btnOpenConditionModal");
+    if (btnOpenConditionModal) {
+        btnOpenConditionModal.addEventListener("click", function () {
+            document.getElementById("modalProductCode").value = "ADULT_ONEWAY";
+            document.getElementById("modalTargetLabel").textContent =
+                `Product: ADULT_ONEWAY | Site: ${stagedAvailabilityDrafts.siteCode}`;
+        });
+    }
+
     // open modal for specific product row
     document.querySelectorAll(".btn-configure-rule").forEach(btn => {
         btn.addEventListener("click", function () {
             const productCode = this.getAttribute("data-product");
             document.getElementById("modalProductCode").value = productCode;
-            document.getElementById("modalTargetLabel").textContent = 
+            document.getElementById("modalTargetLabel").textContent =
                 `Product: ${productCode} | Site: ${stagedAvailabilityDrafts.siteCode}`;
         });
     });
@@ -109,7 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (row) {
                 const badgeContainer = row.querySelector(".temporal-condition-badge-container");
                 if (badgeContainer) {
-                    const badgeText = conditionType === "RECURRING_WEEKLY" 
+                    const badgeText = conditionType === "RECURRING_WEEKLY"
                         ? `${selectedDays.length} Days (${startTime}-${endTime})`
                         : `Promo (${startDate || 'Start'} to ${endDate || 'End'})`;
                     badgeContainer.innerHTML = `

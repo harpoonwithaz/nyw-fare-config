@@ -23,6 +23,8 @@ public class AvailabilityRule {
     @Column(nullable = false)
     private boolean isAvailable;
 
+    private String updatedBy;
+
     private LocalDateTime lastUpdated;
 
     @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
@@ -53,10 +55,13 @@ public class AvailabilityRule {
     public void setProductCode(String productCode) { this.productCode = productCode; }
 
     public boolean isAvailable() { return isAvailable; }
-    public void setAvailable(boolean available) { 
-        isAvailable = available; 
+    public void setAvailable(boolean available) {
+        isAvailable = available;
         this.lastUpdated = LocalDateTime.now();
     }
+
+    public String getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
 
     public LocalDateTime getLastUpdated() { return lastUpdated; }
     public void setLastUpdated(LocalDateTime lastUpdated) { this.lastUpdated = lastUpdated; }

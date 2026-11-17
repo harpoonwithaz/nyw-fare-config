@@ -69,6 +69,8 @@ public class AvailabilityService {
                 ));
 
             rule.setAvailable(draft.isAvailable());
+            rule.setUpdatedBy(actor);
+            rule.setLastUpdated(java.time.LocalDateTime.now());
 
             if (draft.getConditionType() != null && !draft.getConditionType().isEmpty()) {
                 TemporalCondition condition = rule.getTemporalCondition() != null

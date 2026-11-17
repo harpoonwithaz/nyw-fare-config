@@ -18,7 +18,7 @@ public class TemporalCondition {
 
     private String conditionType;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "temporal_condition_days", joinColumns = @JoinColumn(name = "condition_id"))
     @Column(name = "day_of_week")
     private List<Integer> daysOfWeek; // 1 = Mon, 7 = Sun

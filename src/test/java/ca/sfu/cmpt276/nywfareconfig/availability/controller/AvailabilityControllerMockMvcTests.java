@@ -2,7 +2,9 @@ package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.security.AppUser;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.security.Role;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +48,9 @@ class AvailabilityControllerMockMvcTests {
     @BeforeEach
     void setUp() {
         availabilityRuleRepository.deleteAll();
-        operatorUser = new AppUserDetails("operator@nyw.com", "password", "ROLE_OPERATOR");
+        operatorUser = new AppUserDetails(
+            new AppUser("operator@nyw.com", "operator", "password", Role.OPERATOR, true)
+        );
     }
 
     @Test
@@ -60,7 +64,7 @@ class AvailabilityControllerMockMvcTests {
     void selectedTenantRendersCanonicalProductsAndPersistsChanges() throws Exception {
         MockHttpSession session = new MockHttpSession();
         TenantContext context = new TenantContext();
-        context.setSelectedTenant(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD));
+        context.setSelectedTenant(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
         session.setAttribute("scopedTarget.tenantContext", context);
 
         String payload = """
@@ -69,9 +73,10 @@ class AvailabilityControllerMockMvcTests {
                 "siteCode": "MIDTOWN",
                 "productCode": "ADULT_ONEWAY",
                 "available": false,
-                "conditionType": "TEMPORARY_PROMO",
-                "startDate": "2026-11-01",
-                "endDate": "2026-12-01"
+                "conditionType": "RECURRING_WEEKLY",
+                "daysOfWeek": [1, 2, 3, 4, 5],
+                "startTime": "06:00:00",
+                "endTime": "22:00:00"
               }
             ]
             """;
@@ -91,18 +96,19 @@ class AvailabilityControllerMockMvcTests {
             .satisfies(rule -> {
                 assertThat(rule.getProductCode()).isEqualTo("ADULT_ONEWAY");
                 assertThat(rule.isAvailable()).isFalse();
+                assertThat(rule.getUpdatedBy()).contains("operator@nyw.com");
                 assertThat(rule.getTemporalCondition()).isNotNull();
-                assertThat(rule.getTemporalCondition().getConditionType()).isEqualTo("TEMPORARY_PROMO");
+                assertThat(rule.getTemporalCondition().getDaysOfWeek()).containsExactly(1, 2, 3, 4, 5);
             });
 
-        // Verify refreshing GET /availability renders saved state
+        // Verify refreshing GET /availability renders saved state without LazyInitializationException
         mockMvc.perform(get("/availability?site=MIDTOWN")
                 .session(session)
                 .with(user(operatorUser)))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("ADULT_ONEWAY")))
             .andExpect(content().string(containsString("Unavailable")))
-            .andExpect(content().string(containsString("Promo (2026-11-01 to 2026-12-01)")));
+            .andExpect(content().string(containsString("5 Days (06:00-22:00)")));
     }
 
     @Test
