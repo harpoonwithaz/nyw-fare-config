@@ -3,34 +3,44 @@
 <body>
 
 <div th:fragment="availabilityTable" class="table-responsive">
-    <table class="table table-hover align-middle mb-0" id="availabilityTable">
-        <thead class="table-light border-bottom">
+    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable">
+        <thead class="table-light">
             <tr>
-                <th scope="col" class="ps-4" style="width: 25%;">Product Category</th>
-                <th scope="col" style="width: 20%;">Offering Status</th>
-                <th scope="col" style="width: 30%;">Disabled Days / Constraints</th>
-                <th scope="col" style="width: 15%;">Staging Status</th>
-                <th scope="col" class="text-end pe-4" style="width: 10%;">Actions</th>
+                <th scope="col" class="text-secondary small text-uppercase text-start ps-3"
+                    style="min-width: 180px;">
+                    Product Category
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Offering Status
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Disabled Days / Constraints
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Staging Status
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Actions
+                </th>
             </tr>
         </thead>
         <tbody>
             <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
-                <td class="ps-4 fw-semibold text-dark">
+                <td class="table-light text-secondary fw-semibold text-start ps-3">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-ticket-perforated-fill text-primary fs-5"></i>
                         <span th:text="${prod}">ADULT_ONEWAY</span>
                     </div>
                 </td>
 
-                <td>
-                    <div class="form-check form-switch custom-switch">
-                        <input class="form-check-input availability-toggle"
+                <td class="py-2 px-3">
+                    <div class="form-check form-switch d-inline-flex align-items-center justify-content-center mb-0 custom-switch">
+                        <input class="form-check-input mt-0 availability-toggle"
                                type="checkbox"
                                role="switch"
                                th:id="${'toggle-' + prod}"
                                th:checked="${availabilityView.isProductAvailable(prod)}"
                                th:data-product="${prod}">
-                        <label class="form-check-label fw-medium ms-2 status-label"
+                        <label class="form-check-label fw-bold text-dark ms-2 status-label"
                                th:for="${'toggle-' + prod}"
                                th:text="${availabilityView.isProductAvailable(prod) ? 'Available' : 'Unavailable'}">
                             Available
@@ -38,29 +48,29 @@
                     </div>
                 </td>
 
-                <td>
-                    <div class="temporal-condition-badge-container d-flex align-items-center gap-2">
-                        <span class="badge border condition-badge"
-                              th:classappend="${availabilityView.getConditionForProduct(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info' : 'bg-secondary-subtle text-secondary'">
+                <td class="py-2 px-3">
+                    <div class="temporal-condition-badge-container d-flex justify-content-center align-items-center gap-2">
+                        <span class="badge border px-2 py-1 condition-badge"
+                              th:classappend="${availabilityView.getConditionForProduct(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
                             <i class="bi bi-clock-history me-1"></i>
                             <span th:text="${availabilityView.getConditionSummary(prod)}">All Days Active</span>
                         </span>
                     </div>
                 </td>
 
-                <td>
-                    <span class="badge bg-success-subtle text-success border staged-badge">
+                <td class="py-2 px-3">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
                         <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
                     </span>
                 </td>
 
-                <td class="text-end pe-4">
+                <td class="py-2 px-3">
                     <button class="btn btn-sm btn-outline-secondary btn-configure-rule"
                             th:data-product="${prod}"
                             data-bs-toggle="modal"
                             data-bs-target="#conditionBuilderModal"
                             title="Configure Condition">
-                        <i class="bi bi-gear-fill"></i>
+                        <i class="bi bi-gear-fill me-1"></i> Configure
                     </button>
                 </td>
             </tr>
