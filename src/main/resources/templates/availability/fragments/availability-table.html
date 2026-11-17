@@ -1,95 +1,82 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-    <div th:fragment="routeTable" class="card shadow-sm mb-4">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 text-secondary"><i class="bi bi-signpost-split me-2"></i>Active Ferry Route Matrix</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Route Name</th>
-                            <th>Origin → Destination</th>
-                            <th class="text-center">Allow Purchase</th>
-                            <th>Base Price ($)</th>
-                            <th>Recurring / Temp Rule</th>
-                            <th>Disabled Days</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Mock Route 1 -->
-                        <tr>
-                            <td class="fw-bold">Port Imperial Express</td>
-                            <td>Port Imperial → W. 39th St</td>
-                            <td class="text-center">
-                                <div class="form-check form-switch d-inline-block">
-                                    <input class="form-check-input" type="checkbox" role="switch" checked>
-                                </div>
-                            </td>
-                            <td>
-                                <input type="number" step="0.01" class="form-control form-control-sm" value="12.50" style="width: 100px;">
-                            </td>
-                            <td>
-                                <span class="badge bg-info text-dark">Standard</span>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm" style="width: 130px;">
-                                    <option value="none">None</option>
-                                    <option value="weekend" selected>Weekends</option>
-                                    <option value="monday">Mondays</option>
-                                </select>
-                            </td>
-                        </tr>
-                        <!-- Mock Route 2 -->
-                        <tr>
-                            <td class="fw-bold">Hoboken Commuter Link</td>
-                            <td>Hoboken 14th St → Pier 11</td>
-                            <td class="text-center">
-                                <div class="form-check form-switch d-inline-block">
-                                    <input class="form-check-input" type="checkbox" role="switch" checked>
-                                </div>
-                            </td>
-                            <td>
-                                <input type="number" step="0.01" class="form-control form-control-sm" value="10.00" style="width: 100px;">
-                            </td>
-                            <td>
-                                <span class="badge bg-warning text-dark">Christmas Sale ($8.50)</span>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm" style="width: 130px;">
-                                    <option value="none" selected>None</option>
-                                    <option value="weekend">Weekends</option>
-                                </select>
-                            </td>
-                        </tr>
-                        <!-- Mock Route 3 -->
-                        <tr>
-                            <td class="fw-bold">Paulus Hook Shuttle</td>
-                            <td>Paulus Hook → Brookfield Place</td>
-                            <td class="text-center">
-                                <div class="form-check form-switch d-inline-block">
-                                    <input class="form-check-input" type="checkbox" role="switch">
-                                </div>
-                            </td>
-                            <td>
-                                <input type="number" step="0.01" class="form-control form-control-sm" value="9.00" style="width: 100px;">
-                            </td>
-                            <td>
-                                <span class="badge bg-secondary">None</span>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm" style="width: 130px;">
-                                    <option value="all">All Days</option>
-                                    <option value="weekend" selected>Weekends</option>
-                                </select>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+
+<div th:fragment="availabilityTable" class="table-responsive">
+    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable">
+        <thead class="table-light">
+            <tr>
+                <th scope="col" class="text-secondary small text-uppercase text-start ps-3"
+                    style="min-width: 180px;">
+                    Product Category
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Offering Status
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Disabled Days / Constraints
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Staging Status
+                </th>
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                    Actions
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
+                <td class="table-light text-secondary fw-semibold text-start ps-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span th:text="${prod}">ADULT_ONEWAY</span>
+                    </div>
+                </td>
+
+                <td class="py-2 px-3">
+                    <div class="form-check form-switch d-inline-flex align-items-center justify-content-center mb-0 custom-switch">
+                        <input class="form-check-input mt-0 availability-toggle"
+                               type="checkbox"
+                               role="switch"
+                               th:id="${'toggle-' + prod}"
+                               th:checked="${availabilityView.isProductAvailable(prod)}"
+                               th:data-product="${prod}">
+                        <label class="form-check-label fw-bold text-dark ms-2 status-label"
+                               th:for="${'toggle-' + prod}"
+                               th:text="${availabilityView.isProductAvailable(prod) ? 'Available' : 'Unavailable'}">
+                            Available
+                        </label>
+                    </div>
+                </td>
+
+                <td class="py-2 px-3">
+                    <div class="temporal-condition-badge-container d-flex justify-content-center align-items-center gap-2">
+                        <span class="badge border px-2 py-1 condition-badge"
+                              th:classappend="${availabilityView.getConditionForProduct(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
+                            <i class="bi bi-clock-history me-1"></i>
+                            <span th:text="${availabilityView.getConditionSummary(prod)}">All Days Active</span>
+                        </span>
+                    </div>
+                </td>
+
+                <td class="py-2 px-3">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
+                        <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
+                    </span>
+                </td>
+
+                <td class="py-2 px-3">
+                    <button class="btn btn-sm btn-outline-secondary btn-configure-rule"
+                            th:data-product="${prod}"
+                            data-bs-toggle="modal"
+                            data-bs-target="#conditionBuilderModal"
+                            title="Configure Condition">
+                        <i class="bi bi-gear-fill me-1"></i> Configure
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
 </body>
 </html>
