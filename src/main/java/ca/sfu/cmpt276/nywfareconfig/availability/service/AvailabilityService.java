@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
@@ -55,8 +56,7 @@ public class AvailabilityService {
 
     @Transactional
     public void stageAvailabilityDrafts(String tenantCode, List<AvailabilityDraftDTO> drafts) {
-        // Ensure an authenticated actor is present for audit integrity
-        actorService.currentActorHeader();
+        String actor = actorService.currentActorHeader();
 
         for (AvailabilityDraftDTO draft : drafts) {
             AvailabilityRule rule = availabilityRuleRepository
@@ -70,7 +70,7 @@ public class AvailabilityService {
 
             rule.setAvailable(draft.isAvailable());
             rule.setUpdatedBy(actor);
-            rule.setLastUpdated(java.time.LocalDateTime.now());
+            rule.setLastUpdated(LocalDateTime.now());
 
             if (draft.getConditionType() != null && !draft.getConditionType().isEmpty()) {
                 TemporalCondition condition = rule.getTemporalCondition() != null

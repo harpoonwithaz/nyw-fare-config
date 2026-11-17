@@ -1,12 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.security.AppUser;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
-import ca.sfu.cmpt276.nywfareconfig.security.Role;
-import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
-import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -37,36 +36,52 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class AvailabilityControllerMockMvcTests {
 
+    private static final AppUserDetails OPERATOR = new AppUserDetails(
+        new AppUser("operator@nyw.com", "operator", "password", Role.OPERATOR, true)
+    );
+
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private AvailabilityRuleRepository availabilityRuleRepository;
 
-    private AppUserDetails operatorUser;
+    private MockHttpSession session;
+    private Cookie cookie;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         availabilityRuleRepository.deleteAll();
-        operatorUser = new AppUserDetails(
-            new AppUser("operator@nyw.com", "operator", "password", Role.OPERATOR, true)
-        );
+        session = new MockHttpSession();
+        cookie = mockMvc.perform(post("/context/tenant")
+                .session(session)
+                .with(user(OPERATOR))
+                .with(csrf())
+                .param("tenant", "NYW_SANDBOX")
+                .param("returnUrl", "/availability"))
+            .andExpect(status().is3xxRedirection())
+            .andReturn()
+            .getResponse()
+            .getCookie("SESSION");
+    }
+
+    private MockHttpServletRequestBuilder inTenant(MockHttpServletRequestBuilder builder) {
+        builder.session(session).with(user(OPERATOR)).with(csrf());
+        if (cookie != null) {
+            builder.cookie(cookie);
+        }
+        return builder;
     }
 
     @Test
     void noTenantShowsSelectTenantPrompt() throws Exception {
-        mockMvc.perform(get("/availability").with(user(operatorUser)))
+        mockMvc.perform(get("/availability").with(user(OPERATOR)))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("No Tenant Selected")));
     }
 
     @Test
     void selectedTenantRendersCanonicalProductsAndPersistsChanges() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        TenantContext context = new TenantContext();
-        context.setSelectedTenant(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
-        session.setAttribute("scopedTarget.tenantContext", context);
-
         String payload = """
             [
               {
@@ -81,10 +96,7 @@ class AvailabilityControllerMockMvcTests {
             ]
             """;
 
-        mockMvc.perform(post("/availability/api/stage")
-                .session(session)
-                .with(user(operatorUser))
-                .with(csrf())
+        mockMvc.perform(inTenant(post("/availability/api/stage"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
             .andExpect(status().isOk())
@@ -102,9 +114,7 @@ class AvailabilityControllerMockMvcTests {
             });
 
         // Verify refreshing GET /availability renders saved state without LazyInitializationException
-        mockMvc.perform(get("/availability?site=MIDTOWN")
-                .session(session)
-                .with(user(operatorUser)))
+        mockMvc.perform(inTenant(get("/availability?site=MIDTOWN")))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("ADULT_ONEWAY")))
             .andExpect(content().string(containsString("Unavailable")))
@@ -114,7 +124,7 @@ class AvailabilityControllerMockMvcTests {
     @Test
     void stageWithoutCsrfIsRejected() throws Exception {
         mockMvc.perform(post("/availability/api/stage")
-                .with(user(operatorUser))
+                .with(user(OPERATOR))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("[]"))
             .andExpect(status().isForbidden());
