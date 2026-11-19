@@ -1,24 +1,44 @@
 package ca.sfu.cmpt276.nywfareconfig.tenant.service;
 
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 
-@Service 
+@Service
 public class TenantService {
+
+    private final TenantContext tenantContext;
+    private final CaracalApiClient caracalApiClient;
+
+    public TenantService(CaracalApiClient caracalApiClient, TenantContext tenantContext) {
+        this.caracalApiClient = caracalApiClient;
+        this.tenantContext = tenantContext;
+    }
+
     /**
      * Returns the list of demo tenants supported by the platform.
      */
     public List<Tenant> getAvailableTenants() {
-        // TODO: Call GET /functions/tenant-list
+        List<CaracalCatalogDtos.TenantSummary> tenantsSummaryList = caracalApiClient.fetchTenants();
+        if (tenantsSummaryList == null) {
+            return List.of();
+        }
 
         List<Tenant> tenantList = new ArrayList<>();
-        tenantList.add(new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true));
-        tenantList.add(new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true));
+        for (CaracalCatalogDtos.TenantSummary summary : tenantsSummaryList) {
+            if (summary.code() == null || summary.code().isBlank()) {
+                continue;
+            }
+
+            tenantList.add(new Tenant(summary.code(), summary.name()));
+        }
         return tenantList;
     }
 
@@ -30,10 +50,29 @@ public class TenantService {
         if (tenantCode == null) {
             return null;
         }
-        return switch (tenantCode.toUpperCase()) {
-            case "NYW_SANDBOX", "NYW" -> new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
-            case "METRA" -> new Tenant("METRA", "Metra Rail", GridMode.ZONAL, true);
-            default -> null;
-        };
+
+        CaracalCatalogDtos.TenantDetail tenantDetails = caracalApiClient.fetchTenant(tenantCode);
+
+        switch (tenantDetails.code()) {
+            // HARD CODED FOR NOW
+            case "METRA":
+                return new Tenant(
+                        tenantDetails.code(),
+                        tenantDetails.name(),
+                        tenantDetails.defaultCurrency(),
+                        tenantDetails.defaultLocale(),
+                        GridMode.ZONAL,
+                        true,
+                        tenantDetails.supportedLocales());
+            default:
+                return new Tenant(
+                        tenantDetails.code(),
+                        tenantDetails.name(),
+                        tenantDetails.defaultCurrency(),
+                        tenantDetails.defaultLocale(),
+                        GridMode.OD,
+                        true,
+                        tenantDetails.supportedLocales());
+        }
     }
 }

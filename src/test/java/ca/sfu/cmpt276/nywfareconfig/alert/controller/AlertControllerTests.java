@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,15 +26,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.ServiceAlertRepository;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertService;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
 import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
 import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 
 // Full context like FareControllerMockMvcTests, since TenantContext is session scoped
 @SpringBootTest(properties = {
@@ -55,6 +60,8 @@ class AlertControllerTests {
     private static final String TENANT = "NYW_SANDBOX";
     private static final String ROUTE = "PIER11:HOB14ST";
     private static final String NO_TENANT = "No Tenant Selected";
+    private static final Tenant MOCK_TENANT = new Tenant(
+        TENANT, "New York Waterway Sandbox", "USD", "en-US", GridMode.OD, true, List.of("en-US", "es"));
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,11 +72,16 @@ class AlertControllerTests {
     @Autowired
     private ServiceAlertRepository alertRepository;
 
+    @MockitoBean
+    private TenantService tenantService;
+
     private MockHttpSession session;
     private Cookie cookie;
 
     @BeforeEach
     void selectTenant() throws Exception {
+        when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_TENANT));
+        when(tenantService.getTenantByCode(TENANT)).thenReturn(MOCK_TENANT);
         alertRepository.deleteAll();
         session = new MockHttpSession();
         cookie = mockMvc.perform(post("/context/tenant").session(session).with(user(OPERATOR)).with(csrf())

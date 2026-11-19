@@ -70,7 +70,7 @@ class FareServiceDraftOverlayTests {
         when(fareDraftRepository.findByTenantCodeAndDraftStatus("NYW_SANDBOX", DraftStatus.PENDING))
                 .thenReturn(List.of(stagedDraft));
 
-        Tenant tenant = new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+        Tenant tenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true, List.of());
         FareGrid grid = fareService.buildMockGrid(tenant, "EDGEWTR");
 
         // Row 0 = Midtown / W. 39th St, Col 0 = Adult One-Way (Staged Draft Overlaid)
