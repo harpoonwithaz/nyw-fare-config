@@ -45,7 +45,6 @@ public class TenantContextController {
             @RequestParam(name = "returnUrl", required = false) String returnUrl) {
 
         if (tenantCode == null || tenantCode.isBlank()) {
-            // Operator reset dropdown to "-- Select Tenant --"
             tenantContext.setSelectedTenant(null);
             tenantContext.setSelectedOrigin(null);
             tenantContext.setSelectedProduct(null);

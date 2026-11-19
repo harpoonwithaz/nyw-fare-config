@@ -27,7 +27,7 @@
 
             <!-- Editing a live alert makes a draft copy; the live one stays until publish -->
             <th:block th:if="${alert != null and alert.status.name() == 'ACTIVE'}">
-                <div th:replace="~{fare/fragments/feedback-card :: feedback-card('This alert is live. Saving creates a draft copy, and the live alert stays as it is until the draft is published.', 'warning')}"></div>
+                <div th:replace="~{fragments/feedback-card :: feedback-card('This alert is live. Saving creates a draft copy, and the live alert stays as it is until the draft is published.', 'warning')}"></div>
             </th:block>
 
             <div th:unless="${#lists.isEmpty(errors)}" class="alert alert-danger" role="alert">

@@ -46,7 +46,7 @@ class FareControllerDraftTests {
 
     @Test
     void stageFareDraftsReturnsOkWithCountsForValidPayload() throws Exception {
-        Tenant activeTenant = new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+        Tenant activeTenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true);
         when(tenantContext.getSelectedTenant()).thenReturn(activeTenant);
         when(fareDraftService.stageChanges(eq(activeTenant), anyList())).thenReturn(1);
         when(fareDraftService.countPendingDrafts("NYW_SANDBOX")).thenReturn(3L);

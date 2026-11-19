@@ -48,7 +48,7 @@ class FareDraftServiceTests {
     @BeforeEach
     void setUp() {
         fareDraftService = new FareDraftService(fareDraftRepository, fareService, actorService);
-        nywTenant = new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+        nywTenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true);
         lenient().when(actorService.currentActorHeader()).thenReturn("operator:operator@nyw.com");
     }
 
