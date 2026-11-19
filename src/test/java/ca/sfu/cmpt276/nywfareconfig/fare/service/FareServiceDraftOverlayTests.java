@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
@@ -33,11 +34,14 @@ class FareServiceDraftOverlayTests {
     @Mock
     private FareDraftRepository fareDraftRepository;
 
+    @Mock
+    private CaracalApiClient caracalApiClient;
+
     private FareService fareService;
 
     @BeforeEach
     void setUp() {
-        fareService = new FareService(fareDraftRepository);
+        fareService = new FareService(fareDraftRepository, caracalApiClient);
     }
 
     @Test

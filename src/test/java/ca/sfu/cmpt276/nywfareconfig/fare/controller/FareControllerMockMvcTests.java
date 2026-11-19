@@ -26,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
 import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
@@ -59,11 +61,20 @@ class FareControllerMockMvcTests {
     @MockitoBean
     private TenantService tenantService;
 
+    @MockitoBean
+    private CaracalApiClient caracalApiClient;
+
     @BeforeEach
     void setUpTenantMocks() {
         when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_NYW_TENANT, MOCK_METRA_TENANT));
         when(tenantService.getTenantByCode(NYW_TENANT)).thenReturn(MOCK_NYW_TENANT);
         when(tenantService.getTenantByCode(METRA_TENANT)).thenReturn(MOCK_METRA_TENANT);
+        when(caracalApiClient.fetchSites(NYW_TENANT)).thenReturn(List.of(
+                new CaracalCatalogDtos.SiteSummary("EDGEWTR", "Edgewater"),
+                new CaracalCatalogDtos.SiteSummary("PORTIMP", "Port Imperial"),
+                new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown")));
+        when(caracalApiClient.fetchProducts(METRA_TENANT)).thenReturn(List.of(
+                new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true)));
     }
 
     /**
