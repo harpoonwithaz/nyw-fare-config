@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +48,7 @@ class FareControllerDraftTests {
 
     @Test
     void stageFareDraftsReturnsOkWithCountsForValidPayload() throws Exception {
-        Tenant activeTenant = new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+        Tenant activeTenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true, List.of());
         when(tenantContext.getSelectedTenant()).thenReturn(activeTenant);
         when(fareDraftService.stageChanges(eq(activeTenant), anyList())).thenReturn(1);
         when(fareDraftService.countPendingDrafts("NYW_SANDBOX")).thenReturn(3L);

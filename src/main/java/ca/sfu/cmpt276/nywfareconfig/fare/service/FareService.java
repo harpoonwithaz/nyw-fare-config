@@ -11,9 +11,12 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.SecondaryFilter;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.DraftStatus;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
@@ -25,9 +28,11 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 public class FareService {
 
     private final FareDraftRepository fareDraftRepository;
+    private final CaracalApiClient caracalApiClient;
 
-    public FareService(FareDraftRepository fareDraftRepository) {
+    public FareService(FareDraftRepository fareDraftRepository, CaracalApiClient caracalApiClient) {
         this.fareDraftRepository = fareDraftRepository;
+        this.caracalApiClient = caracalApiClient;
     }
 
     /**
@@ -79,17 +84,54 @@ public class FareService {
      * - O-D Mode: Origin Terminal codes
      * - Zonal Mode: Ticket Product codes
      */
-    public List<String> getSecondaryFilterOptions(String tenantCode) {
+    public List<SecondaryFilter> getSecondaryFilterOptions(String tenantCode, GridMode gridMode) {
         if (tenantCode == null) {
             return List.of();
         }
 
-        // TODO: Call GET /functions/site-list or GET /functions/product-list
-        return switch (tenantCode.toUpperCase()) {
-            case "NYW_SANDBOX", "NYW" -> List.of("EDGEWTR", "PORTIMP", "MIDTOWN");
-            case "METRA" -> List.of("ADULT_ONEWAY", "FULL_10TRIP", "FULL_MONTHLY");
-            default -> List.of();
-        };
+        switch (gridMode) {
+
+            // In OD, the secondary filters are the origin terminals/sites
+            case GridMode.OD: {
+                List<CaracalCatalogDtos.SiteSummary> siteList = caracalApiClient.fetchSites(tenantCode);
+                if (siteList == null) {
+                    return List.of();
+                }
+
+                List<SecondaryFilter> filterList = new ArrayList<>();
+                for (CaracalCatalogDtos.SiteSummary site : siteList) {
+                    if (site.siteCode() == null || site.siteCode().isBlank()) {
+                        continue;
+                    }
+
+                    filterList.add(new SecondaryFilter(site.siteCode(), site.name()));
+                }
+
+                return filterList;
+            }
+
+            // In ZONAL, the secondary filters are ticket products
+            case GridMode.ZONAL: {
+                List<CaracalCatalogDtos.ProductSummary> productList = caracalApiClient.fetchProducts(tenantCode);
+                if (productList == null) {
+                    return List.of();
+                }
+
+                List<SecondaryFilter> filterList = new ArrayList<>();
+                for (CaracalCatalogDtos.ProductSummary product : productList) {
+                    // Omit inactive products from the list
+                    if (product.code() == null || product.code().isBlank() || !product.isActive()) {
+                        continue;
+                    }
+
+                    filterList.add(new SecondaryFilter(product.code(), product.name()));
+                }
+
+                return filterList;
+            }
+
+            default: return List.of();
+        }
     }
 
     /**
@@ -101,9 +143,9 @@ public class FareService {
             return null;
         }
 
-        List<String> filterOptions = getSecondaryFilterOptions(tenant.getCode());
-        String defaultFilter = filterOptions.isEmpty() ? "" : filterOptions.get(0);
-        String activeFilter = (filterValue != null && !filterValue.isBlank()) ? filterValue : defaultFilter;
+        String activeFilter = filterValue != null && !filterValue.isBlank()
+                ? filterValue
+                : tenant.getGridMode() == GridMode.ZONAL ? "ADULT_ONEWAY" : "EDGEWTR";
 
         if (tenant.getGridMode() == GridMode.ZONAL) {
             return buildZonalGrid(activeFilter, tenant);

@@ -1,10 +1,14 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
 import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
 import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 import jakarta.servlet.http.Cookie;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,12 +16,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,9 +42,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class AvailabilityControllerMockMvcTests {
 
+    private static final String TENANT = "NYW_SANDBOX";
     private static final AppUserDetails OPERATOR = new AppUserDetails(
         new AppUser("operator@nyw.com", "operator", "password", Role.OPERATOR, true)
     );
+    private static final Tenant MOCK_TENANT = new Tenant(
+        TENANT, "New York Waterway Sandbox", "USD", "en-US", GridMode.OD, true, List.of("en-US", "es"));
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,18 +55,23 @@ class AvailabilityControllerMockMvcTests {
     @Autowired
     private AvailabilityRuleRepository availabilityRuleRepository;
 
+    @MockitoBean
+    private TenantService tenantService;
+
     private MockHttpSession session;
     private Cookie cookie;
 
     @BeforeEach
     void setUp() throws Exception {
+        when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_TENANT));
+        when(tenantService.getTenantByCode(TENANT)).thenReturn(MOCK_TENANT);
         availabilityRuleRepository.deleteAll();
         session = new MockHttpSession();
         cookie = mockMvc.perform(post("/context/tenant")
                 .session(session)
                 .with(user(OPERATOR))
                 .with(csrf())
-                .param("tenant", "NYW_SANDBOX")
+                .param("tenant", TENANT)
                 .param("returnUrl", "/availability"))
             .andExpect(status().is3xxRedirection())
             .andReturn()

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
@@ -33,11 +34,14 @@ class FareServiceDraftOverlayTests {
     @Mock
     private FareDraftRepository fareDraftRepository;
 
+    @Mock
+    private CaracalApiClient caracalApiClient;
+
     private FareService fareService;
 
     @BeforeEach
     void setUp() {
-        fareService = new FareService(fareDraftRepository);
+        fareService = new FareService(fareDraftRepository, caracalApiClient);
     }
 
     @Test
@@ -70,7 +74,7 @@ class FareServiceDraftOverlayTests {
         when(fareDraftRepository.findByTenantCodeAndDraftStatus("NYW_SANDBOX", DraftStatus.PENDING))
                 .thenReturn(List.of(stagedDraft));
 
-        Tenant tenant = new Tenant("NYW_SANDBOX", "NY Waterway", GridMode.OD, true);
+        Tenant tenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true, List.of());
         FareGrid grid = fareService.buildMockGrid(tenant, "EDGEWTR");
 
         // Row 0 = Midtown / W. 39th St, Col 0 = Adult One-Way (Staged Draft Overlaid)

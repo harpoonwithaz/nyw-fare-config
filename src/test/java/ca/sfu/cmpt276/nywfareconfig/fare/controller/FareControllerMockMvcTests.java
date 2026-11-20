@@ -3,6 +3,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,19 +14,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import jakarta.servlet.http.Cookie;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
 import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
 import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:h2:mem:fare-test;DB_CLOSE_DELAY=-1",
@@ -38,11 +46,36 @@ import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
 @AutoConfigureMockMvc
 class FareControllerMockMvcTests {
 
+    private static final String NYW_TENANT = "NYW_SANDBOX";
+    private static final String METRA_TENANT = "METRA";
     private static final AppUserDetails TEST_USER = new AppUserDetails(
         new AppUser("test@example.com", "test-user", "password", Role.OPERATOR, true));
+    private static final Tenant MOCK_NYW_TENANT = new Tenant(
+        NYW_TENANT, "New York Waterway Sandbox", "USD", "en-US", GridMode.OD, true, List.of("en-US", "es"));
+    private static final Tenant MOCK_METRA_TENANT = new Tenant(
+        METRA_TENANT, "Metra", "USD", "en-US", GridMode.ZONAL, true, List.of("en-US"));
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private TenantService tenantService;
+
+    @MockitoBean
+    private CaracalApiClient caracalApiClient;
+
+    @BeforeEach
+    void setUpTenantMocks() {
+        when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_NYW_TENANT, MOCK_METRA_TENANT));
+        when(tenantService.getTenantByCode(NYW_TENANT)).thenReturn(MOCK_NYW_TENANT);
+        when(tenantService.getTenantByCode(METRA_TENANT)).thenReturn(MOCK_METRA_TENANT);
+        when(caracalApiClient.fetchSites(NYW_TENANT)).thenReturn(List.of(
+                new CaracalCatalogDtos.SiteSummary("EDGEWTR", "Edgewater"),
+                new CaracalCatalogDtos.SiteSummary("PORTIMP", "Port Imperial"),
+                new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown")));
+        when(caracalApiClient.fetchProducts(METRA_TENANT)).thenReturn(List.of(
+                new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true)));
+    }
 
     /**
      * Helper that switches the active tenant via POST /context/tenant and
