@@ -46,14 +46,14 @@ public class FareController {
 
     @GetMapping
     public String getFares(
-            @RequestParam(required = false) String origin,
-            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String secondaryFilter,
             Model model) {
 
         Tenant currentTenant = tenantContext.getSelectedTenant();
         if (currentTenant != null) {
+            model.addAttribute("gridMode", currentTenant.getGridMode());
             try {
-                model.addAttribute("secondaryFilter",
+                model.addAttribute("secondaryFilters",
                     fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
             } catch (CaracalApiException ex) {
                 log.warn("Unable to load secondary filters from Caracal API: {}", ex.getMessage(), ex);
@@ -61,24 +61,10 @@ public class FareController {
                 return "fare/fare";
             }
 
-            if (currentTenant.getGridMode() == GridMode.OD) {
-                if (origin != null && !origin.isBlank()) {
-                    tenantContext.setSelectedOrigin(origin);
-                }
-            } else if (currentTenant.getGridMode() == GridMode.ZONAL) {
-                if (product != null && !product.isBlank()) {
-                    tenantContext.setSelectedProduct(product);
-                }
-            }
+            if (secondaryFilter != null && !secondaryFilter.isBlank()) {
+                tenantContext.setSecondaryFilter(secondaryFilter);
 
-            // Populate gridView only when both tenant and secondary filter are selected
-            String activeFilter = (currentTenant.getGridMode() == GridMode.OD)
-                    ? tenantContext.getSelectedOrigin()
-                    : tenantContext.getSelectedProduct();
-
-            if (activeFilter != null && !activeFilter.isBlank()) {
-                FareGrid gridView = fareService.buildMockGrid(currentTenant, activeFilter);
-                model.addAttribute("gridView", gridView);
+                model.addAttribute("gridView", fareService.buildMockGrid(currentTenant, secondaryFilter));
             }
         }
 

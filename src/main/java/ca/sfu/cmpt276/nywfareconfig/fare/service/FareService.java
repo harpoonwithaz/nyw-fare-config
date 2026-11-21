@@ -16,7 +16,7 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.SecondaryFilter;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.DraftStatus;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
@@ -44,7 +44,8 @@ public class FareService {
             return Optional.empty();
         }
 
-        // TODO: Swap with Caracal API call (POST /functions/price-simulate or GET /functions/product-get)
+        // TODO: Swap with Caracal API call (POST /functions/price-simulate or GET
+        // /functions/product-get)
         List<FareRule> baselineRules = "METRA".equalsIgnoreCase(tenantCode)
                 ? getBaselineZonalFareRules(tenantCode, product)
                 : getBaselineOdFareRules(tenantCode, origin);
@@ -84,8 +85,8 @@ public class FareService {
      * - O-D Mode: Origin Terminal codes
      * - Zonal Mode: Ticket Product codes
      */
-    public List<SecondaryFilter> getSecondaryFilterOptions(String tenantCode, GridMode gridMode) {
-        if (tenantCode == null) {
+    public List<CatalogOption> getSecondaryFilterOptions(String tenantCode, GridMode gridMode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
             return List.of();
         }
 
@@ -98,13 +99,13 @@ public class FareService {
                     return List.of();
                 }
 
-                List<SecondaryFilter> filterList = new ArrayList<>();
+                List<CatalogOption> filterList = new ArrayList<>();
                 for (CaracalCatalogDtos.SiteSummary site : siteList) {
                     if (site.siteCode() == null || site.siteCode().isBlank()) {
                         continue;
                     }
 
-                    filterList.add(new SecondaryFilter(site.siteCode(), site.name()));
+                    filterList.add(new CatalogOption(site.siteCode(), site.name()));
                 }
 
                 return filterList;
@@ -117,20 +118,21 @@ public class FareService {
                     return List.of();
                 }
 
-                List<SecondaryFilter> filterList = new ArrayList<>();
+                List<CatalogOption> filterList = new ArrayList<>();
                 for (CaracalCatalogDtos.ProductSummary product : productList) {
                     // Omit inactive products from the list
                     if (product.code() == null || product.code().isBlank() || !product.isActive()) {
                         continue;
                     }
 
-                    filterList.add(new SecondaryFilter(product.code(), product.name()));
+                    filterList.add(new CatalogOption(product.code(), product.name()));
                 }
 
                 return filterList;
             }
 
-            default: return List.of();
+            default:
+                return List.of();
         }
     }
 
@@ -177,9 +179,6 @@ public class FareService {
         }
 
         return new FareGrid(
-                tenant,
-                "Origin Terminal",
-                normalizedOrigin,
                 colHeaders,
                 rowHeaders,
                 rows);
@@ -208,32 +207,28 @@ public class FareService {
         }
 
         return new FareGrid(
-                tenant,
-                "Ticket Product",
-                normalizedProduct,
                 zones,
                 zones,
                 rows);
     }
 
     /**
-     * Converts a normalized FareRule into a presentation FareCell for the 2D matrix,
+     * Converts a normalized FareRule into a presentation FareCell for the 2D
+     * matrix,
      * preserving whether the cell has a staged PENDING draft in PostgreSQL.
      */
     private FareCell toFareCell(FareRule rule, String rowKey, String colKey) {
         if (rule == null || rule.getStatus() == null || rule.getStatus() == FareStatus.NA) {
-            return new FareCell(FareStatus.NA, false, rowKey, colKey);
+            return new FareCell(rule.getPrice(), FareStatus.NA, false, rowKey, colKey); // can be null if its not sold
         }
         if (rule.getStatus() == FareStatus.NOT_SOLD || rule.getPrice() == null) {
-            return new FareCell(rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
+            return new FareCell(rule.getPrice(), rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
         }
 
         BigDecimal price = rule.getPrice().setScale(2, RoundingMode.HALF_UP);
         return new FareCell(
                 price,
-                String.format("$%.2f", price),
                 rule.getStatus(),
-                true,
                 rule.isHasPendingDraft(),
                 rowKey,
                 colKey);
@@ -254,10 +249,12 @@ public class FareService {
     }
 
     /**
-     * Returns untouched baseline O-D FareRule entities (never overlaid with drafts).
+     * Returns untouched baseline O-D FareRule entities (never overlaid with
+     * drafts).
      */
     public List<FareRule> getBaselineOdFareRules(String tenantCode, String originSiteCode) {
-        // TODO: Swap with POST /functions/price-simulate or GET /functions/rate-table-get
+        // TODO: Swap with POST /functions/price-simulate or GET
+        // /functions/rate-table-get
         String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "NYW_SANDBOX";
         String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "EDGEWTR";
 
@@ -284,22 +281,14 @@ public class FareService {
                     price = resolveOdPrice(dest, prod);
                 }
 
-                rules.add(new FareRule(
+                rules.add(FareRule.od(
                         normalizedTenant,
-                        GridMode.OD,
-                        "ORIGIN",
-                        "DEST",
                         normalizedOrigin,
                         dest,
                         prod,
                         "OD-" + prod.toUpperCase().replace(" ", "_"),
-                        null,
-                        null,
-                        null,
-                        null,
                         price,
-                        status,
-                        false));
+                        status));
             }
         }
 
@@ -307,7 +296,8 @@ public class FareService {
     }
 
     /**
-     * Returns Zonal FareRule entities overlaid with any PENDING drafts in PostgreSQL.
+     * Returns Zonal FareRule entities overlaid with any PENDING drafts in
+     * PostgreSQL.
      */
     public List<FareRule> getZonalFareRules(String tenantCode, String productCode) {
         String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "METRA";
@@ -317,10 +307,12 @@ public class FareService {
     }
 
     /**
-     * Returns untouched baseline Zonal FareRule entities (never overlaid with drafts).
+     * Returns untouched baseline Zonal FareRule entities (never overlaid with
+     * drafts).
      */
     public List<FareRule> getBaselineZonalFareRules(String tenantCode, String productCode) {
-        // TODO: Swap with GET /functions/rate-table-get or POST /functions/price-simulate
+        // TODO: Swap with GET /functions/rate-table-get or POST
+        // /functions/price-simulate
         String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "METRA";
         String normalizedProduct = productCode != null ? productCode.toUpperCase() : "ADULT_ONEWAY";
 
@@ -340,25 +332,16 @@ public class FareService {
                     case 1 -> "TIER_B";
                     default -> "TIER_C";
                 };
-                String tierLetter = tierCode.substring(tierCode.length() - 1);
-                String tierLabel = String.format("Tier %s ($%.2f)", tierLetter, price);
 
-                rules.add(new FareRule(
+                rules.add(FareRule.zonal(
                         normalizedTenant,
-                        GridMode.ZONAL,
-                        "ORIGIN_ZONE",
-                        "DEST_ZONE",
                         originZone,
                         destZone,
                         normalizedProduct,
                         "ZONAL-" + normalizedProduct,
-                        null,
-                        null,
                         tierCode,
-                        tierLabel,
                         price,
-                        FareStatus.ACTIVE,
-                        false));
+                        FareStatus.ACTIVE));
             }
         }
 
@@ -366,10 +349,11 @@ public class FareService {
     }
 
     /**
-     * Returns ticket products for O-D tenants.
+     * Returns ticket products codes for O-D tenants.
      */
     public List<String> getOdProducts(String tenantCode) {
         // TODO: Call GET /functions/product-list
+
         return List.of(
                 "Adult One-Way",
                 "Child One-Way",
@@ -379,7 +363,8 @@ public class FareService {
     }
 
     /**
-     * Returns outbound destination terminals for a given origin terminal in O-D mode.
+     * Returns outbound destination terminals for a given origin terminal in O-D
+     * mode.
      */
     public List<String> getOutboundDestinations(String tenantCode, String originSiteCode) {
         // TODO: Call GET /functions/site-list
@@ -423,7 +408,8 @@ public class FareService {
     }
 
     /**
-     * Batch-fetches PENDING drafts for the tenant in 1 query and overlays matching rules.
+     * Batch-fetches PENDING drafts for the tenant in 1 query and overlays matching
+     * rules.
      */
     private void applyPendingDraftsToRules(String normalizedTenant, List<FareRule> rules) {
         if (fareDraftRepository == null || rules.isEmpty()) {
@@ -465,16 +451,13 @@ public class FareService {
         rule.setStatus(draft.getTargetStatus());
         if (draft.getTierCode() != null && !draft.getTierCode().isBlank()) {
             rule.setTierCode(draft.getTierCode());
-            if (draft.getDraftPrice() != null) {
-                String tierSuffix = draft.getTierCode().replace("TIER_", "");
-                rule.setTierLabel(String.format("Tier %s ($%.2f)", tierSuffix, draft.getDraftPrice()));
-            }
         }
         rule.setHasPendingDraft(true);
     }
 
     /**
-     * Helper to mock realistic NYW ticket prices with exact 2-decimal BigDecimal scale.
+     * Helper to mock realistic NYW ticket prices with exact 2-decimal BigDecimal
+     * scale.
      */
     private BigDecimal resolveOdPrice(String dest, String prod) {
         BigDecimal base = dest.contains("Midtown")
@@ -492,7 +475,8 @@ public class FareService {
     }
 
     /**
-     * Helper to mock 3x3 symmetric zone baseline rates matching the system rate schedule.
+     * Helper to mock 3x3 symmetric zone baseline rates matching the system rate
+     * schedule.
      */
     private BigDecimal[][] resolveZonalBaseRates(String normalizedProduct) {
         return switch (normalizedProduct) {
