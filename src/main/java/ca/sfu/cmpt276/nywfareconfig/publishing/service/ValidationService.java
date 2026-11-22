@@ -1,3 +1,4 @@
+
 package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 
 import java.io.IOException;
@@ -6,11 +7,15 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -279,6 +284,56 @@ public class ValidationService {
     }
 
     // ============================================================
+    // Shared Caracal price simulation
+    // ============================================================
+
+    private BigDecimal getSimulatedPrice(
+            String tenantCode,
+            String productCode,
+            String origin,
+            String destination,
+            String at) {
+
+        PriceSimulateRequest request = new PriceSimulateRequest(
+                tenantCode,
+                productCode,
+                origin,
+                Map.of("DEST", destination),
+                at,
+                "UNATTENDED");
+
+        CaracalSimulationDtos.PriceSimulationResult result =
+                caracalApiClient.simulatePrice(request);
+
+        if (result == null) {
+            throw new IllegalStateException(
+                    "Caracal returned no simulation result.");
+        }
+
+        if (!result.isSuccess()) {
+                Integer status = result.statusCode();
+
+                if (status != null &&
+                        (status == 404 || status == 409 || status == 422)) {
+                    return null;
+                }
+
+                throw new IllegalStateException(
+                        "Unexpected Caracal simulation error: "
+                        + result.errorMessage());
+        }
+
+        BigDecimal total = result.response().pricing().total();
+
+        if (total == null) {
+            throw new IllegalStateException(
+                    "Caracal returned a simulation without a total price.");
+        }
+
+        return total;
+    }
+
+    // ============================================================
     // Simulate pricing with product-code fallbacks
     // ============================================================
 
@@ -290,13 +345,12 @@ public class ValidationService {
 
         for (String productCode : check.productCodes()) {
 
-            BigDecimal price =
-                    caracalApiClient.fetchSimulatedPrice(
-                            tenantCode,
-                            productCode,
-                            origin,
-                            destination,
-                            check.at());
+            BigDecimal price = getSimulatedPrice(
+                    tenantCode,
+                    productCode,
+                    origin,
+                    destination,
+                    check.at());
 
             if (price != null) {
                 return price;
@@ -378,13 +432,12 @@ public class ValidationService {
             String routeKey = entry.getKey();
             String[] routeParts = routeKey.split("→", 2);
 
-            BigDecimal offSalePrice =
-                    caracalApiClient.fetchSimulatedPrice(
-                            tenantCode,
-                            "FULL_MONTHLY",
-                            routeParts[0],
-                            routeParts[1],
-                            MONTHLY_OFF_SALE);
+            BigDecimal offSalePrice = getSimulatedPrice(
+                    tenantCode,
+                    "FULL_MONTHLY",
+                    routeParts[0],
+                    routeParts[1],
+                    MONTHLY_OFF_SALE);
 
             fareChecks++;
 
@@ -408,3 +461,4 @@ public class ValidationService {
                 List.copyOf(discrepancies));
     }
 }
+

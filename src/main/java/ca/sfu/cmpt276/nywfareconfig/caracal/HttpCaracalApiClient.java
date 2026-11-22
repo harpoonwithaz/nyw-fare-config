@@ -5,6 +5,7 @@ import java.util.function.Supplier;
 import java.math.BigDecimal;
 import java.util.Map;
 
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -12,6 +13,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
@@ -57,7 +60,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
     // to discover specific tenant details.
     @Override
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -78,7 +81,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
     // directories.
     @Override
     public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -97,7 +100,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
     @Override
     public List<CaracalCatalogDtos.ProductSummary> fetchProducts(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -182,56 +185,100 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response.path("pricing").path("base").decimalValue();
     }
 
+    // @Override
+    // public BigDecimal fetchSimulatedPrice(
+    //         String tenantCode,
+    //         String productCode,
+    //         String originCode,
+    //         String destCode,
+    //         String at) {
+
+    //     Map<String, Object> requestBody = Map.of(
+    //             "tenantCode", tenantCode,
+    //             "productCode", productCode,
+    //             "siteCode", originCode,
+    //             "dimensions", Map.of("DEST", destCode),
+    //             "at", at,
+    //             "channel", "UNATTENDED"
+    //     );
+
+    //     JsonNode response;
+
+    //     try {
+    //         response = execute(
+    //                 "simulating sandbox fare price",
+    //                 () -> caracalRestClient
+    //                         .post()
+    //                         .uri("/price-simulate")
+    //                         .attribute("useSystemActor", true)
+    //                         .body(requestBody)
+    //                         .retrieve()
+    //                         .body(JsonNode.class)
+    //         );
+
+    //     } catch (CaracalApiException ex) {
+    //         if (ex.getCause() instanceof RestClientResponseException httpEx) {
+    //             int status = httpEx.getStatusCode().value();
+
+    //             if (status == 404 || status == 409 || status == 422) {
+    //                 return null;
+    //             }
+    //         }
+
+    //         throw ex;
+    //     }
+
+    //     if (response == null
+    //             || !response.path("pricing").path("total").isNumber()) {
+    //         throw new CaracalApiException(
+    //                 "Caracal returned an invalid simulated pricing response.");
+    //     }
+
+    //     return response.path("pricing").path("total").decimalValue();
+    // }
+
+    // ==============================================================================
+    // Matrix & Availability Hydration
+    // ==============================================================================
     @Override
-    public BigDecimal fetchSimulatedPrice(
-            String tenantCode,
-            String productCode,
-            String originCode,
-            String destCode,
-            String at) {
+    public CaracalSimulationDtos.PriceSimulationResult simulatePrice(
+            CaracalSimulationDtos.PriceSimulateRequest requestPayload) {
+        if (requestPayload == null
+                || isNullOrBlank(requestPayload.tenantCode())
+                || isNullOrBlank(requestPayload.productCode())
+                || isNullOrBlank(requestPayload.siteCode())
+                || requestPayload.dimensions() == null) {
+            throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
+        }
 
-        Map<String, Object> requestBody = Map.of(
-                "tenantCode", tenantCode,
-                "productCode", productCode,
-                "siteCode", originCode,
-                "dimensions", Map.of("DEST", destCode),
-                "at", at,
-                "channel", "UNATTENDED"
-        );
+        String actionDescription = "simulating price for product "
+                + requestPayload.productCode() + " at site " + requestPayload.siteCode();
 
-        JsonNode response;
+        return execute(actionDescription, () -> {
+            try {
+                CaracalSimulationDtos.PriceSimulateResponse response = caracalRestClient
+                        .post()
+                        .uri("/price-simulate")
+                        .attribute("useSystemActor", false)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestPayload)
+                        .retrieve()
+                        .body(CaracalSimulationDtos.PriceSimulateResponse.class);
 
-        try {
-            response = execute(
-                    "simulating sandbox fare price",
-                    () -> caracalRestClient
-                            .post()
-                            .uri("/price-simulate")
-                            .attribute("useSystemActor", true)
-                            .body(requestBody)
-                            .retrieve()
-                            .body(JsonNode.class)
-            );
-
-        } catch (CaracalApiException ex) {
-            if (ex.getCause() instanceof RestClientResponseException httpEx) {
-                int status = httpEx.getStatusCode().value();
-
-                if (status == 404 || status == 409 || status == 422) {
-                    return null;
+                if (response == null || response.pricing() == null) {
+                    throw new CaracalApiException("Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
+                return new CaracalSimulationDtos.PriceSimulationResult(response, "");
+            } catch (RestClientResponseException ex) {
+                if (isBusiness4xx(ex)) {
+                    String errorMessage = extractErrorMessage(ex);
+                    if (!isNullOrBlank(errorMessage)) {
+                        return new CaracalSimulationDtos.PriceSimulationResult(null, errorMessage, ex.getStatusCode().value());
+                    }
+                }
+                throw ex;
             }
-
-            throw ex;
-        }
-
-        if (response == null
-                || !response.path("pricing").path("total").isNumber()) {
-            throw new CaracalApiException(
-                    "Caracal returned an invalid simulated pricing response.");
-        }
-
-        return response.path("pricing").path("total").decimalValue();
+        });
     }
 
     // ==============================================================================
@@ -270,4 +317,24 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         }
     }
 
+    private boolean isNullOrBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private boolean isBusiness4xx(RestClientResponseException ex) {
+        int status = ex.getStatusCode().value();
+        return ex.getStatusCode().is4xxClientError() && status != 401 && status != 403;
+    }
+
+    private String extractErrorMessage(RestClientResponseException ex) {
+        try {
+            CaracalErrorResponse errorResponse = ex.getResponseBodyAs(CaracalErrorResponse.class);
+            if (errorResponse != null && !isNullOrBlank(errorResponse.error())) {
+                return errorResponse.error();
+            }
+        } catch (RestClientException ignored) {
+            // Fall back to raw response body if 4xx payload is not valid JSON
+        }
+        return ex.getResponseBodyAsString();
+    }
 }

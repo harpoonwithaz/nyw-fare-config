@@ -44,44 +44,27 @@
 
             <div class="col-md-3 col-sm-6">
               <label
-                th:if="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD}"
-                for="secondaryFilter" class="form-label fw-semibold small text-uppercase text-secondary">
-                Origin Terminal
-              </label>
-              <label
-                th:if="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL}"
-                for="secondaryFilter" class="form-label fw-semibold small text-uppercase text-secondary">
-                Ticket Product / Class
+                th:text="${tenantContext.selectedTenant.odMode ? 'Origin Terminal' : 'Ticket Product'}"
+                for="secondaryFilterDropdown" class="form-label fw-semibold small text-uppercase text-secondary">
               </label>
 
               <div class="input-group input-group-sm">
 
                 <!-- Backend couldn't fetch secondary filters -->
-                <select th:if="${caracalSecondaryFilterErrorMessage != null}" id="secondaryFilter"
+                <select th:if="${caracalSecondaryFilterErrorMessage != null}" id="secondaryFilterDropdown"
                   class="form-select form-select-sm border-danger-subtle text-danger bg-danger-subtle"
                   style="min-width: 200px;" disabled aria-label="Tenant selection unavailable">
                   <option selected>Unavailable</option>
                 </select>
 
                 <select
-                  th:if="${caracalSecondaryFilterErrorMessage == null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD}"
-                  id="originSelect" name="origin"
-                  class="form-select" onchange="this.form.submit()">
-                  <option value="" th:selected="${tenantContext.selectedOrigin == null}">Select Terminal</option>
-                  <option th:each="terminal : ${secondaryFilter}" th:value="${terminal.code}"
-                    th:text="${terminal.displayName}"
-                    th:selected="${tenantContext.selectedOrigin != null and tenantContext.selectedOrigin == terminal.code}">
-                  </option>
-                </select>
-
-                <select
-                  th:if="${caracalSecondaryFilterErrorMessage == null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL}"
-                  id="productSelect" name="product"
-                  class="form-select" onchange="this.form.submit()">
-                  <option value="" th:selected="${tenantContext.selectedProduct == null}">Select a Ticket / Product</option>
-                  <option th:each="product : ${secondaryFilter}" th:value="${product.code}"
-                    th:text="${product.displayName}"
-                    th:selected="${tenantContext.selectedProduct != null and tenantContext.selectedProduct == product.code}">
+                  th:if="${caracalSecondaryFilterErrorMessage == null}"
+                  id="originSelect" name="secondaryFilter" class="form-select" onchange="this.form.submit()">
+                  <option value="" th:selected="${tenantContext.secondaryFilter == null}"
+                    th:text="${tenantContext.selectedTenant.odMode ? 'Select Terminal' : 'Selected a Ticket'}"></option>
+                  <option th:each="filter : ${secondaryFilters}" th:value="${filter.code}"
+                    th:text="${filter.displayName}"
+                    th:selected="${tenantContext.secondaryFilter != null and tenantContext.secondaryFilter == filter.code}">
                   </option>
                 </select>
               </div>
@@ -103,17 +86,22 @@
         </div>
       </th:block>
 
-      <th:block th:if="caracalSecondaryFilterErrorMessage == null">
+      <th:block th:if="${caracalGridErrorMessage != null}">
+        <div th:replace="~{fragments/feedback-card :: feedback-card(${caracalGridErrorMessage}, 'danger')}">
+        </div>
+      </th:block>
+
+      <th:block th:if="${caracalSecondaryFilterErrorMessage == null}">
 
         <th:block
-          th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}">
+          th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.odMode and tenantContext.secondaryFilter == null}">
           <div
             th:replace="~{fragments/feedback-card :: feedback-card('Origin Terminal Required: Select a departure terminal to load outbound destination pricing.', 'warning')}">
           </div>
         </th:block>
 
         <th:block
-          th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL and tenantContext.selectedProduct == null}">
+          th:if="${tenantContext.selectedTenant != null and !tenantContext.selectedTenant.odMode and tenantContext.secondaryFilter == null}">
           <div
             th:replace="~{fragments/feedback-card :: feedback-card('Ticket Product Required: Select a fare product to populate the symmetric Zone-to-Zone matrix.', 'warning')}">
           </div>
@@ -137,7 +125,7 @@
 
       <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
       <div class="card shadow border-bottom-0"
-        th:if="${tenantContext.selectedTenant != null and tenantContext.isSecondarySelected()}">
+        th:if="${tenantContext.selectedTenant != null and tenantContext.secondaryFilter != null}">
 
         <!-- Operational Controls & Save/Discard Actions -->
         <div
@@ -148,7 +136,7 @@
 
             <!-- Zonal Actions -->
             <th:block
-              th:if="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).ZONAL}">
+              th:if="${!tenantContext.selectedTenant.odMode}">
               <button type="button" class="btn btn-outline-primary btn-sm" title="View all system tiers">
                 <i class="bi bi-layers me-1"></i> Manage Rate Tiers
               </button>
@@ -182,21 +170,13 @@
 
   </div>
 
-  <!-- STORY 2.6b: Transaction Review Diff Modal                  -->
-  <!-- Owner: Rate Grid Batch Review and Submission               -->
-  <!-- Purpose: Show all staged rate changes before API dispatch  -->
-
-  <!-- PR COMMENT #7: Load reusable rate review modal -->
   <div th:replace="~{fare/fragments/rate-review-modal :: rateReviewModal}"></div>
-
-  <!-- END STORY 2.6b: Transaction Review Diff Modal -->
 
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  
   <script th:src="@{/js/fare-grid.js}"></script>
   <script th:src="@{/js/draft-manager.js}"></script>
-
-  <!-- STORY 2.6b: Review modal JavaScript (created in next step) -->
   <script th:src="@{/js/rate-review.js}"></script>
 
 </body>

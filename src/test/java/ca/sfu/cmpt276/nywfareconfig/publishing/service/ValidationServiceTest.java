@@ -1,8 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -12,6 +11,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
+
 import tools.jackson.databind.ObjectMapper;
 
 class ValidationServiceTest {
@@ -26,6 +28,39 @@ class ValidationServiceTest {
         validationService = new ValidationService(
                 new ObjectMapper(),
                 caracalApiClient
+        );
+
+        // Default: Caracal reports that a fare is unavailable.
+        // Individual tests can override this behavior.
+        when(caracalApiClient.simulatePrice(any(PriceSimulateRequest.class)))
+                .thenReturn(unavailableFare());
+    }
+
+    private CaracalSimulationDtos.PriceSimulationResult unavailableFare() {
+        return new CaracalSimulationDtos.PriceSimulationResult(
+                null,
+                "Fare unavailable",
+                404
+        );
+    }
+
+    private CaracalSimulationDtos.PriceSimulationResult successfulFare(
+            String price) {
+
+        var pricing = new CaracalSimulationDtos.PricingDetail(
+                "OD-FULL_MONTHLY",
+                new BigDecimal(price),
+                new BigDecimal(price)
+        );
+
+        var response = new CaracalSimulationDtos.PriceSimulateResponse(
+                pricing
+        );
+
+        return new CaracalSimulationDtos.PriceSimulationResult(
+                response,
+                "",
+                null
         );
     }
 
@@ -119,28 +154,37 @@ class ValidationServiceTest {
 
     @Test
     void caracalFailureShouldPropagate() {
-        when(caracalApiClient.fetchSimulatedPrice(
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString()
-        )).thenThrow(new IllegalStateException("Caracal unavailable"));
+        when(caracalApiClient.simulatePrice(any(PriceSimulateRequest.class)))
+                .thenThrow(new IllegalStateException("Caracal unavailable"));
 
         assertThrows(
                 IllegalStateException.class,
                 () -> validationService.validate("NYW_SANDBOX")
         );
     }
+
     @Test
     void monthlyTicketSoldOutsideSaleWindowShouldBeDetected() {
-        when(caracalApiClient.fetchSimulatedPrice(
-                eq("NYW_SANDBOX"),
-                eq("FULL_MONTHLY"),
-                eq("EDGEWTR"),
-                eq("MIDTOWN"),
-                eq("2026-10-12T12:00:00-04:00")
-        )).thenReturn(new BigDecimal("414.50"));
+
+        when(caracalApiClient.simulatePrice(any(PriceSimulateRequest.class)))
+                .thenAnswer(invocation -> {
+
+                    PriceSimulateRequest request =
+                            invocation.getArgument(0);
+
+                    if (request.tenantCode().equals("NYW_SANDBOX")
+                            && request.productCode().equals("FULL_MONTHLY")
+                            && request.siteCode().equals("EDGEWTR")
+                            && "MIDTOWN".equals(
+                                    request.dimensions().get("DEST"))
+                            && request.at().equals(
+                                    "2026-10-12T12:00:00-04:00")) {
+
+                        return successfulFare("414.50");
+                    }
+
+                    return unavailableFare();
+                });
 
         var result = validationService.validate("NYW_SANDBOX");
 
@@ -152,4 +196,5 @@ class ValidationServiceTest {
         ));
     }
 }
+
 

@@ -1,6 +1,5 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
-import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -20,8 +19,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareDraftBatchRequest;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.*;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.*;
 import jakarta.validation.Valid;
@@ -46,39 +43,32 @@ public class FareController {
 
     @GetMapping
     public String getFares(
-            @RequestParam(required = false) String origin,
-            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String secondaryFilter,
             Model model) {
 
         Tenant currentTenant = tenantContext.getSelectedTenant();
         if (currentTenant != null) {
+            model.addAttribute("gridMode", currentTenant.getGridMode());
             try {
-                model.addAttribute("secondaryFilter",
+                model.addAttribute("secondaryFilters",
                     fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
             } catch (CaracalApiException ex) {
                 log.warn("Unable to load secondary filters from Caracal API: {}", ex.getMessage(), ex);
                 model.addAttribute("caracalSecondaryFilterErrorMessage", ex.getMessage());
                 return "fare/fare";
             }
+            
+            if (secondaryFilter != null && !secondaryFilter.isBlank()) {
+                try {
+                    tenantContext.setSecondaryFilter(secondaryFilter);
+    
+                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, secondaryFilter));
+                } catch (CaracalApiException ex) {
+                    log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
 
-            if (currentTenant.getGridMode() == GridMode.OD) {
-                if (origin != null && !origin.isBlank()) {
-                    tenantContext.setSelectedOrigin(origin);
+                    model.addAttribute("caracalGridErrorMessage", ex.getMessage());
+                    return "fare/fare";
                 }
-            } else if (currentTenant.getGridMode() == GridMode.ZONAL) {
-                if (product != null && !product.isBlank()) {
-                    tenantContext.setSelectedProduct(product);
-                }
-            }
-
-            // Populate gridView only when both tenant and secondary filter are selected
-            String activeFilter = (currentTenant.getGridMode() == GridMode.OD)
-                    ? tenantContext.getSelectedOrigin()
-                    : tenantContext.getSelectedProduct();
-
-            if (activeFilter != null && !activeFilter.isBlank()) {
-                FareGrid gridView = fareService.buildMockGrid(currentTenant, activeFilter);
-                model.addAttribute("gridView", gridView);
             }
         }
 

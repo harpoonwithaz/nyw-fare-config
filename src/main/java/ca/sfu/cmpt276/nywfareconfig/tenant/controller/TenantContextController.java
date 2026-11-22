@@ -46,8 +46,7 @@ public class TenantContextController {
 
         if (tenantCode == null || tenantCode.isBlank()) {
             tenantContext.setSelectedTenant(null);
-            tenantContext.setSelectedOrigin(null);
-            tenantContext.setSelectedProduct(null);
+            tenantContext.setSecondaryFilter(null);
         } else {
             boolean isNewTenant = tenantContext.getSelectedTenant() == null ||
                     !tenantContext.getSelectedTenant().getCode().equalsIgnoreCase(tenantCode);
@@ -57,8 +56,7 @@ public class TenantContextController {
                 tenantContext.setSelectedTenant(resolvedTenant);
 
                 // Clear secondary filter state when switching tenants
-                tenantContext.setSelectedOrigin(null);
-                tenantContext.setSelectedProduct(null);
+                tenantContext.setSecondaryFilter(null);
             }
         }
 

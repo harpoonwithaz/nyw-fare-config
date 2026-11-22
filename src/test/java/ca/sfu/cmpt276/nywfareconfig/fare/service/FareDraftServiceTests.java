@@ -53,28 +53,20 @@ class FareDraftServiceTests {
     }
 
     private FareRule createBaselineRule(String dest, String prod, BigDecimal price, FareStatus status) {
-        return new FareRule(
+        return FareRule.od(
                 "NYW_SANDBOX",
-                GridMode.OD,
-                "ORIGIN",
-                "DEST",
                 "EDGEWTR",
                 dest,
                 prod,
                 "OD-ADULT_ONEWAY",
-                null,
-                null,
-                null,
-                null,
                 price,
-                status,
-                false);
+                status);
     }
 
     private void stubBaselineLookup(String dest, String prod, FareRule rule) {
-        lenient().when(fareService.getBaselineFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
-        lenient().when(fareService.getFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
     }
 

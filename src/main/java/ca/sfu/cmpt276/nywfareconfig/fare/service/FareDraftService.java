@@ -90,7 +90,7 @@ public class FareDraftService {
         // Resolve baseline prices in memory and build batch upsert/delete lists
         for (FareChangeRequest req : deduplicatedRequests.values()) {
             FareRule baselineRule = fareService.getBaselineFareRule(
-                    tenantCode,
+                    activeTenant,
                     req.getOriginIdentifier(),
                     req.getDestIdentifier(),
                     req.getProductCode())

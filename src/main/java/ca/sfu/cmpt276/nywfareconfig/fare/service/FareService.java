@@ -3,6 +3,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,10 +14,12 @@ import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.SecondaryFilter;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.DraftStatus;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
@@ -30,38 +33,40 @@ public class FareService {
     private final FareDraftRepository fareDraftRepository;
     private final CaracalApiClient caracalApiClient;
 
+    // Price simulate can return 4xx.
+    // When it is not sold you get a 4xx with a reason, which is represented as-is:
+    private static final String NO_PRICE = "no PriceRule matched the resolved dimension context";
+    private static final String NOT_SOLD = "not sold";
+    private static final String NOT_SOLD_CURRENTLY = "no rate assignment's condition matches the requested moment or channel";
+
     public FareService(FareDraftRepository fareDraftRepository, CaracalApiClient caracalApiClient) {
         this.fareDraftRepository = fareDraftRepository;
         this.caracalApiClient = caracalApiClient;
     }
 
     /**
-     * RAW BASELINE LOOKUP (Used by FareDraftService to set originalPrice safely).
+     * RAW BASELINE LOOKUP.
      * Never queries FareDraftRepository; returns hasPendingDraft = false.
      */
-    public Optional<FareRule> getBaselineFareRule(String tenantCode, String origin, String dest, String product) {
-        if (tenantCode == null || origin == null || dest == null || product == null) {
+    public Optional<FareRule> getBaselineFareRule(Tenant tenant, String origin, String dest, String product) {
+        if (tenant == null || tenant.getCode() == null || origin == null || dest == null || product == null) {
             return Optional.empty();
         }
 
-        // TODO: Swap with Caracal API call (POST /functions/price-simulate or GET /functions/product-get)
-        List<FareRule> baselineRules = "METRA".equalsIgnoreCase(tenantCode)
-                ? getBaselineZonalFareRules(tenantCode, product)
-                : getBaselineOdFareRules(tenantCode, origin);
+        if (tenant.getGridMode() == GridMode.OD) {
+            return simulateOdFareRule(tenant.getCode(), origin, dest, product);
+        }
 
-        return baselineRules.stream()
-                .filter(rule -> origin.equalsIgnoreCase(rule.getOriginIdentifier())
-                        && dest.equalsIgnoreCase(rule.getDestIdentifier())
-                        && product.equalsIgnoreCase(rule.getProductCode()))
-                .findFirst();
+        // TODO: Swap with Caracal API call for ZONAL
+        return Optional.empty();
     }
 
     /**
-     * EFFECTIVE LOOKUP (Used by Epic 3, Epic 5, and single-rule queries).
+     * EFFECTIVE LOOKUP.
      * Returns baseline rule overlaid with any PENDING FareDraft from PostgreSQL.
      */
-    public Optional<FareRule> getFareRule(String tenantCode, String origin, String dest, String product) {
-        Optional<FareRule> ruleOpt = getBaselineFareRule(tenantCode, origin, dest, product);
+    public Optional<FareRule> getFareRule(Tenant tenant, String origin, String dest, String product) {
+        Optional<FareRule> ruleOpt = getBaselineFareRule(tenant, origin, dest, product);
         if (ruleOpt.isEmpty()) {
             return Optional.empty();
         }
@@ -69,7 +74,7 @@ public class FareService {
         FareRule rule = ruleOpt.get();
         fareDraftRepository
                 .findByTenantCodeAndOriginIdentifierAndDestIdentifierAndProductCodeAndDraftStatus(
-                        tenantCode.toUpperCase(),
+                        tenant.getCode().toUpperCase(),
                         rule.getOriginIdentifier(),
                         rule.getDestIdentifier(),
                         rule.getProductCode(),
@@ -84,8 +89,8 @@ public class FareService {
      * - O-D Mode: Origin Terminal codes
      * - Zonal Mode: Ticket Product codes
      */
-    public List<SecondaryFilter> getSecondaryFilterOptions(String tenantCode, GridMode gridMode) {
-        if (tenantCode == null) {
+    public List<CatalogOption> getSecondaryFilterOptions(String tenantCode, GridMode gridMode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
             return List.of();
         }
 
@@ -93,64 +98,32 @@ public class FareService {
 
             // In OD, the secondary filters are the origin terminals/sites
             case GridMode.OD: {
-                List<CaracalCatalogDtos.SiteSummary> siteList = caracalApiClient.fetchSites(tenantCode);
-                if (siteList == null) {
-                    return List.of();
-                }
-
-                List<SecondaryFilter> filterList = new ArrayList<>();
-                for (CaracalCatalogDtos.SiteSummary site : siteList) {
-                    if (site.siteCode() == null || site.siteCode().isBlank()) {
-                        continue;
-                    }
-
-                    filterList.add(new SecondaryFilter(site.siteCode(), site.name()));
-                }
-
-                return filterList;
+                return getSitesCatalog(tenantCode);
             }
 
             // In ZONAL, the secondary filters are ticket products
             case GridMode.ZONAL: {
-                List<CaracalCatalogDtos.ProductSummary> productList = caracalApiClient.fetchProducts(tenantCode);
-                if (productList == null) {
-                    return List.of();
-                }
-
-                List<SecondaryFilter> filterList = new ArrayList<>();
-                for (CaracalCatalogDtos.ProductSummary product : productList) {
-                    // Omit inactive products from the list
-                    if (product.code() == null || product.code().isBlank() || !product.isActive()) {
-                        continue;
-                    }
-
-                    filterList.add(new SecondaryFilter(product.code(), product.name()));
-                }
-
-                return filterList;
+                return getProductsCatalog(tenantCode);
             }
 
-            default: return List.of();
+            default:
+                return List.of();
         }
     }
 
     /**
      * Builds the structured 2D FareGrid view-model based on the active mode.
-     * Does not need to be modified when swapping mock data for live API calls.
      */
-    public FareGrid buildMockGrid(Tenant tenant, String filterValue) {
-        if (tenant == null) {
+
+    public FareGrid buildGrid(Tenant tenant, String filterValue) {
+        if (tenant == null || filterValue == null || filterValue.isBlank()) {
             return null;
         }
 
-        String activeFilter = filterValue != null && !filterValue.isBlank()
-                ? filterValue
-                : tenant.getGridMode() == GridMode.ZONAL ? "ADULT_ONEWAY" : "EDGEWTR";
-
         if (tenant.getGridMode() == GridMode.ZONAL) {
-            return buildZonalGrid(activeFilter, tenant);
+            return buildZonalGrid(tenant, filterValue);
         }
-        return buildOdGrid(activeFilter, tenant);
+        return buildOdGrid(tenant, filterValue);
     }
 
     /**
@@ -158,31 +131,36 @@ public class FareService {
      * - Rows: Outbound Destination Terminals
      * - Columns: Ticket Products
      */
-    private FareGrid buildOdGrid(String originSiteCode, Tenant tenant) {
-        String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "";
+    private FareGrid buildOdGrid(Tenant tenant, String originSiteCode) {
+        List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed(); // follow conventions of the NYW spreadsheet
+        List<CatalogOption> outboundDestinations = getOutboundDestinations(tenant.getCode(), originSiteCode);
+        Map<String, FareRule> ruleMap = indexRulesByCoordinates(
+                getOdFareRules(tenant.getCode(), originSiteCode, outboundDestinations, colHeaders));
 
-        List<String> colHeaders = getOdProducts(tenant.getCode());
-        List<String> rowHeaders = getOutboundDestinations(tenant.getCode(), normalizedOrigin);
-        Map<String, FareRule> ruleMap = indexRulesByCoordinates(getOdFareRules(tenant.getCode(), normalizedOrigin));
-
+        List<CatalogOption> visibleRowHeaders = new ArrayList<>();
         List<List<FareCell>> rows = new ArrayList<>();
 
-        for (String dest : rowHeaders) {
+        for (CatalogOption dest : outboundDestinations) {
             List<FareCell> rowCells = new ArrayList<>();
-            for (String prod : colHeaders) {
-                FareRule rule = ruleMap.get(coordinateKey(normalizedOrigin, dest, prod));
-                rowCells.add(toFareCell(rule, dest, prod));
+            boolean hasVisibleCell = false;
+
+            for (CatalogOption prod : colHeaders) {
+                FareRule rule = ruleMap.get(coordinateKey(originSiteCode, dest.code(), prod.code()));
+                FareCell cell = toFareCell(rule, dest.code(), prod.code());
+                rowCells.add(cell);
+
+                if (cell.getStatus() != FareStatus.NA || cell.isHasPendingDraft()) {
+                    hasVisibleCell = true;
+                }
             }
-            rows.add(rowCells);
+
+            if (hasVisibleCell) {
+                visibleRowHeaders.add(dest);
+                rows.add(rowCells);
+            }
         }
 
-        return new FareGrid(
-                tenant,
-                "Origin Terminal",
-                normalizedOrigin,
-                colHeaders,
-                rowHeaders,
-                rows);
+        return new FareGrid(colHeaders, visibleRowHeaders, rows);
     }
 
     /**
@@ -190,50 +168,41 @@ public class FareService {
      * - Rows: Origin Zones
      * - Columns: Destination Zones
      */
-    private FareGrid buildZonalGrid(String productCode, Tenant tenant) {
-        String normalizedProduct = productCode != null ? productCode.toUpperCase() : "";
-
-        List<String> zones = getZones(tenant.getCode());
-        Map<String, FareRule> ruleMap = indexRulesByCoordinates(getZonalFareRules(tenant.getCode(), normalizedProduct));
+    private FareGrid buildZonalGrid(Tenant tenant, String productCode) {
+        List<CatalogOption> zones = getZones(tenant.getCode());
+        Map<String, FareRule> ruleMap = indexRulesByCoordinates(getZonalFareRules(tenant.getCode(), productCode));
 
         List<List<FareCell>> rows = new ArrayList<>();
 
-        for (String originZone : zones) {
+        for (CatalogOption originZone : zones) {
             List<FareCell> rowCells = new ArrayList<>();
-            for (String destZone : zones) {
-                FareRule rule = ruleMap.get(coordinateKey(originZone, destZone, normalizedProduct));
-                rowCells.add(toFareCell(rule, originZone, destZone));
+            for (CatalogOption destZone : zones) {
+                FareRule rule = ruleMap.get(coordinateKey(originZone.code(), destZone.code(), productCode));
+                rowCells.add(toFareCell(rule, originZone.code(), destZone.code()));
             }
             rows.add(rowCells);
         }
 
-        return new FareGrid(
-                tenant,
-                "Ticket Product",
-                normalizedProduct,
-                zones,
-                zones,
-                rows);
+        return new FareGrid(zones, zones, rows);
     }
 
     /**
-     * Converts a normalized FareRule into a presentation FareCell for the 2D matrix,
+     * Converts a normalized FareRule into a presentation FareCell for the 2D
+     * matrix,
      * preserving whether the cell has a staged PENDING draft in PostgreSQL.
      */
     private FareCell toFareCell(FareRule rule, String rowKey, String colKey) {
         if (rule == null || rule.getStatus() == null || rule.getStatus() == FareStatus.NA) {
-            return new FareCell(FareStatus.NA, false, rowKey, colKey);
+            return new FareCell(null, FareStatus.NA, false, rowKey, colKey); // can be null if its not sold
         }
         if (rule.getStatus() == FareStatus.NOT_SOLD || rule.getPrice() == null) {
-            return new FareCell(rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
+            return new FareCell(rule.getPrice(), rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
         }
 
         BigDecimal price = rule.getPrice().setScale(2, RoundingMode.HALF_UP);
         return new FareCell(
                 price,
-                String.format("$%.2f", price),
                 rule.getStatus(),
-                true,
                 rule.isHasPendingDraft(),
                 rowKey,
                 colKey);
@@ -247,59 +216,42 @@ public class FareService {
      * Returns O-D FareRule entities overlaid with any PENDING drafts in PostgreSQL.
      */
     public List<FareRule> getOdFareRules(String tenantCode, String originSiteCode) {
-        String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "NYW_SANDBOX";
-        List<FareRule> rules = getBaselineOdFareRules(normalizedTenant, originSiteCode);
-        applyPendingDraftsToRules(normalizedTenant, rules);
+        List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
+        List<CatalogOption> products = getOdProducts(tenantCode);
+        return getOdFareRules(tenantCode, originSiteCode, destinations, products);
+    }
+
+    private List<FareRule> getOdFareRules(
+            String tenantCode,
+            String originSiteCode,
+            List<CatalogOption> destinations,
+            List<CatalogOption> products) {
+        List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
+        applyPendingDraftsToRules(tenantCode.toUpperCase(), rules);
         return rules;
     }
 
     /**
-     * Returns untouched baseline O-D FareRule entities (never overlaid with drafts).
+     * Returns untouched baseline O-D FareRule entities (never overlaid with
+     * drafts).
      */
     public List<FareRule> getBaselineOdFareRules(String tenantCode, String originSiteCode) {
-        // TODO: Swap with POST /functions/price-simulate or GET /functions/rate-table-get
-        String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "NYW_SANDBOX";
-        String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "EDGEWTR";
+        List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
+        List<CatalogOption> products = getOdProducts(tenantCode);
+        return getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
+    }
 
-        List<String> destinations = getOutboundDestinations(normalizedTenant, normalizedOrigin);
-        List<String> products = getOdProducts(normalizedTenant);
+    private List<FareRule> getBaselineOdFareRules(
+            String tenantCode,
+            String originSiteCode,
+            List<CatalogOption> destinations,
+            List<CatalogOption> products) {
         List<FareRule> rules = new ArrayList<>();
 
-        for (String dest : destinations) {
-            for (String prod : products) {
-                FareStatus status;
-                BigDecimal price = null;
-
-                // NYW discontinued Senior tickets across all terminals -> NOT_SOLD
-                if ("Senior 65+".equals(prod)) {
-                    status = FareStatus.NOT_SOLD;
-                }
-                // Pier 11 is not directly served from Edgewater -> NA badge
-                else if ("EDGEWTR".equals(normalizedOrigin) && "Pier 11 / Wall St".equals(dest)) {
-                    status = FareStatus.NA;
-                }
-                // Standard active pricing
-                else {
-                    status = FareStatus.ACTIVE;
-                    price = resolveOdPrice(dest, prod);
-                }
-
-                rules.add(new FareRule(
-                        normalizedTenant,
-                        GridMode.OD,
-                        "ORIGIN",
-                        "DEST",
-                        normalizedOrigin,
-                        dest,
-                        prod,
-                        "OD-" + prod.toUpperCase().replace(" ", "_"),
-                        null,
-                        null,
-                        null,
-                        null,
-                        price,
-                        status,
-                        false));
+        for (CatalogOption dest : destinations) {
+            for (CatalogOption prod : products) {
+                simulateOdFareRule(tenantCode, originSiteCode, dest.code(), prod.code())
+                        .ifPresent(rules::add);
             }
         }
 
@@ -307,7 +259,8 @@ public class FareService {
     }
 
     /**
-     * Returns Zonal FareRule entities overlaid with any PENDING drafts in PostgreSQL.
+     * Returns Zonal FareRule entities overlaid with any PENDING drafts in
+     * PostgreSQL.
      */
     public List<FareRule> getZonalFareRules(String tenantCode, String productCode) {
         String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "METRA";
@@ -317,21 +270,23 @@ public class FareService {
     }
 
     /**
-     * Returns untouched baseline Zonal FareRule entities (never overlaid with drafts).
+     * Returns untouched baseline Zonal FareRule entities (never overlaid with
+     * drafts).
      */
     public List<FareRule> getBaselineZonalFareRules(String tenantCode, String productCode) {
-        // TODO: Swap with GET /functions/rate-table-get or POST /functions/price-simulate
+        // TODO: Swap with GET /functions/rate-table-get or POST
+        // /functions/price-simulate
         String normalizedTenant = tenantCode != null ? tenantCode.toUpperCase() : "METRA";
         String normalizedProduct = productCode != null ? productCode.toUpperCase() : "ADULT_ONEWAY";
 
-        List<String> zones = getZones(normalizedTenant);
+        List<CatalogOption> zones = getZones(normalizedTenant);
         BigDecimal[][] baseRates = resolveZonalBaseRates(normalizedProduct);
         List<FareRule> rules = new ArrayList<>();
 
         for (int r = 0; r < zones.size(); r++) {
             for (int c = 0; c < zones.size(); c++) {
-                String originZone = zones.get(r);
-                String destZone = zones.get(c);
+                String originZone = zones.get(r).code();
+                String destZone = zones.get(c).code();
                 BigDecimal price = baseRates[r][c].setScale(2, RoundingMode.HALF_UP);
 
                 int zoneDistance = Math.abs(r - c);
@@ -340,25 +295,16 @@ public class FareService {
                     case 1 -> "TIER_B";
                     default -> "TIER_C";
                 };
-                String tierLetter = tierCode.substring(tierCode.length() - 1);
-                String tierLabel = String.format("Tier %s ($%.2f)", tierLetter, price);
 
-                rules.add(new FareRule(
+                rules.add(FareRule.zonal(
                         normalizedTenant,
-                        GridMode.ZONAL,
-                        "ORIGIN_ZONE",
-                        "DEST_ZONE",
                         originZone,
                         destZone,
                         normalizedProduct,
                         "ZONAL-" + normalizedProduct,
-                        null,
-                        null,
                         tierCode,
-                        tierLabel,
                         price,
-                        FareStatus.ACTIVE,
-                        false));
+                        FareStatus.ACTIVE));
             }
         }
 
@@ -366,42 +312,117 @@ public class FareService {
     }
 
     /**
-     * Returns ticket products for O-D tenants.
+     * Returns ticket products codes for O-D tenants.
      */
-    public List<String> getOdProducts(String tenantCode) {
-        // TODO: Call GET /functions/product-list
-        return List.of(
-                "Adult One-Way",
-                "Child One-Way",
-                "Senior 65+",
-                "10-Trip Pass",
-                "Monthly Pass");
+    public List<CatalogOption> getOdProducts(String tenantCode) {
+        return getProductsCatalog(tenantCode);
     }
 
     /**
-     * Returns outbound destination terminals for a given origin terminal in O-D mode.
+     * Returns outbound destination terminals for a given origin terminal in O-D
+     * mode.
      */
-    public List<String> getOutboundDestinations(String tenantCode, String originSiteCode) {
-        // TODO: Call GET /functions/site-list
-        String normalizedOrigin = originSiteCode != null ? originSiteCode.toUpperCase() : "EDGEWTR";
-        return switch (normalizedOrigin) {
-            case "PORTIMP" -> List.of("Midtown / W. 39th St", "Brookfield Place", "Pier 11 / Wall St");
-            case "MIDTOWN" -> List.of("Edgewater", "Port Imperial", "Hoboken 14th St");
-            case "EDGEWTR" -> List.of("Midtown / W. 39th St", "Brookfield Place", "Pier 11 / Wall St");
-            default -> List.of("Midtown / W. 39th St", "Brookfield Place");
-        };
+    public List<CatalogOption> getOutboundDestinations(String tenantCode, String originSiteCode) {
+        return getSitesCatalog(tenantCode).stream()
+                .filter(destination -> !destination.code().equalsIgnoreCase(originSiteCode))
+                .toList();
     }
 
     /**
      * Returns fare zones for Zonal tenants.
      */
-    public List<String> getZones(String tenantCode) {
+    public List<CatalogOption> getZones(String tenantCode) {
         // TODO: Call GET /functions/site-list
-        return List.of("Zone 1", "Zone 2", "Zone 3");
+        return List.of(
+                new CatalogOption("Zone 1", "Zone 1"),
+                new CatalogOption("Zone 2", "Zone 2"),
+                new CatalogOption("Zone 3", "Zone 3"));
     }
 
     // =========================================================================
-    // INTERNAL MOCK HELPERS & COORDINATE INDEXING
+    // CARACAL API CLIENT HELPERS
+    // =========================================================================
+
+    private List<CatalogOption> getProductsCatalog(String tenantCode) {
+        List<CaracalCatalogDtos.ProductSummary> productList = caracalApiClient.fetchProducts(tenantCode);
+        if (productList == null) {
+            return List.of();
+        }
+
+        List<CatalogOption> products = new ArrayList<>();
+        for (CaracalCatalogDtos.ProductSummary product : productList) {
+            if (product.code() == null || product.code().isBlank() || !product.isActive()) {
+                continue;
+            }
+
+            products.add(new CatalogOption(product.code(), product.name()));
+        }
+
+        return products;
+    }
+
+    private List<CatalogOption> getSitesCatalog(String tenantCode) {
+        List<CaracalCatalogDtos.SiteSummary> siteList = caracalApiClient.fetchSites(tenantCode);
+        if (siteList == null) {
+            return List.of();
+        }
+
+        List<CatalogOption> sites = new ArrayList<>();
+        for (CaracalCatalogDtos.SiteSummary site : siteList) {
+            if (site.siteCode() == null || site.siteCode().isBlank()) {
+                continue;
+            }
+
+            sites.add(new CatalogOption(site.siteCode(), site.name()));
+        }
+
+        return sites;
+    }
+
+    private Optional<FareRule> simulateOdFareRule(
+            String tenantCode,
+            String originSiteCode,
+            String destSiteCode,
+            String productCode) {
+        Map<String, String> dimensions = Map.of("DEST", destSiteCode);
+
+        CaracalSimulationDtos.PriceSimulationResult simulatedPrice = caracalApiClient.simulatePrice(
+                new PriceSimulateRequest(tenantCode, productCode, originSiteCode, dimensions));
+        if (simulatedPrice == null) {
+            return Optional.empty();
+        }
+
+        if (simulatedPrice.response() == null || simulatedPrice.response().pricing() == null) {
+            String msg = simulatedPrice.errorMessage() != null
+                    ? simulatedPrice.errorMessage().toLowerCase()
+                    : "";
+
+            if (msg.contains(NOT_SOLD)) {
+                return Optional.of(FareRule.od(
+                        tenantCode, originSiteCode, destSiteCode, productCode, null, null, FareStatus.NOT_SOLD));
+            }
+
+            // TODO: Add distinct handling for NOT_SOLD_CURRENTLY / temporal conditions
+            return Optional.of(FareRule.od(
+                    tenantCode, originSiteCode, destSiteCode, productCode, null, null, FareStatus.NA));
+        }
+
+        CaracalSimulationDtos.PricingDetail fare = simulatedPrice.response().pricing();
+        BigDecimal total = fare.total() != null ? fare.total() : null;
+
+        return Optional.of(FareRule.od(
+                tenantCode,
+                originSiteCode,
+                destSiteCode,
+                productCode,
+                fare.priceRuleSetName(),
+                null,
+                total,
+                FareStatus.ACTIVE));
+    }
+
+    // =========================================================================
+    // INTERNAL HELPERS & COORDINATE INDEXING
     // =========================================================================
 
     private Map<String, FareRule> indexRulesByCoordinates(List<FareRule> rules) {
@@ -423,7 +444,8 @@ public class FareService {
     }
 
     /**
-     * Batch-fetches PENDING drafts for the tenant in 1 query and overlays matching rules.
+     * Batch-fetches PENDING drafts for the tenant in 1 query and overlays matching
+     * rules.
      */
     private void applyPendingDraftsToRules(String normalizedTenant, List<FareRule> rules) {
         if (fareDraftRepository == null || rules.isEmpty()) {
@@ -465,34 +487,13 @@ public class FareService {
         rule.setStatus(draft.getTargetStatus());
         if (draft.getTierCode() != null && !draft.getTierCode().isBlank()) {
             rule.setTierCode(draft.getTierCode());
-            if (draft.getDraftPrice() != null) {
-                String tierSuffix = draft.getTierCode().replace("TIER_", "");
-                rule.setTierLabel(String.format("Tier %s ($%.2f)", tierSuffix, draft.getDraftPrice()));
-            }
         }
         rule.setHasPendingDraft(true);
     }
 
     /**
-     * Helper to mock realistic NYW ticket prices with exact 2-decimal BigDecimal scale.
-     */
-    private BigDecimal resolveOdPrice(String dest, String prod) {
-        BigDecimal base = dest.contains("Midtown")
-                ? new BigDecimal("13.25")
-                : new BigDecimal("15.00");
-
-        BigDecimal rawPrice = switch (prod) {
-            case "Child One-Way" -> base.subtract(new BigDecimal("4.25"));
-            case "10-Trip Pass" -> base.multiply(new BigDecimal("8.5"));
-            case "Monthly Pass" -> base.multiply(new BigDecimal("31.25"));
-            default -> base; // Adult One-Way
-        };
-
-        return rawPrice.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Helper to mock 3x3 symmetric zone baseline rates matching the system rate schedule.
+     * Helper to mock 3x3 symmetric zone baseline rates matching the system rate
+     * schedule.
      */
     private BigDecimal[][] resolveZonalBaseRates(String normalizedProduct) {
         return switch (normalizedProduct) {
