@@ -64,9 +64,9 @@ class FareDraftServiceTests {
     }
 
     private void stubBaselineLookup(String dest, String prod, FareRule rule) {
-        lenient().when(fareService.getBaselineFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
-        lenient().when(fareService.getFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
     }
 

@@ -1,6 +1,5 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
-import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -20,8 +19,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareDraftBatchRequest;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
-import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.*;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.*;
 import jakarta.validation.Valid;
@@ -60,11 +57,18 @@ public class FareController {
                 model.addAttribute("caracalSecondaryFilterErrorMessage", ex.getMessage());
                 return "fare/fare";
             }
-
+            
             if (secondaryFilter != null && !secondaryFilter.isBlank()) {
-                tenantContext.setSecondaryFilter(secondaryFilter);
+                try {
+                    tenantContext.setSecondaryFilter(secondaryFilter);
+    
+                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, secondaryFilter));
+                } catch (CaracalApiException ex) {
+                    log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
 
-                model.addAttribute("gridView", fareService.buildMockGrid(currentTenant, secondaryFilter));
+                    model.addAttribute("caracalGridErrorMessage", ex.getMessage());
+                    return "fare/fare";
+                }
             }
         }
 

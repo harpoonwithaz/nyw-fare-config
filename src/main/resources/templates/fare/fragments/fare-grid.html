@@ -6,6 +6,12 @@
   <!-- 2D Rate Matrix Table Fragment -->
   <div th:fragment="fare-grid-table" class="card shadow-sm border-top-0 mb-4 rounded-top-0">
 
+    <th:block th:if="${gridView.rows.isEmpty()}">
+      <div
+        th:replace="~{fragments/feedback-card :: feedback-card('Origin Terminal: No active outbound routes configured for this terminal.', 'warning')}">
+      </div>
+    </th:block>
+
     <!-- Table Context Header -->
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
       <div>
@@ -23,20 +29,19 @@
 
     <!-- Table Scroll Container -->
     <div class="table-responsive">
-      <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table"
-        th:attr="data-tenant=${tenantContext.selectedTenant.code},
+      <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table" th:attr="data-tenant=${tenantContext.selectedTenant.code},
                  data-grid-mode=${tenantContext.selectedTenant.gridMode.name()},
                  data-filter-value=${tenantContext.secondaryFilter}">
         <thead class="table-light">
           <tr>
             <!-- Corner Axis Label -->
             <th class="text-secondary small text-uppercase text-start ps-3" style="min-width: 180px;"
-              th:text="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD ? 'Outbound Destination' : 'Origin / Destination Zone'}">
+              th:text="${tenantContext.selectedTenant.odMode ? 'Outbound Destination' : 'Origin / Destination Zone'}">
             </th>
 
             <!-- Column Headers (Products or Destination Zones) -->
-            <th th:each="col : ${gridView.columnHeaders}" th:text="${col}" class="text-secondary small text-uppercase"
-              style="min-width: 130px;">
+            <th th:each="col : ${gridView.columnHeaders}" th:text="${col.displayName}"
+              class="text-secondary small text-uppercase" style="min-width: 130px;">
             </th>
           </tr>
         </thead>
@@ -45,26 +50,23 @@
           <tr th:each="row, rowStat : ${gridView.rows}">
             <!-- Row Title (Destination Name or Origin Zone) -->
             <th class="table-light text-secondary fw-semibold text-start ps-3"
-              th:text="${gridView.rowHeaders[rowStat.index]}">
+              th:text="${gridView.rowHeaders[rowStat.index].displayName}">
             </th>
 
             <!-- Matrix Intersection Cells -->
             <td th:each="cell : ${row}" class="py-2 px-3 fare-cell-container"
-              th:classappend="${cell.hasPendingDraft} ? 'cell-staged'"
-              th:attr="data-row-key=${cell.rowKey}, data-col-key=${cell.colKey}, data-status=${cell.status},
+              th:classappend="${cell.hasPendingDraft} ? 'cell-staged'" th:attr="data-row-key=${cell.rowKey}, data-col-key=${cell.colKey}, data-status=${cell.status},
                 data-inline-editable=${cell.editable and tenantContext.selectedTenant.odMode},
                 data-value=${cell.price}, data-original-price=${cell.price},
                 data-staged=${cell.hasPendingDraft}">
 
               <!-- Subtle Staged Draft Indicator -->
-              <span th:if="${cell.hasPendingDraft}"
-                class="fare-cell-staged-dot"
-                title="Staged draft (pending publish)">
+              <span th:if="${cell.hasPendingDraft}" class="fare-cell-staged-dot" title="Staged draft (pending publish)">
               </span>
 
               <!-- Active Rate -->
-              <span th:if="${cell.active}"
-                class="fw-bold font-monospace text-dark fare-cell-value" th:text="${cell.formattedPrice}">
+              <span th:if="${cell.active}" class="fw-bold font-monospace text-dark fare-cell-value"
+                th:text="${cell.formattedPrice}">
               </span>
 
               <!-- Route Not Sold -->

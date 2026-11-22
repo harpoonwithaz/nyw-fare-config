@@ -3,6 +3,7 @@ package ca.sfu.cmpt276.nywfareconfig.caracal;
 import java.util.List;
 import java.util.function.Supplier;
 
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -10,6 +11,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
@@ -53,7 +56,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
     // to discover specific tenant details.
     @Override
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -74,7 +77,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
     // directories.
     @Override
     public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -93,7 +96,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
     @Override
     public List<CaracalCatalogDtos.ProductSummary> fetchProducts(String tenantCode) {
-        if (tenantCode == null || tenantCode.isBlank()) {
+        if (isNullOrBlank(tenantCode)) {
             throw new IllegalArgumentException("Tenant code must not be blank.");
         }
 
@@ -108,6 +111,50 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             throw new CaracalApiException("Caracal returned an empty response for tenant " + tenantCode + ".");
         }
         return response.products();
+    }
+
+    // ==============================================================================
+    // Matrix & Availability Hydration
+    // ==============================================================================
+    @Override
+    public CaracalSimulationDtos.PriceSimulationResult simulatePrice(
+            CaracalSimulationDtos.PriceSimulateRequest requestPayload) {
+        if (requestPayload == null
+                || isNullOrBlank(requestPayload.tenantCode())
+                || isNullOrBlank(requestPayload.productCode())
+                || isNullOrBlank(requestPayload.siteCode())
+                || requestPayload.dimensions() == null) {
+            throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
+        }
+
+        String actionDescription = "simulating price for product "
+                + requestPayload.productCode() + " at site " + requestPayload.siteCode();
+
+        return execute(actionDescription, () -> {
+            try {
+                CaracalSimulationDtos.PriceSimulateResponse response = caracalRestClient
+                        .post()
+                        .uri("/price-simulate")
+                        .attribute("useSystemActor", false)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestPayload)
+                        .retrieve()
+                        .body(CaracalSimulationDtos.PriceSimulateResponse.class);
+
+                if (response == null || response.pricing() == null) {
+                    throw new CaracalApiException("Caracal returned an empty pricing response while " + actionDescription + ".");
+                }
+                return new CaracalSimulationDtos.PriceSimulationResult(response, "");
+            } catch (RestClientResponseException ex) {
+                if (isBusiness4xx(ex)) {
+                    String errorMessage = extractErrorMessage(ex);
+                    if (!isNullOrBlank(errorMessage)) {
+                        return new CaracalSimulationDtos.PriceSimulationResult(null, errorMessage);
+                    }
+                }
+                throw ex;
+            }
+        });
     }
 
     // ==============================================================================
@@ -146,4 +193,24 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         }
     }
 
+    private boolean isNullOrBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private boolean isBusiness4xx(RestClientResponseException ex) {
+        int status = ex.getStatusCode().value();
+        return ex.getStatusCode().is4xxClientError() && status != 401 && status != 403;
+    }
+
+    private String extractErrorMessage(RestClientResponseException ex) {
+        try {
+            CaracalErrorResponse errorResponse = ex.getResponseBodyAs(CaracalErrorResponse.class);
+            if (errorResponse != null && !isNullOrBlank(errorResponse.error())) {
+                return errorResponse.error();
+            }
+        } catch (RestClientException ignored) {
+            // Fall back to raw response body if 4xx payload is not valid JSON
+        }
+        return ex.getResponseBodyAsString();
+    }
 }
