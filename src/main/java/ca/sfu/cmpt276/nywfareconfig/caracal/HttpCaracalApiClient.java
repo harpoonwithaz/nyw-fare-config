@@ -2,6 +2,8 @@ package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
 import java.util.function.Supplier;
+import java.math.BigDecimal;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -13,6 +15,8 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
+
+import tools.jackson.databind.JsonNode;
 
 @Service
 public class HttpCaracalApiClient implements CaracalApiClient {
@@ -108,6 +112,126 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             throw new CaracalApiException("Caracal returned an empty response for tenant " + tenantCode + ".");
         }
         return response.products();
+    }
+    
+    /**
+    * Retrieves recent audit log entries for a specific tenant from Caracal.
+    *
+    * Sends a GET request to /functions/audit-log-get with the tenant code
+    * and maximum number of entries to retrieve.
+    * Returns the raw JSON response until the audit schema is finalized.
+    */
+    @Override 
+    public JsonNode fetchPublicationHistory(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        return get("/publication-list?tenant={tenant}", false, JsonNode.class, 
+            "loading publication history for tenant " + tenantCode, tenantCode
+        );
+    }
+
+    @Override 
+    public JsonNode fetchAuditHistory(String tenantCode, int limit) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+        if (limit <= 0){
+            throw new IllegalArgumentException("History limit must be positive.");
+        }
+        return get("/audit-log-get?tenantCode={tenantCode}&limit={limit}", false, JsonNode.class, 
+            "loading audit history for tenant" + tenantCode, tenantCode, limit
+        );
+    }
+
+
+    @Override
+    public BigDecimal fetchBaselinePrice(String tenantCode, String originCode,
+            String destCode, String productCode) {
+
+        Map<String, Object> requestBody = Map.of(
+                "tenantCode", tenantCode,
+                "productCode", productCode,
+                "durationMinutes", 0,
+                "siteCode", originCode,
+                "dimensions", Map.of(
+                        "ORIGIN", originCode,
+                        "DEST", destCode
+                )
+        );
+
+        JsonNode response = execute(
+                "retrieving live fare price",
+                () -> caracalRestClient
+                        .post()
+                        .uri("/quote-create")
+                        .attribute("useSystemActor", false)
+                        .body(requestBody)
+                        .retrieve()
+                        .body(JsonNode.class)
+        );
+
+        if (response == null
+                || response.path("pricing").path("base").isMissingNode()
+                || !response.path("pricing").path("base").isNumber()) {
+            throw new CaracalApiException(
+                    "Caracal returned an invalid fare pricing response.");
+        }
+
+        return response.path("pricing").path("base").decimalValue();
+    }
+
+    @Override
+    public BigDecimal fetchSimulatedPrice(
+            String tenantCode,
+            String productCode,
+            String originCode,
+            String destCode,
+            String at) {
+
+        Map<String, Object> requestBody = Map.of(
+                "tenantCode", tenantCode,
+                "productCode", productCode,
+                "siteCode", originCode,
+                "dimensions", Map.of("DEST", destCode),
+                "at", at,
+                "channel", "UNATTENDED"
+        );
+
+        JsonNode response;
+
+        try {
+            response = execute(
+                    "simulating sandbox fare price",
+                    () -> caracalRestClient
+                            .post()
+                            .uri("/price-simulate")
+                            .attribute("useSystemActor", true)
+                            .body(requestBody)
+                            .retrieve()
+                            .body(JsonNode.class)
+            );
+
+        } catch (CaracalApiException ex) {
+            if (ex.getCause() instanceof RestClientResponseException httpEx) {
+                int status = httpEx.getStatusCode().value();
+
+                if (status == 404 || status == 409 || status == 422) {
+                    return null;
+                }
+            }
+
+            throw ex;
+        }
+
+        if (response == null
+                || !response.path("pricing").path("total").isNumber()) {
+            throw new CaracalApiException(
+                    "Caracal returned an invalid simulated pricing response.");
+        }
+
+        return response.path("pricing").path("total").decimalValue();
     }
 
     // ==============================================================================

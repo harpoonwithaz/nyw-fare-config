@@ -37,14 +37,18 @@ public class PublishingController {
         List<ConfigurationChangeView> fareChanges =
                 stagingService.getConfigurationChanges(tenantCode);
 
-        long pendingCount = fareChanges.size();
+        long totalCount = fareChanges.size();
+        long changedCount = fareChanges.stream()
+                .filter(ConfigurationChangeView::isChanged)
+                .count();
+        long unchangedCount = totalCount - changedCount;
 
         model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("pendingChanges", fareChanges);
 
-        model.addAttribute("totalCount", pendingCount);
-        model.addAttribute("changedCount", pendingCount);
-        model.addAttribute("unchangedCount", 0);
+        model.addAttribute("totalCount", totalCount);
+        model.addAttribute("changedCount", changedCount);
+        model.addAttribute("unchangedCount", unchangedCount);
 
         return "publishing/review";
     }

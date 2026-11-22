@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -13,9 +14,12 @@ import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 public class StagingService {
 
     private final FareDraftService fareDraftService;
+    private final FareBaselineProvider fareBaselineProvider;
 
-    public StagingService(FareDraftService fareDraftService) {
+    public StagingService(FareDraftService fareDraftService,
+        FareBaselineProvider fareBaselineProvider) {
         this.fareDraftService = fareDraftService;
+        this.fareBaselineProvider = fareBaselineProvider;
     }
 
     /**
@@ -29,9 +33,12 @@ public class StagingService {
             return List.of();
         }
 
+        //retreive postgresql pending drafts
         List<FareDraft> drafts =
                 fareDraftService.getPendingDrafts(tenantCode);
-
+        
+        //convert each draft into a configuration change view
+        //and filter out non-changed entries
         return drafts.stream()
                 .map(this::toConfigurationChangeView)
                 .filter(ConfigurationChangeView::isChanged)
@@ -47,35 +54,31 @@ public class StagingService {
 
         boolean isZonal = draft.getGridMode() == GridMode.ZONAL;
 
+        BigDecimal baselinePrice =
+                fareBaselineProvider.getBaselinePrice(draft);
+
         return new ConfigurationChangeView(
                 draft.getTenantCode(),
                 draft.getGridMode(),
 
-                // O-D: origin terminal
-                // ZONAL: selected fare product
                 isZonal
                         ? draft.getProductCode()
                         : draft.getOriginIdentifier(),
 
-                // O-D: destination terminal
-                // ZONAL: origin zone
                 isZonal
                         ? draft.getOriginIdentifier()
                         : draft.getDestIdentifier(),
 
-                // O-D: fare product
-                // ZONAL: destination zone
                 isZonal
                         ? draft.getDestIdentifier()
                         : draft.getProductCode(),
 
                 draft.getProductCode(),
-                draft.getOriginalPrice(),
+                baselinePrice,
                 draft.getDraftPrice()
         );
     }
 }
-
 
 
 

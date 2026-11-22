@@ -8,11 +8,10 @@ import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 /**
  * STORY 5.1: Configuration Review
  *
- * Represents one fare configuration comparison.
- * Supports both O-D and zonal fare grids.
+ * Represents a comparison between a baseline fare
+ * and a staged PostgreSQL fare draft.
  *
- * Currently used with mock data.
- * Later, values will be retrieved from PostgreSQL.
+ * Supports both O-D and zonal fare configurations.
  */
 public record ConfigurationChangeView(
     String tenantCode,
