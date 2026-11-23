@@ -57,8 +57,7 @@ class TenantContextControllerTest {
         Tenant metra = createTenant("METRA", "Metra");
 
         tenantContext.setSelectedTenant(nyw);
-        tenantContext.setSelectedOrigin("EDGEWTR");
-        tenantContext.setSelectedProduct("ADULT_ONEWAY");
+        tenantContext.setSecondaryFilter("EDGEWTR");
 
         when(tenantService.getTenantByCode("METRA")).thenReturn(metra);
 
@@ -69,8 +68,7 @@ class TenantContextControllerTest {
             .andExpect(redirectedUrl("/fares"));
 
         assertSame(metra, tenantContext.getSelectedTenant());
-        assertNull(tenantContext.getSelectedOrigin());
-        assertNull(tenantContext.getSelectedProduct());
+        assertNull(tenantContext.getSecondaryFilter());
         verify(tenantService).getTenantByCode("METRA");
     }
 
@@ -78,8 +76,7 @@ class TenantContextControllerTest {
     void switchTenant_WithSameTenantCaseInsensitive_PreservesSecondaryFilters() throws Exception {
         Tenant nyw = createTenant("NYW_SANDBOX", "NY Waterway");
         tenantContext.setSelectedTenant(nyw);
-        tenantContext.setSelectedOrigin("EDGEWTR");
-        tenantContext.setSelectedProduct("ADULT_ONEWAY");
+        tenantContext.setSecondaryFilter("EDGEWTR");
 
         mockMvc.perform(post("/context/tenant")
                 .param("tenant", "nyw_sandbox")
@@ -88,8 +85,7 @@ class TenantContextControllerTest {
             .andExpect(redirectedUrl("/availability"));
 
         assertSame(nyw, tenantContext.getSelectedTenant());
-        assertEquals("EDGEWTR", tenantContext.getSelectedOrigin());
-        assertEquals("ADULT_ONEWAY", tenantContext.getSelectedProduct());
+        assertEquals("EDGEWTR", tenantContext.getSecondaryFilter());
         verify(tenantService, never()).getTenantByCode(anyString());
     }
 
@@ -99,15 +95,13 @@ class TenantContextControllerTest {
     void switchTenant_WithNullOrBlankTenant_ResetsEntireContext(String blankTenant) {
         Tenant nyw = createTenant("NYW_SANDBOX", "NY Waterway");
         tenantContext.setSelectedTenant(nyw);
-        tenantContext.setSelectedOrigin("EDGEWTR");
-        tenantContext.setSelectedProduct("ADULT_ONEWAY");
+        tenantContext.setSecondaryFilter("EDGEWTR");
 
         String view = controller.switchTenant(blankTenant, "/fares");
 
         assertEquals("redirect:/fares", view);
         assertNull(tenantContext.getSelectedTenant());
-        assertNull(tenantContext.getSelectedOrigin());
-        assertNull(tenantContext.getSelectedProduct());
+        assertNull(tenantContext.getSecondaryFilter());
         verify(tenantService, never()).getTenantByCode(anyString());
     }
 

@@ -109,4 +109,9 @@ public class Tenant implements Serializable {
     public int hashCode() {
         return Objects.hash(code);
     }
+
+    // Methods for thymeleaf
+    public boolean isOdMode() {
+        return gridMode == GridMode.OD;
+    }
 }

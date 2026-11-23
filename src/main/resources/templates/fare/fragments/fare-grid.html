@@ -10,35 +10,33 @@
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
       <div>
         <h6 class="mb-0 fw-bold text-dark">
-          <span th:text="${gridView.tenant.displayName}">Tenant</span> Rate Matrix
+          <span th:text="${tenantContext.selectedTenant.displayName}">Tenant</span> Rate Matrix
         </h6>
         <small class="text-muted">
-          <span th:text="${gridView.contextSelectorLabel}">Context</span>:
+          <span th:text="${tenantContext.selectedTenant.odMode ? 'Origin Terminal' : 'Ticket Product'}"></span>:
           <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1"
-            th:text="${gridView.selectedFilterValue}">FILTER_VALUE</span>
+            th:text="${tenantContext.secondaryFilter}"></span>
         </small>
       </div>
-      <span class="badge bg-secondary" th:text="${gridView.tenant.gridMode.name() + ' MODE'}">OD MODE</span>
+      <span class="badge bg-secondary" th:text="${tenantContext.selectedTenant.gridMode.name() + ' MODE'}"></span>
     </div>
 
     <!-- Table Scroll Container -->
     <div class="table-responsive">
       <table class="table table-bordered align-middle mb-0 text-center fare-matrix-table"
-        th:attr="data-tenant=${gridView.tenant.code},
-                 data-grid-mode=${gridView.tenant.gridMode.name()},
-                 data-filter-value=${gridView.selectedFilterValue}">
+        th:attr="data-tenant=${tenantContext.selectedTenant.code},
+                 data-grid-mode=${tenantContext.selectedTenant.gridMode.name()},
+                 data-filter-value=${tenantContext.secondaryFilter}">
         <thead class="table-light">
           <tr>
             <!-- Corner Axis Label -->
             <th class="text-secondary small text-uppercase text-start ps-3" style="min-width: 180px;"
               th:text="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD ? 'Outbound Destination' : 'Origin / Destination Zone'}">
-              Route / Zone
             </th>
 
             <!-- Column Headers (Products or Destination Zones) -->
             <th th:each="col : ${gridView.columnHeaders}" th:text="${col}" class="text-secondary small text-uppercase"
               style="min-width: 130px;">
-              Column Header
             </th>
           </tr>
         </thead>
@@ -48,14 +46,13 @@
             <!-- Row Title (Destination Name or Origin Zone) -->
             <th class="table-light text-secondary fw-semibold text-start ps-3"
               th:text="${gridView.rowHeaders[rowStat.index]}">
-              Row Header
             </th>
 
             <!-- Matrix Intersection Cells -->
             <td th:each="cell : ${row}" class="py-2 px-3 fare-cell-container"
               th:classappend="${cell.hasPendingDraft} ? 'cell-staged'"
               th:attr="data-row-key=${cell.rowKey}, data-col-key=${cell.colKey}, data-status=${cell.status},
-                data-inline-editable=${cell.editable and gridView.tenant.gridMode.name() == 'OD'},
+                data-inline-editable=${cell.editable and tenantContext.selectedTenant.odMode},
                 data-value=${cell.price}, data-original-price=${cell.price},
                 data-staged=${cell.hasPendingDraft}">
 
@@ -66,21 +63,13 @@
               </span>
 
               <!-- Active Rate -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).ACTIVE}"
+              <span th:if="${cell.active}"
                 class="fw-bold font-monospace text-dark fare-cell-value" th:text="${cell.formattedPrice}">
-                $0.00
               </span>
 
               <!-- Route Not Sold -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).NOT_SOLD}"
-                class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
-                NOT_SOLD
-              </span>
-
-              <!-- Unserved / Inactive Combination -->
-              <span th:if="${cell.status == T(ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus).NA}"
-                class="badge bg-light text-muted border px-2 py-1">
-                N/A
+              <span th:if="${!cell.active}"
+                class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">NOT_SOLD
               </span>
             </td>
           </tr>
