@@ -8,6 +8,11 @@ import java.util.Optional;
 
 public interface AvailabilityRuleRepository extends JpaRepository<AvailabilityRule, Long> {
     List<AvailabilityRule> findByTenantCodeAndSiteCode(String tenantCode, String siteCode);
+    List<AvailabilityRule> findByTenantCodeAndSiteCodeAndRouteCode(String tenantCode, String siteCode, String routeCode);
     Optional<AvailabilityRule> findByTenantCodeAndSiteCodeAndProductCode(String tenantCode, String siteCode, String productCode);
+    Optional<AvailabilityRule> findByTenantCodeAndSiteCodeAndRouteCodeAndProductCode(
+            String tenantCode, String siteCode, String routeCode, String productCode);
+    List<AvailabilityRule> findByTenantCodeAndProductCode(String tenantCode, String productCode);
     List<AvailabilityRule> findByTenantCode(String tenantCode);
+    List<AvailabilityRule> findByTenantCodeAndSyncedToCaracalFalse(String tenantCode);
 }
