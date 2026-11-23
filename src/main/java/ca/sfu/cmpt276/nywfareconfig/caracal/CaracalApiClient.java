@@ -11,4 +11,6 @@ public interface CaracalApiClient {
     // Catalog Discovery
     public List<CaracalCatalogDtos.TenantSummary> fetchTenants();
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode);
+    public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode);
+    public List<CaracalCatalogDtos.ProductSummary> fetchProducts(String tenantCode);
 }

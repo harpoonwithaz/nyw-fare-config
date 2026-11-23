@@ -46,7 +46,7 @@ public class TenantSwitcherAdvice {
             return tenantService.getAvailableTenants();
         } catch (CaracalApiException ex) {
             log.warn("Unable to load available tenants from Caracal API: {}", ex.getMessage(), ex);
-            model.addAttribute("caracalErrorMessage", ex.getMessage());
+            model.addAttribute("caracalTenantErrorMessage", ex.getMessage());
             return List.of();
         }
     }
