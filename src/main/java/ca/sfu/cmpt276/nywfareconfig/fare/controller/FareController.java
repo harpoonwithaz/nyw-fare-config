@@ -47,22 +47,38 @@ public class FareController {
             Model model) {
 
         Tenant currentTenant = tenantContext.getSelectedTenant();
+
         if (currentTenant != null) {
             model.addAttribute("gridMode", currentTenant.getGridMode());
+
             try {
                 model.addAttribute("secondaryFilters",
-                    fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
+                        fareService.getSecondaryFilterOptions(
+                                currentTenant.getCode(),
+                                currentTenant.getGridMode()));
             } catch (CaracalApiException ex) {
                 log.warn("Unable to load secondary filters from Caracal API: {}", ex.getMessage(), ex);
                 model.addAttribute("caracalSecondaryFilterErrorMessage", ex.getMessage());
                 return "fare/fare";
             }
-            
-            if (secondaryFilter != null && !secondaryFilter.isBlank()) {
+
+            // Update the selected secondary filter when supplied.
+            // An empty value clears the previously selected filter.
+            if (secondaryFilter != null) {
+                tenantContext.setSecondaryFilter(
+                        secondaryFilter.isBlank() ? null : secondaryFilter);
+            }
+
+            // Reuse the selected filter when the request does not specify one.
+            String activeFilter = tenantContext.getSecondaryFilter();
+
+            if (activeFilter != null && !activeFilter.isBlank()) {
                 try {
-                    tenantContext.setSecondaryFilter(secondaryFilter);
-    
-                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, secondaryFilter));
+                    // Populate the grid using real Caracal pricing data.
+                    model.addAttribute(
+                            "gridView",
+                            fareService.buildGrid(currentTenant, activeFilter));
+
                 } catch (CaracalApiException ex) {
                     log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
 
@@ -85,13 +101,18 @@ public class FareController {
             @Valid @RequestBody FareDraftBatchRequest batchRequest) {
 
         Tenant activeTenant = tenantContext.getSelectedTenant();
+
         if (activeTenant == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "No active tenant selected in session."));
         }
 
-        int savedCount = fareDraftService.stageChanges(activeTenant, batchRequest.getChanges());
-        long totalPendingCount = fareDraftService.countPendingDrafts(activeTenant.getCode());
+        int savedCount = fareDraftService.stageChanges(
+                activeTenant,
+                batchRequest.getChanges());
+
+        long totalPendingCount = fareDraftService.countPendingDrafts(
+                activeTenant.getCode());
 
         return ResponseEntity.ok(Map.of(
                 "savedCount", savedCount,
@@ -112,7 +133,8 @@ public class FareController {
                 .map(FieldError::getDefaultMessage)
                 .orElse("Invalid fare change payload.");
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", message));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", message));
     }
 
     /**
@@ -124,6 +146,8 @@ public class FareController {
     public ResponseEntity<?> handleIllegalArgumentException(
             IllegalArgumentException ex) {
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));
     }
 }
+
