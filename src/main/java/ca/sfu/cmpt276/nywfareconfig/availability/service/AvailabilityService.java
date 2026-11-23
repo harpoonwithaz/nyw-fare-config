@@ -8,7 +8,6 @@ import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepo
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
-import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +73,7 @@ public class AvailabilityService {
                                 s.kind() != null ? s.kind() : "TERMINAL"))
                         .toList();
             }
-        } catch (CaracalApiException | CaracalUnavailableException ex) {
+        } catch (CaracalApiException ex) {
             log.warn("Unable to load live sites from Caracal for tenant {}: {}", tenantCode, ex.getMessage());
         }
         return List.of();
@@ -147,7 +146,7 @@ public class AvailabilityService {
                         }
                     }
                 }
-            } catch (CaracalApiException | CaracalUnavailableException ex) {
+            } catch (CaracalApiException ex) {
                 log.warn("Caracal product-list unavailable for {}: {}", tenantCode, ex.getMessage());
             }
 
@@ -180,7 +179,7 @@ public class AvailabilityService {
                         }
                     }
                 }
-            } catch (CaracalApiException | CaracalUnavailableException ex) {
+            } catch (CaracalApiException ex) {
                 log.warn("Caracal rate-table lookup unavailable for {}/{}: {}", tenantCode, siteCode, ex.getMessage());
             }
 
@@ -208,7 +207,7 @@ public class AvailabilityService {
                         activeWhenConditions.put(code, sim.matchedCondition());
                     }
                 }
-            } catch (CaracalApiException | CaracalUnavailableException ex) {
+            } catch (CaracalApiException ex) {
                 log.warn("Caracal availability-simulate unavailable for {}/{}: {}", tenantCode, siteCode, ex.getMessage());
             }
         }
@@ -337,7 +336,6 @@ public class AvailabilityService {
                             "Only CLIENT_SERVICES administrators can reactivate permanently phased-out product: "
                                     + draft.getProductCode());
                 }
-                // Re-enable across tenant if CLIENT_SERVICES explicitly lifts phase-out
                 List<AvailabilityRule> phasedRows = availabilityRuleRepository
                         .findByTenantCodeAndProductCode(tenantCode, draft.getProductCode());
                 for (AvailabilityRule r : phasedRows) {
@@ -351,7 +349,6 @@ public class AvailabilityService {
             }
 
             if (Boolean.TRUE.equals(draft.getPhasedOut())) {
-                // Permanently phase out across all existing rules for this tenant + product
                 List<AvailabilityRule> existingForProduct = availabilityRuleRepository
                         .findByTenantCodeAndProductCode(tenantCode, draft.getProductCode());
                 for (AvailabilityRule r : existingForProduct) {
@@ -495,7 +492,7 @@ public class AvailabilityService {
                             });
                 }
             }
-        } catch (CaracalApiException | CaracalUnavailableException ex) {
+        } catch (CaracalApiException ex) {
             log.debug("Skipping live assignment metadata attachment for {}/{}: {}", tenantCode, siteCode, ex.getMessage());
         }
     }

@@ -27,6 +27,9 @@ public class CaracalCatalogDtos {
     // GET /functions/site-list?tenantCode=
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SiteSummary(String id, String siteCode, String name, String kind, String timezone) {
+        public SiteSummary(String siteCode, String name) {
+            this(null, siteCode, name, null, null);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

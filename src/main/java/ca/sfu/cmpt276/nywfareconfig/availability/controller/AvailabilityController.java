@@ -5,7 +5,6 @@ import ca.sfu.cmpt276.nywfareconfig.availability.dto.ProductAvailabilityView;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.service.AvailabilityService;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
-import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -128,7 +127,7 @@ public class AvailabilityController {
                 "status", "SUCCESS",
                 "message", "Synchronized " + synced + " availability rule(s) with Caracal platform."
             ));
-        } catch (CaracalApiException | CaracalUnavailableException ex) {
+        } catch (CaracalApiException ex) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
                 "status", "ERROR",
                 "message", "Failed to synchronize availability with platform: " + ex.getMessage()
