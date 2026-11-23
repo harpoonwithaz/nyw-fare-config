@@ -3,32 +3,47 @@
 <body>
 
 <div th:fragment="availabilityTable" class="table-responsive">
-    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable">
+    <table class="table table-bordered align-middle mb-0 text-center availability-table"
+           id="availabilityTable"
+           th:data-site="${siteCode}"
+           th:data-route="${routeCode}">
         <thead class="table-light">
             <tr>
                 <th scope="col" class="text-secondary small text-uppercase text-start ps-3"
-                    style="min-width: 180px;">
+                    style="min-width: 200px;">
                     Product Category
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 140px;">
                     Offering Status
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
-                    Disabled Days / Constraints
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 180px;">
+                    Temporal Window / Discount
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 140px;">
                     Staging Status
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 210px;">
                     Actions
                 </th>
             </tr>
         </thead>
         <tbody>
-            <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
+            <tr th:each="prod : ${availabilityView.ticketProducts}"
+                th:data-product="${prod}"
+                th:data-site="${siteCode}"
+                th:data-route="${routeCode}"
+                th:data-phased-out="${availabilityView.isProductPhasedOut(prod)}">
                 <td class="table-light text-secondary fw-semibold text-start ps-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <span th:text="${prod}">ADULT_ONEWAY</span>
+                    <div class="d-flex flex-column">
+                        <span class="text-dark" th:text="${prod}">ADULT_ONEWAY</span>
+                        <small class="text-muted fw-normal"
+                               th:if="${availabilityView.getProductDisplayName(prod) != prod}"
+                               th:text="${availabilityView.getProductDisplayName(prod)}">One Way - Adult</small>
+                        <small class="text-muted fw-normal" style="font-size: 0.7rem;"
+                               th:if="${availabilityView.getRateAssignmentId(prod) != null}"
+                               th:text="${'Assignment: ' + #strings.abbreviate(availabilityView.getRateAssignmentId(prod), 14)}">
+                            Assignment UUID
+                        </small>
                     </div>
                 </td>
 
@@ -39,10 +54,12 @@
                                role="switch"
                                th:id="${'toggle-' + prod}"
                                th:checked="${availabilityView.isProductAvailable(prod)}"
+                               th:disabled="${availabilityView.isProductPhasedOut(prod) and !isClientServices}"
                                th:data-product="${prod}">
-                        <label class="form-check-label fw-bold text-dark ms-2 status-label"
+                        <label class="form-check-label fw-bold ms-2 status-label"
+                               th:classappend="${availabilityView.isProductPhasedOut(prod)} ? 'text-danger' : 'text-dark'"
                                th:for="${'toggle-' + prod}"
-                               th:text="${availabilityView.isProductAvailable(prod) ? 'Available' : 'Unavailable'}">
+                               th:text="${availabilityView.isProductPhasedOut(prod) ? 'Phased Out' : (availabilityView.isProductAvailable(prod) ? 'Available' : 'Unavailable')}">
                             Available
                         </label>
                     </div>
@@ -51,7 +68,7 @@
                 <td class="py-2 px-3">
                     <div class="temporal-condition-badge-container d-flex justify-content-center align-items-center gap-2">
                         <span class="badge border px-2 py-1 condition-badge"
-                              th:classappend="${availabilityView.getConditionForProduct(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
+                              th:classappend="${availabilityView.getConditionForProduct(prod) != null or availabilityView.getActiveWhenCondition(prod) != null} ? 'bg-info-subtle text-info-emphasis border-info-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
                             <i class="bi bi-clock-history me-1"></i>
                             <span th:text="${availabilityView.getConditionSummary(prod)}">All Days Active</span>
                         </span>
@@ -59,19 +76,41 @@
                 </td>
 
                 <td class="py-2 px-3">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
+                    <span th:if="${availabilityView.isProductPhasedOut(prod)}"
+                          class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 staged-badge">
+                        <i class="bi bi-slash-circle-fill me-1"></i>PHASED OUT
+                    </span>
+                    <span th:if="${!availabilityView.isProductPhasedOut(prod) and availabilityView.isSavedInDb(prod)}"
+                          class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1 staged-badge">
+                        <i class="bi bi-database-check me-1"></i>SAVED IN DB
+                    </span>
+                    <span th:if="${!availabilityView.isProductPhasedOut(prod) and !availabilityView.isSavedInDb(prod)}"
+                          class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
                         <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
                     </span>
                 </td>
 
                 <td class="py-2 px-3">
-                    <button class="btn btn-sm btn-outline-secondary btn-configure-rule"
-                            th:data-product="${prod}"
-                            data-bs-toggle="modal"
-                            data-bs-target="#conditionBuilderModal"
-                            title="Configure Condition">
-                        <i class="bi bi-gear-fill me-1"></i> Configure
-                    </button>
+                    <div class="d-inline-flex gap-1">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary btn-configure-rule"
+                                th:data-product="${prod}"
+                                th:disabled="${availabilityView.isProductPhasedOut(prod) and !isClientServices}"
+                                data-bs-toggle="modal"
+                                data-bs-target="#conditionBuilderModal"
+                                title="Configure Temporal Condition or Discount">
+                            <i class="bi bi-gear-fill me-1"></i> Configure
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger btn-phase-out"
+                                th:data-product="${prod}"
+                                th:disabled="${availabilityView.isProductPhasedOut(prod)}"
+                                data-bs-toggle="modal"
+                                data-bs-target="#phaseOutConfirmModal"
+                                title="Permanently Phase Out Product">
+                            <i class="bi bi-slash-circle"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         </tbody>

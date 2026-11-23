@@ -13,7 +13,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 
-<body class="d-flex vh-100 overflow-hidden">
+<body class="d-flex vh-100 overflow-hidden"
+      th:data-client-services="${isClientServices}">
 
   <!-- Sidebar -->
   <div th:replace="~{fragments/sidebar :: sidebar-nav('availability')}"></div>
@@ -30,9 +31,8 @@
       <!-- Header Section -->
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 class="h4 fw-bold mb-1">Terminal Ticket Availability</h2>
-          <p class="text-muted small mb-0">Configure active ticket offerings and temporal sales conditions for terminal
-            sites.</p>
+          <h2 class="h4 fw-bold mb-1">Station &amp; Route Ticket Availability</h2>
+          <p class="text-muted small mb-0">Configure active ticket offerings, route availability, permanent phase-outs, and temporal sales conditions.</p>
         </div>
       </div>
 
@@ -52,23 +52,48 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
 
-      <!-- Context Selector Card (Filters Only) -->
+      <!-- Context Selector Card (Station Dropdown -> Nested Route Dropdown) -->
       <div class="card shadow-sm mb-3" th:if="${tenantContext.selectedTenant != null}">
         <div class="card-body p-3">
-          <form th:action="@{/availability}" method="get" class="row g-3 align-items-end">
-            <!-- Terminal Selector -->
-            <div class="col-md-3 col-sm-6">
+          <form id="stationRouteFilterForm" th:action="@{/availability}" method="get" class="row g-3 align-items-end">
+            <!-- Station / Terminal Selector (All Stations Sourced from Caracal API) -->
+            <div class="col-md-5 col-sm-6">
               <label for="siteSelect" class="form-label fw-semibold small text-uppercase text-secondary">
-                Terminal Site
+                <i class="bi bi-geo-alt-fill me-1"></i>Origin Station / Terminal
               </label>
               <div class="input-group input-group-sm">
-                <select id="siteSelect" name="site" class="form-select" onchange="this.form.submit()">
-                  <option th:each="t : ${terminals}" th:value="${t.code}" th:selected="${t.code == siteCode}"
-                    th:text="${t.name}">
-                    Terminal Name
+                <select id="siteSelect" name="site" class="form-select">
+                  <option th:each="t : ${terminals}"
+                          th:value="${t.code}"
+                          th:selected="${t.code == siteCode}"
+                          th:text="${t.name + ' (' + t.code + ')'}">
+                    Station Name
                   </option>
                 </select>
               </div>
+            </div>
+
+            <!-- Nested Route Selector within Selected Station -->
+            <div class="col-md-5 col-sm-6">
+              <label for="routeSelect" class="form-label fw-semibold small text-uppercase text-secondary">
+                <i class="bi bi-signpost-split-fill me-1"></i>Route / Destination
+              </label>
+              <div class="input-group input-group-sm">
+                <select id="routeSelect" name="route" class="form-select">
+                  <option th:each="r : ${routes}"
+                          th:value="${r.code}"
+                          th:selected="${r.code == routeCode}"
+                          th:text="${r.label}">
+                    All Routes
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="col-md-2 col-sm-12">
+              <span class="badge bg-light text-dark border w-100 py-2" th:if="${availabilityView != null}">
+                Table: <strong th:text="${availabilityView.rateTableName}">RT-MIDTOWN</strong>
+              </span>
             </div>
           </form>
         </div>
@@ -77,7 +102,7 @@
       <!-- Action Bar (Visible only when context is selected) -->
       <div class="card shadow border-bottom-0" th:if="${tenantContext.selectedTenant != null}">
 
-        <!-- Operational Controls & Save/Discard Actions -->
+        <!-- Operational Controls & Save/Discard/Sync Actions -->
         <div
           class="card-header bg-white border-bottom py-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
 
@@ -86,18 +111,21 @@
             <button type="button" id="btnOpenConditionModal" class="btn btn-outline-primary btn-sm"
               data-bs-toggle="modal" data-bs-target="#conditionBuilderModal">
               <i class="bi bi-calendar-plus me-1"></i>
-              <span>Add Temporal Condition</span>
+              <span>Add Temporal Condition / Discount</span>
             </button>
           </div>
 
           <!-- Edit State Actions -->
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex flex-wrap align-items-center gap-2">
             <button type="button" class="btn btn-outline-secondary btn-sm" disabled id="discardDraftsBtn">
               <i class="bi bi-arrow-counterclockwise me-1"></i> Discard Drafts
             </button>
             <button type="button" id="btnSaveAvailabilityDrafts" class="btn btn-success btn-sm" disabled>
               <i class="bi bi-check2-circle me-1"></i> Save Availability Drafts
               <span class="badge bg-light text-dark ms-1" id="changesCounter">0</span>
+            </button>
+            <button type="button" id="btnSyncCaracal" class="btn btn-primary btn-sm">
+              <i class="bi bi-cloud-upload me-1"></i> Sync to Caracal
             </button>
           </div>
 
@@ -113,9 +141,12 @@
               <i class="bi bi-card-checklist me-2"></i>Product Availability Rules
             </h6>
             <small class="text-muted">
-              Terminal site:
+              Station:
               <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1"
                 th:text="${siteCode}">MIDTOWN</span>
+              &nbsp;|&nbsp; Route:
+              <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1"
+                th:text="${routeCode}">ALL</span>
             </small>
           </div>
           <span class="badge bg-secondary">AVAILABILITY MODE</span>
@@ -125,9 +156,43 @@
     </main>
   </div>
 
-  <!-- Modal Include -->
+  <!-- Temporal Condition Modal Include -->
   <div th:if="${tenantContext.selectedTenant != null}"
     th:replace="~{availability/fragments/group-edit-modal :: conditionBuilderModal}"></div>
+
+  <!-- Permanent Phase-Out Confirmation Modal (Story 3.2) -->
+  <div th:if="${tenantContext.selectedTenant != null}"
+       class="modal fade"
+       id="phaseOutConfirmModal"
+       tabindex="-1"
+       aria-labelledby="phaseOutConfirmModalLabel"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger-subtle">
+          <h5 class="modal-title fw-bold text-danger-emphasis" id="phaseOutConfirmModalLabel">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Permanent Product Phase-Out
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="phaseOutProductCode">
+          <p class="mb-2">
+            You are about to permanently phase out <strong id="phaseOutProductLabel">SENIOR_ONEWAY</strong> across all regional terminals.
+          </p>
+          <p class="small text-muted mb-0">
+            This sets the offering to <code>NOT_SOLD</code> across all terminals and blocks standard operators from re-enabling it without <code>CLIENT_SERVICES</code> clearance.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="btnConfirmPhaseOut" class="btn btn-danger">
+            <i class="bi bi-slash-circle me-1"></i>Confirm Permanent Phase-Out
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script th:src="@{/js/availability.js}"></script>

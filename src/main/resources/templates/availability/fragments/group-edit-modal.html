@@ -4,9 +4,9 @@
 
 <div th:fragment="conditionBuilderModal"
      class="modal fade"
-     id="conditionBuilderModal" 
-     tabindex="-1" 
-     aria-labelledby="conditionBuilderModalLabel" 
+     id="conditionBuilderModal"
+     tabindex="-1"
+     aria-labelledby="conditionBuilderModalLabel"
      aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -15,10 +15,10 @@
                 <div>
                     <h5 class="modal-title fw-bold" id="conditionBuilderModalLabel">
                         <i class="bi bi-clock-history me-2"></i>
-                        Temporal Condition &amp; Rule Builder
+                        Temporal Sales &amp; Discount Rule Builder
                     </h5>
                     <p class="text-muted small mb-0 mt-1">
-                        Configure when this product should be available for sale.
+                        Configure recurring (weekly/monthly) or one-time (holiday/senior) windows with Start/End dates and hours.
                     </p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -30,33 +30,46 @@
                     <!-- Hidden Target Fields -->
                     <input type="hidden" id="modalProductCode" name="productCode" value="ADULT_ONEWAY">
                     <input type="hidden" id="modalSiteCode" name="siteCode" th:value="${siteCode}">
+                    <input type="hidden" id="modalRouteCode" name="routeCode" th:value="${routeCode}">
 
                     <!-- Selected Target Badge -->
                     <div class="mb-4 p-3 bg-light rounded border d-flex align-items-center justify-content-between gap-3">
                         <div>
                             <span class="text-muted small d-block">Target Configuration</span>
-                            <strong class="text-dark fs-6" id="modalTargetLabel">Product: ADULT | Site: MIDTOWN</strong>
+                            <strong class="text-dark fs-6" id="modalTargetLabel">Product: ADULT_ONEWAY | Site: MIDTOWN | Route: ALL</strong>
                         </div>
                         <span class="badge bg-light text-dark border">Epic 3 Rule Engine</span>
                     </div>
 
+                    <!-- Optional Rule / Discount Name -->
+                    <div class="mb-3">
+                        <label for="inputDiscountLabel" class="form-label fw-bold">Rule / Discount Label (Optional)</label>
+                        <input type="text" class="form-control" id="inputDiscountLabel"
+                               placeholder="e.g. Weekday Commuter, Holiday Promo, Senior Off-Peak Discount">
+                    </div>
+
                     <!-- Condition Type Selector -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Condition Type</label>
+                        <label class="form-label fw-bold">Schedule / Discount Type</label>
                         <div class="btn-group w-100" role="group" aria-label="Condition Type Selector">
                             <input type="radio" class="btn-check" name="conditionType" id="typeRecurring" value="RECURRING_WEEKLY" checked>
                             <label class="btn btn-outline-primary" for="typeRecurring">
-                                <i class="bi bi-arrow-repeat me-1"></i>Recurring Weekly Window
+                                <i class="bi bi-arrow-repeat me-1"></i>Recurring Weekly
+                            </label>
+
+                            <input type="radio" class="btn-check" name="conditionType" id="typeMonthly" value="RECURRING_MONTHLY">
+                            <label class="btn btn-outline-primary" for="typeMonthly">
+                                <i class="bi bi-calendar3 me-1"></i>Recurring Monthly
                             </label>
 
                             <input type="radio" class="btn-check" name="conditionType" id="typePromo" value="TEMPORARY_PROMO">
                             <label class="btn btn-outline-primary" for="typePromo">
-                                <i class="bi bi-calendar-range me-1"></i>Temporary Date-Range Promo
+                                <i class="bi bi-calendar-range me-1"></i>One-Time / Holiday Discount
                             </label>
                         </div>
                     </div>
 
-                    <!-- Section 1: Days of Week Multi-select (Recurring) -->
+                    <!-- Section 1: Days of Week Multi-select (Recurring Weekly) -->
                     <div id="sectionDaysOfWeek" class="mb-4">
                         <label class="form-label fw-bold">Active Days of Week</label>
                         <div class="d-flex flex-wrap gap-2">
@@ -84,27 +97,39 @@
                         <div class="form-text">Uncheck days on which this ticket offering should be automatically disabled.</div>
                     </div>
 
-                    <!-- Section 2: Time Range Inputs (Recurring) -->
-                    <div id="sectionTimeRange" class="row g-3 mb-4">
+                    <!-- Section 1B: Day of Month Range (Recurring Monthly) -->
+                    <div id="sectionDayOfMonth" class="row g-3 mb-4 d-none">
                         <div class="col-md-6">
-                            <label for="inputStartTime" class="form-label fw-bold">Daily Start Time</label>
-                            <input type="time" class="form-control" id="inputStartTime" value="06:00">
+                            <label for="inputDayOfMonthStart" class="form-label fw-bold">Start Day of Month (1–31)</label>
+                            <input type="number" class="form-control" id="inputDayOfMonthStart" min="1" max="31" value="20">
                         </div>
                         <div class="col-md-6">
-                            <label for="inputEndTime" class="form-label fw-bold">Daily End Time</label>
-                            <input type="time" class="form-control" id="inputEndTime" value="22:00">
+                            <label for="inputDayOfMonthEnd" class="form-label fw-bold">End Day of Month (1–31)</label>
+                            <input type="number" class="form-control" id="inputDayOfMonthEnd" min="1" max="31" value="15">
                         </div>
                     </div>
 
-                    <!-- Section 3: Date Range Inputs (Temporary Promo) -->
-                    <div id="sectionDateRange" class="row g-3 mb-4 d-none">
+                    <!-- Section 2: Effective Start & End Dates (Applies to BOTH Recurring & One-Time Discounts) -->
+                    <div id="sectionDateRange" class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label for="inputStartDate" class="form-label fw-bold">Effective Start Date</label>
+                            <label for="inputStartDate" class="form-label fw-bold">Start Date</label>
                             <input type="date" class="form-control" id="inputStartDate">
                         </div>
                         <div class="col-md-6">
-                            <label for="inputEndDate" class="form-label fw-bold">Effective End Date</label>
+                            <label for="inputEndDate" class="form-label fw-bold">End Date</label>
                             <input type="date" class="form-control" id="inputEndDate">
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Start & End Hours (Applies to BOTH Recurring & One-Time Discounts) -->
+                    <div id="sectionTimeRange" class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="inputStartTime" class="form-label fw-bold">Start Hour</label>
+                            <input type="time" class="form-control" id="inputStartTime" value="06:00">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="inputEndTime" class="form-label fw-bold">End Hour</label>
+                            <input type="time" class="form-control" id="inputEndTime" value="22:00">
                         </div>
                     </div>
                 </form>
