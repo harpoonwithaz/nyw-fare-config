@@ -65,9 +65,7 @@ public class FareController {
             String activeFilter = tenantContext.getSecondaryFilter();
             if (activeFilter != null && !activeFilter.isBlank()) {
                 try {
-                    tenantContext.setSecondaryFilter(secondaryFilter);
-
-                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, secondaryFilter));
+                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, activeFilter));
                 } catch (CaracalApiException ex) {
                     log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
 

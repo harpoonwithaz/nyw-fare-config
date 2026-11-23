@@ -13,18 +13,6 @@ public class CaracalSimulationDtos {
             Map<String, String> dimensions) {
     }
 
-    // {
-    // "dryRun": true,
-    // "pricing": {
-    // "resolvedAssignmentId": "e460546c-090d-4e24-aaf5-ab2f6db906ea",
-    // "priceRuleSetName": "OD-ADULT_ONEWAY",
-    // "matchedPriceRuleId": "c7f18988-dc95-4440-a110-0b188174bfb5",
-    // "durationMinutes": 0,
-    // "base": 13.25,
-    // "adjustments": [],
-    // "total": 13.25
-    // }
-    // }
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record PricingDetail(String priceRuleSetName, BigDecimal base, BigDecimal total) {
     }
