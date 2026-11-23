@@ -1,8 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -25,15 +27,10 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         this.actorService = actorService;
     }
 
-    // TODO: Remove the X-Actor: system header from each api request except
-    // fetchTenants()
-
     // ==============================================================================
     // Catalog Discovery
     // ==============================================================================
 
-    // Queries GET /functions/tenant-list using X-Actor: system
-    // to discover active platform tenants.
     @Override
     public List<CaracalCatalogDtos.TenantSummary> fetchTenants() {
         CaracalCatalogDtos.TenantList response = get(
@@ -48,9 +45,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response.tenants();
     }
 
-    // Queries GET /functions/tenant-get?tenantCode={tenantCode} using X-Actor:
-    // operator:<email>
-    // to discover specific tenant details.
     @Override
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
@@ -70,8 +64,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response;
     }
 
-    // Queries GET /functions/site-list to populate O-D terminals and Zonal station
-    // directories.
     @Override
     public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
@@ -80,13 +72,13 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
         CaracalCatalogDtos.SiteList response = get(
                 "/site-list?tenantCode={tenantCode}",
-                true,
+                false,
                 CaracalCatalogDtos.SiteList.class,
                 "loading site list for tenant " + tenantCode,
                 tenantCode);
 
-        if (response == null) {
-            throw new CaracalApiException("Caracal returned an empty response for tenant " + tenantCode + ".");
+        if (response == null || response.sites() == null) {
+            return List.of();
         }
         return response.sites();
     }
@@ -99,15 +91,137 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
         CaracalCatalogDtos.ProductList response = get(
                 "/product-list?tenantCode={tenantCode}",
-                true,
+                false,
                 CaracalCatalogDtos.ProductList.class,
                 "loading product list for tenant " + tenantCode,
                 tenantCode);
 
-        if (response == null) {
-            throw new CaracalApiException("Caracal returned an empty response for tenant " + tenantCode + ".");
+        if (response == null || response.products() == null) {
+            return List.of();
         }
         return response.products();
+    }
+
+    // ==============================================================================
+    // Epic 3: Rate Tables & Availability Simulation
+    // ==============================================================================
+
+    @Override
+    public List<CaracalCatalogDtos.RateTableSummary> fetchRateTables(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        CaracalCatalogDtos.RateTableListResponse response = post(
+                "/rate-table-list",
+                new CaracalCatalogDtos.RateTableListRequest(tenantCode, null, 100),
+                false,
+                null,
+                CaracalCatalogDtos.RateTableListResponse.class,
+                "loading rate tables for tenant " + tenantCode);
+
+        if (response == null || response.items() == null) {
+            return List.of();
+        }
+        return response.items();
+    }
+
+    @Override
+    public CaracalCatalogDtos.RateTableGetResponse fetchRateTable(String tenantCode, String rateTableName) {
+        if (tenantCode == null || tenantCode.isBlank() || rateTableName == null || rateTableName.isBlank()) {
+            throw new IllegalArgumentException("Tenant code and rate table name must not be blank.");
+        }
+
+        return post(
+                "/rate-table-get",
+                new CaracalCatalogDtos.RateTableGetRequest(tenantCode, rateTableName),
+                false,
+                null,
+                CaracalCatalogDtos.RateTableGetResponse.class,
+                "loading rate table " + rateTableName);
+    }
+
+    @Override
+    public List<CaracalCatalogDtos.SimulatedProductAvailability> simulateAvailability(
+            String tenantCode,
+            String siteCode,
+            Map<String, String> dimensions) {
+        if (tenantCode == null || tenantCode.isBlank() || siteCode == null || siteCode.isBlank()) {
+            throw new IllegalArgumentException("Tenant code and site code must not be blank.");
+        }
+
+        CaracalCatalogDtos.AvailabilitySimulateRequest request = new CaracalCatalogDtos.AvailabilitySimulateRequest(
+                tenantCode,
+                siteCode,
+                null,
+                null,
+                null,
+                dimensions);
+
+        CaracalCatalogDtos.AvailabilitySimulateResponse response = post(
+                "/availability-simulate",
+                request,
+                false,
+                null,
+                CaracalCatalogDtos.AvailabilitySimulateResponse.class,
+                "simulating availability for site " + siteCode);
+
+        if (response == null || response.products() == null) {
+            return List.of();
+        }
+        return response.products();
+    }
+
+    // ==============================================================================
+    // Epic 3: Authoring Sync Mutations (Story 3.4)
+    // ==============================================================================
+
+    @Override
+    public String updateRateAssignment(
+            CaracalCatalogDtos.RateAssignmentUpdateRequest request,
+            String actorEmail) {
+        CaracalCatalogDtos.CaracalIdResponse response = post(
+                "/rate-assignment-update",
+                request,
+                false,
+                actorEmail,
+                CaracalCatalogDtos.CaracalIdResponse.class,
+                "updating rate assignment " + request.assignmentId());
+
+        return response != null ? response.id() : request.assignmentId();
+    }
+
+    @Override
+    public String createWhenCondition(
+            CaracalCatalogDtos.WhenConditionCreateRequest request,
+            String actorEmail) {
+        CaracalCatalogDtos.CaracalIdResponse response = post(
+                "/when-condition-create",
+                request,
+                false,
+                actorEmail,
+                CaracalCatalogDtos.CaracalIdResponse.class,
+                "creating when-condition " + request.name());
+
+        if (response == null || response.id() == null) {
+            throw new CaracalApiException("Caracal did not return an ID for when-condition " + request.name());
+        }
+        return response.id();
+    }
+
+    @Override
+    public String createRateAssignment(
+            CaracalCatalogDtos.RateAssignmentCreateRequest request,
+            String actorEmail) {
+        CaracalCatalogDtos.CaracalIdResponse response = post(
+                "/rate-assignment-create",
+                request,
+                false,
+                actorEmail,
+                CaracalCatalogDtos.CaracalIdResponse.class,
+                "creating rate assignment for product " + request.productCode());
+
+        return response != null ? response.id() : null;
     }
 
     // ==============================================================================
@@ -124,11 +238,34 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return execute(actionDescription, () -> caracalRestClient
                 .get()
                 .uri(uri, uriVars)
-                // If using CaracalActorInterceptor, pass the flag as an attribute;
-                // otherwise set .header("X-Actor", ...) directly here.
                 .attribute("useSystemActor", useSystemActor)
                 .retrieve()
                 .body(responseType));
+    }
+
+    private <T> T post(
+            String uri,
+            Object body,
+            boolean useSystemActor,
+            String explicitActor,
+            Class<T> responseType,
+            String actionDescription) {
+
+        return execute(actionDescription, () -> {
+            RestClient.RequestBodySpec spec = caracalRestClient
+                    .post()
+                    .uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .attribute("useSystemActor", useSystemActor);
+
+            if (explicitActor != null && !explicitActor.isBlank()) {
+                spec.attribute("explicitActor", explicitActor);
+            }
+
+            return spec.body(body)
+                    .retrieve()
+                    .body(responseType);
+        });
     }
 
     private <T> T execute(String actionDescription, Supplier<T> request) {
@@ -145,5 +282,4 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                     "Received an invalid response format from Caracal while " + actionDescription + ".", ex);
         }
     }
-
 }
