@@ -144,7 +144,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 if (response == null || response.pricing() == null) {
                     throw new CaracalApiException("Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
-                return new CaracalSimulationDtos.PriceSimulationResult(response, "");
+                return new CaracalSimulationDtos.PriceSimulationResult(response, null);
             } catch (RestClientResponseException ex) {
                 if (isBusiness4xx(ex)) {
                     String errorMessage = extractErrorMessage(ex);

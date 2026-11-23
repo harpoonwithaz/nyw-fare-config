@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 public class CaracalSimulationDtos {
 
-    // GET /functions/price-simulate request body
+    // POST /functions/price-simulate request body
     // TODO: add String at for when implemnting prices at certain times
     public record PriceSimulateRequest(String tenantCode, String productCode, String siteCode,
             Map<String, String> dimensions) {
@@ -21,11 +21,9 @@ public class CaracalSimulationDtos {
     public record PriceSimulateResponse(PricingDetail pricing) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record CaracalErrorResponse(String error) {}
 
     public record PriceSimulationResult(PriceSimulateResponse response, String errorMessage) {
-        public boolean isSuccess() {
-            return response != null && response.pricing() != null;
-        }
     }
 }

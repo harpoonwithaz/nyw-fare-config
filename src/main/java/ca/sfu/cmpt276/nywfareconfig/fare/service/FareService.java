@@ -3,7 +3,6 @@ package ca.sfu.cmpt276.nywfareconfig.fare.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -132,7 +131,8 @@ public class FareService {
      * - Columns: Ticket Products
      */
     private FareGrid buildOdGrid(Tenant tenant, String originSiteCode) {
-        List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed(); // follow conventions of the NYW spreadsheet
+        List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed(); // follow conventions of the NYW
+                                                                                     // spreadsheet
         List<CatalogOption> outboundDestinations = getOutboundDestinations(tenant.getCode(), originSiteCode);
         Map<String, FareRule> ruleMap = indexRulesByCoordinates(
                 getOdFareRules(tenant.getCode(), originSiteCode, outboundDestinations, colHeaders));
@@ -226,6 +226,11 @@ public class FareService {
             String originSiteCode,
             List<CatalogOption> destinations,
             List<CatalogOption> products) {
+        if (tenantCode == null || tenantCode.isBlank() ||
+                originSiteCode == null || originSiteCode.isBlank()) {
+            return List.of();
+        }
+
         List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
         applyPendingDraftsToRules(tenantCode.toUpperCase(), rules);
         return rules;
@@ -408,7 +413,7 @@ public class FareService {
         }
 
         CaracalSimulationDtos.PricingDetail fare = simulatedPrice.response().pricing();
-        BigDecimal total = fare.total() != null ? fare.total() : null;
+        BigDecimal total = fare.total() != null ? fare.total().setScale(2, RoundingMode.HALF_UP) : null;
 
         return Optional.of(FareRule.od(
                 tenantCode,
