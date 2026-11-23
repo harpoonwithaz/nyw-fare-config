@@ -219,7 +219,7 @@ public class FareService {
      */
     private FareCell toFareCell(FareRule rule, String rowKey, String colKey) {
         if (rule == null || rule.getStatus() == null || rule.getStatus() == FareStatus.NA) {
-            return new FareCell(rule.getPrice(), FareStatus.NA, false, rowKey, colKey); // can be null if its not sold
+            return new FareCell(null, FareStatus.NA, false, rowKey, colKey); // can be null if its not sold
         }
         if (rule.getStatus() == FareStatus.NOT_SOLD || rule.getPrice() == null) {
             return new FareCell(rule.getPrice(), rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
