@@ -103,7 +103,7 @@
         </div>
       </th:block>
 
-      <th:block th:if="caracalSecondaryFilterErrorMessage == null">
+      <th:block th:if="${caracalSecondaryFilterErrorMessage == null}">
 
         <th:block
           th:if="${tenantContext.selectedTenant != null and tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD and tenantContext.selectedOrigin == null}">
