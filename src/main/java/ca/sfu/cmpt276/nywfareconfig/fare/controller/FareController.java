@@ -1,6 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
+import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareDraftBatchRequest;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
@@ -31,6 +36,7 @@ public class FareController {
     private final TenantContext tenantContext;
     private final FareService fareService;
     private final FareDraftService fareDraftService;
+    private static final Logger log = LoggerFactory.getLogger(FareController.class);
 
     public FareController(TenantContext tenantContext, FareService fareService, FareDraftService fareDraftService) {
         this.tenantContext = tenantContext;
@@ -40,30 +46,28 @@ public class FareController {
 
     @GetMapping
     public String getFares(
-            @RequestParam(required = false) String origin,
-            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String secondaryFilter,
             Model model) {
 
         Tenant currentTenant = tenantContext.getSelectedTenant();
         if (currentTenant != null) {
-            if (currentTenant.getGridMode() == GridMode.OD) {
-                if (origin != null && !origin.isBlank()) {
-                    tenantContext.setSelectedOrigin(origin);
-                }
-            } else if (currentTenant.getGridMode() == GridMode.ZONAL) {
-                if (product != null && !product.isBlank()) {
-                    tenantContext.setSelectedProduct(product);
-                }
+            model.addAttribute("gridMode", currentTenant.getGridMode());
+            try {
+                model.addAttribute("secondaryFilters",
+                        fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
+            } catch (CaracalApiException ex) {
+                log.warn("Unable to load secondary filters from Caracal API: {}", ex.getMessage(), ex);
+                model.addAttribute("caracalSecondaryFilterErrorMessage", ex.getMessage());
+                return "fare/fare";
             }
 
-            // Populate gridView only when both tenant and secondary filter are selected
-            String activeFilter = (currentTenant.getGridMode() == GridMode.OD)
-                    ? tenantContext.getSelectedOrigin()
-                    : tenantContext.getSelectedProduct();
+            if (secondaryFilter != null) {
+                tenantContext.setSecondaryFilter(secondaryFilter.isBlank() ? null : secondaryFilter);
+            }
 
+            String activeFilter = tenantContext.getSecondaryFilter();
             if (activeFilter != null && !activeFilter.isBlank()) {
-                FareGrid gridView = fareService.buildMockGrid(currentTenant, activeFilter);
-                model.addAttribute("gridView", gridView);
+                model.addAttribute("gridView", fareService.buildMockGrid(currentTenant, activeFilter));
             }
         }
 

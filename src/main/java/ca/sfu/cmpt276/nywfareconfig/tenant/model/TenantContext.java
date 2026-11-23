@@ -3,6 +3,8 @@ package ca.sfu.cmpt276.nywfareconfig.tenant.model;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+
 import java.io.Serializable;
 
 // Stores the currently selected tenant and selection state in the user's session.
@@ -13,16 +15,14 @@ public class TenantContext implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Tenant selectedTenant;
-    private String selectedOrigin;
-    private String selectedProduct;
+    private String secondaryFilter;
 
     public TenantContext() {
     }
 
-    public TenantContext(Tenant selectedTenant, String selectedOrigin, String selectedProduct) {
+    public TenantContext(Tenant selectedTenant, String secondaryFilter) {
         this.selectedTenant = selectedTenant;
-        this.selectedOrigin = selectedOrigin;
-        this.selectedProduct = selectedProduct;
+        this.secondaryFilter = secondaryFilter;
     }
 
     public Tenant getSelectedTenant() {
@@ -33,23 +33,12 @@ public class TenantContext implements Serializable {
         this.selectedTenant = selectedTenant;
     }
 
-    public String getSelectedOrigin() {
-        return selectedOrigin;
+    public String getSecondaryFilter() {
+        return secondaryFilter;
     }
 
-    public void setSelectedOrigin(String selectedOrigin) {
-        this.selectedOrigin = selectedOrigin;
+    public void setSecondaryFilter(String secondaryFilter) {
+        this.secondaryFilter = secondaryFilter;
     }
 
-    public String getSelectedProduct() {
-        return selectedProduct;
-    }
-
-    public void setSelectedProduct(String selectedProduct) {
-        this.selectedProduct = selectedProduct;
-    }
-
-    public boolean isSecondarySelected() {
-        return selectedOrigin != null || selectedProduct != null;
-    }
 }
