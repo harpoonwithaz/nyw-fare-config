@@ -61,7 +61,7 @@
                   th:if="${caracalSecondaryFilterErrorMessage == null}"
                   id="originSelect" name="secondaryFilter" class="form-select" onchange="this.form.submit()">
                   <option value="" th:selected="${tenantContext.secondaryFilter == null}"
-                    th:text="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD ? 'Select Terminal' : 'Selected a Ticket'}"></option>
+                    th:text="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD ? 'Select Terminal' : 'Select Ticket'}"></option>
                   <option th:each="filter : ${secondaryFilters}" th:value="${filter.code}"
                     th:text="${filter.displayName}"
                     th:selected="${tenantContext.secondaryFilter != null and tenantContext.secondaryFilter == filter.code}">
