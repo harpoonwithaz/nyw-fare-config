@@ -115,7 +115,8 @@ public class FareService {
      */
 
     public FareGrid buildGrid(Tenant tenant, String filterValue) {
-        if (tenant == null || filterValue == null || filterValue.isBlank()) {
+        if (tenant == null || tenant.getCode() == null || tenant.getCode().isBlank()
+                || filterValue == null || filterValue.isBlank()) {
             return null;
         }
 
@@ -216,6 +217,11 @@ public class FareService {
      * Returns O-D FareRule entities overlaid with any PENDING drafts in PostgreSQL.
      */
     public List<FareRule> getOdFareRules(String tenantCode, String originSiteCode) {
+        if (tenantCode == null || tenantCode.isBlank()
+                || originSiteCode == null || originSiteCode.isBlank()) {
+            return List.of();
+        }
+
         List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
         List<CatalogOption> products = getOdProducts(tenantCode);
         return getOdFareRules(tenantCode, originSiteCode, destinations, products);
@@ -226,11 +232,6 @@ public class FareService {
             String originSiteCode,
             List<CatalogOption> destinations,
             List<CatalogOption> products) {
-        if (tenantCode == null || tenantCode.isBlank() ||
-                originSiteCode == null || originSiteCode.isBlank()) {
-            return List.of();
-        }
-
         List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
         applyPendingDraftsToRules(tenantCode.toUpperCase(), rules);
         return rules;
@@ -241,6 +242,11 @@ public class FareService {
      * drafts).
      */
     public List<FareRule> getBaselineOdFareRules(String tenantCode, String originSiteCode) {
+        if (tenantCode == null || tenantCode.isBlank()
+                || originSiteCode == null || originSiteCode.isBlank()) {
+            return List.of();
+        }
+        
         List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
         List<CatalogOption> products = getOdProducts(tenantCode);
         return getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);

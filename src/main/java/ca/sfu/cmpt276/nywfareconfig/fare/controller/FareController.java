@@ -93,12 +93,18 @@ public class FareController {
                     "error", "No active tenant selected in session."));
         }
 
-        int savedCount = fareDraftService.stageChanges(activeTenant, batchRequest.getChanges());
-        long totalPendingCount = fareDraftService.countPendingDrafts(activeTenant.getCode());
+        try {
+            int savedCount = fareDraftService.stageChanges(activeTenant, batchRequest.getChanges());
+            long totalPendingCount = fareDraftService.countPendingDrafts(activeTenant.getCode());
 
-        return ResponseEntity.ok(Map.of(
-                "savedCount", savedCount,
-                "totalPendingCount", totalPendingCount));
+            return ResponseEntity.ok(Map.of(
+                    "savedCount", savedCount,
+                    "totalPendingCount", totalPendingCount));
+        } catch (CaracalApiException ex) {
+            log.warn("Unable to validate baseline fare against Caracal API: {}", ex.getMessage(), ex);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", ex.getMessage()));
+        }
     }
 
     /**

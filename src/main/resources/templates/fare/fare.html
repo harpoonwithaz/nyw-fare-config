@@ -124,13 +124,13 @@
 
       <!-- Render Matrix Table Fragment When Context is Fully Resolved -->
       <div th:if="${gridView != null}">
-        <th:block th:if="${gridView.rows.isEmpty()}">
+        <th:block th:if="${#lists.isEmpty(gridView.rows)}">
           <div th:if="${tenantContext.selectedTenant.odMode}"
             th:replace="~{fragments/feedback-card :: feedback-card('Origin Terminal: No active outbound routes configured for this terminal.', 'warning')}">
           </div>
         </th:block>
 
-        <th:block th:if="${!gridView.rows.isEmpty()}">
+        <th:block th:if="${!#lists.isEmpty(gridView.rows)}">
 
           <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
           <div class="card shadow border-bottom-0"
