@@ -54,17 +54,20 @@ public class FareController {
             model.addAttribute("gridMode", currentTenant.getGridMode());
             try {
                 model.addAttribute("secondaryFilters",
-                    fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
+                        fareService.getSecondaryFilterOptions(currentTenant.getCode(), currentTenant.getGridMode()));
             } catch (CaracalApiException ex) {
                 log.warn("Unable to load secondary filters from Caracal API: {}", ex.getMessage(), ex);
                 model.addAttribute("caracalSecondaryFilterErrorMessage", ex.getMessage());
                 return "fare/fare";
             }
 
-            if (secondaryFilter != null && !secondaryFilter.isBlank()) {
-                tenantContext.setSecondaryFilter(secondaryFilter);
+            if (secondaryFilter != null) {
+                tenantContext.setSecondaryFilter(secondaryFilter.isBlank() ? null : secondaryFilter);
+            }
 
-                model.addAttribute("gridView", fareService.buildMockGrid(currentTenant, secondaryFilter));
+            String activeFilter = tenantContext.getSecondaryFilter();
+            if (activeFilter != null && !activeFilter.isBlank()) {
+                model.addAttribute("gridView", fareService.buildMockGrid(currentTenant, activeFilter));
             }
         }
 
