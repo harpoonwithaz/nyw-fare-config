@@ -166,6 +166,12 @@ public class AlertService {
             return errors;
         }
 
+        // Blank labels fall back to the defaults so the popup never shows an empty button
+        confirmEn = confirmEn == null ? AlertLimits.DEFAULT_CONFIRM_EN : confirmEn;
+        confirmEs = confirmEs == null ? AlertLimits.DEFAULT_CONFIRM_ES : confirmEs;
+        dismissEn = dismissEn == null ? AlertLimits.DEFAULT_DISMISS_EN : dismissEn;
+        dismissEs = dismissEs == null ? AlertLimits.DEFAULT_DISMISS_ES : dismissEs;
+
         ServiceAlert target;
         if (existing == null) {
             target = new ServiceAlert(tenantCode);

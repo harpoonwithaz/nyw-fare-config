@@ -21,6 +21,7 @@ import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertLimits;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertService;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
 @Controller
@@ -158,15 +159,30 @@ public class AlertController {
 
     private String showForm(Model model, String tenantCode, ServiceAlert alert, AlertForm form,
             List<String> errors) {
+        // Sites and tickets come live from the Caracal catalog; an empty site list means it couldn't be reached
         Map<String, ?> routeOptions = alertService.routeOptionsByTerminal(tenantCode);
         model.addAttribute("alert", alert);
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("routeOptions", routeOptions);
+        model.addAttribute("catalogMissing", routeOptions.isEmpty());
+        model.addAttribute("productOptions", alertService.productOptions(tenantCode));
+        model.addAttribute("spanishEnabled", supportsSpanish());
         model.addAttribute("triggerTypes", TriggerType.values());
         model.addAttribute("messageMax", AlertLimits.MESSAGE_MAX_LENGTH);
         model.addAttribute("labelMax", AlertLimits.LABEL_MAX_LENGTH);
         return "alerts/form";
+    }
+
+    // Spanish fields show only when the tenant lists a Spanish locale (es, es-US, ...).
+    // A tenant with no locales configured keeps both languages, like before.
+    private boolean supportsSpanish() {
+        Tenant tenant = tenantContext.getSelectedTenant();
+        List<String> locales = tenant == null ? null : tenant.getSupportedLocales();
+        if (locales == null || locales.isEmpty()) {
+            return true;
+        }
+        return locales.stream().anyMatch(locale -> locale != null && locale.toLowerCase().startsWith("es"));
     }
 
     private String tenantCode() {

@@ -29,10 +29,15 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.ProductOption;
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.SiteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.ServiceAlertRepository;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertService;
+import ca.sfu.cmpt276.nywfareconfig.alert.service.CatalogLookup;
+import ca.sfu.cmpt276.nywfareconfig.alert.service.CatalogUnavailableException;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
 import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
@@ -75,6 +80,10 @@ class AlertControllerTests {
     @MockitoBean
     private TenantService tenantService;
 
+    // Stands in for the live Caracal site-list and product-list
+    @MockitoBean
+    private CatalogLookup catalog;
+
     private MockHttpSession session;
     private Cookie cookie;
 
@@ -82,6 +91,11 @@ class AlertControllerTests {
     void selectTenant() throws Exception {
         when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_TENANT));
         when(tenantService.getTenantByCode(TENANT)).thenReturn(MOCK_TENANT);
+        when(catalog.sites(TENANT)).thenReturn(List.of(
+            new SiteOption("PIER11", "Pier 11"),
+            new SiteOption("HOB14ST", "Hoboken 14th St"),
+            new SiteOption("EDGEWTR", "Edgewater")));
+        when(catalog.products(TENANT)).thenReturn(List.of(new ProductOption("ADULT_ONEWAY", "Adult One-Way")));
         alertRepository.deleteAll();
         session = new MockHttpSession();
         cookie = mockMvc.perform(post("/context/tenant").session(session).with(user(OPERATOR)).with(csrf())
@@ -181,6 +195,134 @@ class AlertControllerTests {
                 .param("messageEn", "x".repeat(201)))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("Message must be 200 characters or fewer.")));
+    }
+
+    // Iteration 3: form options come from the Caracal catalog and the tenant's locales
+    @Test
+    void formListsCaracalRoutesAndTickets() throws Exception {
+        mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("catalogMissing", false))
+            .andExpect(content().string(containsString("value=\"EDGEWTR:PIER11\"")))
+            .andExpect(content().string(containsString("Edgewater to Pier 11")))
+            .andExpect(content().string(containsString("All tickets on the route")))
+            .andExpect(content().string(containsString("Adult One-Way (ADULT_ONEWAY)")));
+    }
+
+    @Test
+    void savedTicketIsSelectedOnEdit() throws Exception {
+        AlertForm form = new AlertForm();
+        form.setRouteKeys(List.of(ROUTE));
+        form.setMessageEn("Ticket kept");
+        form.setProductCode("ADULT_ONEWAY");
+        assertTrue(alertService.save(TENANT, null, form, "test").isEmpty());
+        ServiceAlert saved = alertService.list(TENANT, "Ticket kept", null, null).get(0);
+        assertEquals("ADULT_ONEWAY", saved.getProductCode());
+
+        mockMvc.perform(inTenant(get("/fares/alerts/" + saved.getId() + "/edit"), OPERATOR))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("value=\"ADULT_ONEWAY\" selected")))
+            .andExpect(content().string(not(containsString("not in catalog"))));
+    }
+
+    @Test
+    void caracalDownShowsRouteWarning() throws Exception {
+        when(catalog.sites(TENANT)).thenThrow(new CatalogUnavailableException("down"));
+        when(catalog.products(TENANT)).thenThrow(new CatalogUnavailableException("down"));
+
+        mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("catalogMissing", true))
+            .andExpect(content().string(containsString("Routes could not be loaded from Caracal")));
+    }
+
+    @Test
+    void spanishFieldsShowForSpanishTenant() throws Exception {
+        mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
+            .andExpect(model().attribute("spanishEnabled", true))
+            .andExpect(content().string(containsString("Spanish message")))
+            .andExpect(content().string(containsString("Continue button (ES)")));
+    }
+
+    @Test
+    void englishOnlyTenantHidesSpanishButKeepsSavedText() throws Exception {
+        // Switching to a different tenant code reloads it, now with only English configured
+        String englishTenant = "EN_ONLY";
+        when(tenantService.getTenantByCode(englishTenant)).thenReturn(
+            new Tenant(englishTenant, "English only", "USD", "en-US", GridMode.OD, true, List.of("en-US")));
+        when(catalog.sites(englishTenant)).thenReturn(List.of(
+            new SiteOption("PIER11", "Pier 11"), new SiteOption("HOB14ST", "Hoboken 14th St")));
+        mockMvc.perform(inTenant(post("/context/tenant"), OPERATOR)
+                .param("tenant", englishTenant)
+                .param("returnUrl", "/fares/alerts"))
+            .andExpect(status().is3xxRedirection());
+
+        AlertForm form = new AlertForm();
+        form.setRouteKeys(List.of(ROUTE));
+        form.setMessageEn("English only alert");
+        form.setMessageEs("Texto guardado");
+        assertTrue(alertService.save(englishTenant, null, form, "test").isEmpty());
+        ServiceAlert saved = alertService.list(englishTenant, "English only alert", null, null).get(0);
+
+        mockMvc.perform(inTenant(get("/fares/alerts/" + saved.getId() + "/edit"), OPERATOR))
+            .andExpect(model().attribute("spanishEnabled", false))
+            .andExpect(content().string(not(containsString("Spanish message"))))
+            .andExpect(content().string(containsString("value=\"Texto guardado\"")));
+    }
+
+    // Story 4.5
+    @Test
+    void blankLabelsFallBackToDefaults() throws Exception {
+        mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
+                .param("routeKeys", ROUTE)
+                .param("triggerType", "WEEKENDS")
+                .param("messageEn", "Default labels")
+                .param("confirmLabelEn", "  "))
+            .andExpect(status().is3xxRedirection());
+
+        ServiceAlert saved = alertService.list(TENANT, "Default labels", null, null).get(0);
+        assertEquals("Continue", saved.getConfirmLabelEn());
+        assertEquals("Continuar", saved.getConfirmLabelEs());
+        assertEquals("Cancel", saved.getDismissLabelEn());
+        assertEquals("Cancelar", saved.getDismissLabelEs());
+    }
+
+    @Test
+    void typedLabelsAreKept() throws Exception {
+        mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
+                .param("routeKeys", ROUTE)
+                .param("triggerType", "WEEKENDS")
+                .param("messageEn", "Custom labels")
+                .param("confirmLabelEn", "Buy for Monday")
+                .param("confirmLabelEs", "Comprar el lunes"))
+            .andExpect(status().is3xxRedirection());
+
+        ServiceAlert saved = alertService.list(TENANT, "Custom labels", null, null).get(0);
+        assertEquals("Buy for Monday", saved.getConfirmLabelEn());
+        assertEquals("Comprar el lunes", saved.getConfirmLabelEs());
+        assertEquals("Cancel", saved.getDismissLabelEn());
+    }
+
+    @Test
+    void suggestedLabelMatchesTrigger() {
+        assertEquals("Buy for [Day]", TriggerType.WEEKENDS.getSuggestedConfirmEn());
+        assertEquals("Buy for [Day]", TriggerType.OUTSIDE_SERVICE_HOURS.getSuggestedConfirmEn());
+        assertEquals("Buy now", TriggerType.BEFORE_START_DATE.getSuggestedConfirmEn());
+        assertEquals("Comprar ahora", TriggerType.BEFORE_START_DATE.getSuggestedConfirmEs());
+        // Suggestions must fit on the TVM button too
+        for (TriggerType t : TriggerType.values()) {
+            assertTrue(t.getSuggestedConfirmEn().length() <= 20);
+            assertTrue(t.getSuggestedConfirmEs().length() <= 20);
+        }
+    }
+
+    @Test
+    void formOffersSuggestionForEachTrigger() throws Exception {
+        mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-suggest-en=\"Buy now\"")))
+            .andExpect(content().string(containsString("data-suggest-es=\"Comprar para [día]\"")))
+            .andExpect(content().string(containsString("Blank labels use Continue")));
     }
 
     // Story 4.3

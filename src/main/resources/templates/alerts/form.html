@@ -51,11 +51,17 @@
                                         th:attr="maxlength=${messageMax}" data-counter="messageEnCount"></textarea>
                                     <div class="form-text text-end"><span id="messageEnCount">0</span> / <span th:text="${messageMax}">200</span></div>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3" th:if="${spanishEnabled}">
                                     <label for="messageEs" class="form-label">Spanish message</label>
                                     <textarea id="messageEs" th:field="*{messageEs}" class="form-control" rows="3"
                                         th:attr="maxlength=${messageMax}" data-counter="messageEsCount"></textarea>
                                     <div class="form-text text-end"><span id="messageEsCount">0</span> / <span th:text="${messageMax}">200</span></div>
+                                </div>
+
+                                <!-- Suggested continue label for the chosen trigger; filled in by the script below -->
+                                <div class="small mb-2">
+                                    Suggested continue label:
+                                    <button type="button" id="useSuggestion" class="btn btn-link btn-sm p-0 align-baseline">Buy for [Day]</button>
                                 </div>
 
                                 <div class="row g-3">
@@ -64,7 +70,7 @@
                                         <input id="confirmLabelEn" th:field="*{confirmLabelEn}" class="form-control"
                                             th:attr="maxlength=${labelMax}" placeholder="Continue">
                                     </div>
-                                    <div class="col-sm-6">
+                                    <div class="col-sm-6" th:if="${spanishEnabled}">
                                         <label for="confirmLabelEs" class="form-label">Continue button (ES)</label>
                                         <input id="confirmLabelEs" th:field="*{confirmLabelEs}" class="form-control"
                                             th:attr="maxlength=${labelMax}" placeholder="Continuar">
@@ -74,12 +80,20 @@
                                         <input id="dismissLabelEn" th:field="*{dismissLabelEn}" class="form-control"
                                             th:attr="maxlength=${labelMax}" placeholder="Cancel">
                                     </div>
-                                    <div class="col-sm-6">
+                                    <div class="col-sm-6" th:if="${spanishEnabled}">
                                         <label for="dismissLabelEs" class="form-label">Cancel button (ES)</label>
                                         <input id="dismissLabelEs" th:field="*{dismissLabelEs}" class="form-control"
                                             th:attr="maxlength=${labelMax}" placeholder="Cancelar">
                                     </div>
                                 </div>
+                                <div class="form-text">Blank labels use Continue / Continuar and Cancel / Cancelar.</div>
+
+                                <!-- English-only tenant: keep any saved Spanish text instead of wiping it on save -->
+                                <th:block th:unless="${spanishEnabled}">
+                                    <input type="hidden" th:field="*{messageEs}">
+                                    <input type="hidden" th:field="*{confirmLabelEs}">
+                                    <input type="hidden" th:field="*{dismissLabelEs}">
+                                </th:block>
                             </div>
                         </div>
                     </div>
@@ -91,7 +105,8 @@
                                 <div class="mb-3">
                                     <label for="triggerType" class="form-label">Trigger</label>
                                     <select id="triggerType" th:field="*{triggerType}" class="form-select">
-                                        <option th:each="t : ${triggerTypes}" th:value="${t}" th:text="${t.label}">Weekends</option>
+                                        <option th:each="t : ${triggerTypes}" th:value="${t}" th:text="${t.label}"
+                                            th:attr="data-suggest-en=${t.suggestedConfirmEn},data-suggest-es=${t.suggestedConfirmEs}">Weekends</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
@@ -100,9 +115,15 @@
                                     <div class="form-text">Only used for "Before the start date".</div>
                                 </div>
                                 <div>
-                                    <label for="productCode" class="form-label">Ticket code</label>
-                                    <input id="productCode" th:field="*{productCode}" class="form-control"
-                                        placeholder="Leave blank for all tickets">
+                                    <label for="productCode" class="form-label">Ticket</label>
+                                    <select id="productCode" th:field="*{productCode}" class="form-select">
+                                        <option value="">All tickets on the route</option>
+                                        <option th:each="p : ${productOptions}" th:value="${p.code()}"
+                                            th:text="${p.label() + ' (' + p.code() + ')'}">Adult One-Way (ADULT_ONEWAY)</option>
+                                        <!-- A saved ticket that is no longer in the catalog stays visible so it isn't lost silently -->
+                                        <option th:if="${!#strings.isEmpty(form.productCode) and !#lists.contains(productOptions.![code()], form.productCode)}"
+                                            th:value="${form.productCode}" th:text="${form.productCode + ' (not in catalog)'}">OLD</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -110,6 +131,9 @@
                         <div class="card mb-4">
                             <div class="card-header fw-semibold">Routes <span class="text-danger">*</span></div>
                             <div class="card-body" style="max-height: 320px; overflow-y: auto;">
+                                <div th:if="${catalogMissing}" class="alert alert-warning small mb-0" role="alert">
+                                    Routes could not be loaded from Caracal. Check that the Caracal API is running, then reload this page.
+                                </div>
                                 <!-- One group per origin terminal; route keys are ORIGIN:DESTINATION -->
                                 <div th:each="terminal : ${routeOptions}" class="mb-2">
                                     <div class="small fw-semibold text-muted" th:text="${terminal.key}">PIER11</div>
@@ -142,6 +166,31 @@
             const update = function () { counter.textContent = box.value.length; };
             box.addEventListener("input", update);
             update();
+        });
+
+        // Suggested continue label follows the trigger; clicking it fills both language boxes
+        const trigger = document.getElementById("triggerType");
+        const suggestion = document.getElementById("useSuggestion");
+        const showSuggestion = function () {
+            suggestion.textContent = trigger.selectedOptions[0].dataset.suggestEn;
+        };
+        trigger.addEventListener("change", showSuggestion);
+        showSuggestion();
+
+        suggestion.addEventListener("click", function () {
+            const option = trigger.selectedOptions[0];
+            const en = document.getElementById("confirmLabelEn");
+            const es = document.getElementById("confirmLabelEs");
+            if (es.type !== "hidden") {
+                es.value = option.dataset.suggestEs;
+            }
+            en.value = option.dataset.suggestEn;
+            // Select [Day] so the operator can type the real day straight over it
+            const day = en.value.indexOf("[Day]");
+            en.focus();
+            if (day >= 0) {
+                en.setSelectionRange(day, day + "[Day]".length);
+            }
         });
     </script>
 </body>
