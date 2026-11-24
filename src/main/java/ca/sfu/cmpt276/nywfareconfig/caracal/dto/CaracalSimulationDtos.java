@@ -1,16 +1,18 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 public class CaracalSimulationDtos {
 
     // POST /functions/price-simulate request body
     // TODO: add String at for when implemnting prices at certain times
     public record PriceSimulateRequest(String tenantCode, String productCode, String siteCode,
-            Map<String, String> dimensions) {
+            Map<String, String> dimensions, @JsonInclude(JsonInclude.Include.NON_NULL) String at) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

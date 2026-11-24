@@ -39,4 +39,13 @@ public class CaracalCatalogDtos {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProductList(List<ProductSummary> products) {
     }
+
+    // POST /functions/rate-table-get
+    public record RateTableGetRequest(String tenantCode, String rateTableName) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record RateAssignmentSummary(String productCode, String cellType, String priceRuleSetName) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record RateTableGetResponse(List<RateAssignmentSummary> assignments) {}
 }

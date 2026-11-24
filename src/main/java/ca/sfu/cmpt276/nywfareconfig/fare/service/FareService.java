@@ -4,15 +4,18 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos.RateTableGetRequest;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
@@ -132,8 +135,8 @@ public class FareService {
      * - Columns: Ticket Products
      */
     private FareGrid buildOdGrid(Tenant tenant, String originSiteCode) {
-        List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed(); // follow conventions of the NYW
-                                                                                     // spreadsheet
+        List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed();
+        // follow conventions of the NYW spreadsheet
         List<CatalogOption> outboundDestinations = getOutboundDestinations(tenant.getCode(), originSiteCode);
         Map<String, FareRule> ruleMap = indexRulesByCoordinates(
                 getOdFareRules(tenant.getCode(), originSiteCode, outboundDestinations, colHeaders));
@@ -150,7 +153,7 @@ public class FareService {
                 FareCell cell = toFareCell(rule, dest.code(), prod.code());
                 rowCells.add(cell);
 
-                if (cell.getStatus() != FareStatus.NA || cell.isHasPendingDraft()) {
+                if (cell.getStatus() == FareStatus.ACTIVE || cell.isHasPendingDraft()) {
                     hasVisibleCell = true;
                 }
             }
@@ -246,7 +249,7 @@ public class FareService {
                 || originSiteCode == null || originSiteCode.isBlank()) {
             return List.of();
         }
-        
+
         List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
         List<CatalogOption> products = getOdProducts(tenantCode);
         return getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
@@ -257,10 +260,27 @@ public class FareService {
             String originSiteCode,
             List<CatalogOption> destinations,
             List<CatalogOption> products) {
+        Set<String> soldProductCodes = getRateTable(tenantCode, originSiteCode);
+        if (soldProductCodes.isEmpty()) {
+            return List.of();
+        }
+
         List<FareRule> rules = new ArrayList<>();
 
         for (CatalogOption dest : destinations) {
             for (CatalogOption prod : products) {
+                if (!soldProductCodes.contains(prod.code().trim().toUpperCase())) {
+                    rules.add(FareRule.od(
+                            tenantCode,
+                            originSiteCode,
+                            dest.code(),
+                            prod.code(),
+                            null,
+                            null,
+                            FareStatus.NOT_SOLD));
+                    continue;
+                }
+
                 simulateOdFareRule(tenantCode, originSiteCode, dest.code(), prod.code())
                         .ifPresent(rules::add);
             }
@@ -390,6 +410,28 @@ public class FareService {
         return sites;
     }
 
+    private Set<String> getRateTable(String tenantCode, String originTerminal) {
+        Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> rateAssignmentList = caracalApiClient.fetchRateTable(
+                new RateTableGetRequest(tenantCode, "RT-" + originTerminal));
+        if (rateAssignmentList.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<String> soldProductCodes = new HashSet<>();
+        for (CaracalCatalogDtos.RateAssignmentSummary assignment : rateAssignmentList.get()) {
+            if (assignment.productCode() == null || assignment.productCode().isBlank()) {
+                continue;
+            }
+            if (!"VALUE".equalsIgnoreCase(assignment.cellType())) {
+                continue;
+            }
+
+            soldProductCodes.add(assignment.productCode().trim().toUpperCase());
+        }
+
+        return soldProductCodes;
+    }
+
     private Optional<FareRule> simulateOdFareRule(
             String tenantCode,
             String originSiteCode,
@@ -398,7 +440,7 @@ public class FareService {
         Map<String, String> dimensions = Map.of("DEST", destSiteCode);
 
         CaracalSimulationDtos.PriceSimulationResult simulatedPrice = caracalApiClient.simulatePrice(
-                new PriceSimulateRequest(tenantCode, productCode, originSiteCode, dimensions));
+                new PriceSimulateRequest(tenantCode, productCode, originSiteCode, dimensions, "")); // for now omitted
         if (simulatedPrice == null) {
             return Optional.empty();
         }

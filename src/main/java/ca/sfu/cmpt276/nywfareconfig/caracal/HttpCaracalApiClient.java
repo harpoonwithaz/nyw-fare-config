@@ -1,8 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -113,6 +115,46 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response.products();
     }
 
+    // Queries POST /functions/rate-table-get to populate O-D tenants
+    @Override
+    public Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(
+            CaracalCatalogDtos.RateTableGetRequest requestPayload) {
+        if (requestPayload == null
+                || isNullOrBlank(requestPayload.tenantCode())
+                || isNullOrBlank(requestPayload.rateTableName())) {
+            throw new IllegalArgumentException("Invalid request payload for rate table get.");
+        }
+
+        String actionDescription = "loading rate table " + requestPayload.rateTableName();
+
+        return execute(actionDescription, () -> {
+            try {
+                CaracalCatalogDtos.RateTableGetResponse response = caracalRestClient
+                        .post()
+                        .uri("/rate-table-get")
+                        .attribute("useSystemActor", false)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestPayload)
+                        .retrieve()
+                        .body(CaracalCatalogDtos.RateTableGetResponse.class);
+
+                if (response == null) {
+                    throw new CaracalApiException(
+                            "Caracal returned an empty response for rate table "
+                                    + requestPayload.rateTableName() + ".");
+                }
+                List<CaracalCatalogDtos.RateAssignmentSummary> assignments =
+                        response.assignments() != null ? response.assignments() : List.of();
+                return Optional.of(assignments);
+            } catch (RestClientResponseException ex) {
+                if (ex.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
+                    return Optional.empty();
+                }
+                throw ex;
+            }
+        });
+    }
+
     // ==============================================================================
     // Matrix & Availability Hydration
     // ==============================================================================
@@ -142,7 +184,8 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                         .body(CaracalSimulationDtos.PriceSimulateResponse.class);
 
                 if (response == null || response.pricing() == null) {
-                    throw new CaracalApiException("Caracal returned an empty pricing response while " + actionDescription + ".");
+                    throw new CaracalApiException(
+                            "Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
                 return new CaracalSimulationDtos.PriceSimulationResult(response, null);
             } catch (RestClientResponseException ex) {
