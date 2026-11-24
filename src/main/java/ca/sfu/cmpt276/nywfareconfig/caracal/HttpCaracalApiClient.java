@@ -17,17 +17,14 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
-import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 @Service
 public class HttpCaracalApiClient implements CaracalApiClient {
 
     private final RestClient caracalRestClient;
-    private final ActorService actorService;
 
-    public HttpCaracalApiClient(RestClient caracalRestClient, ActorService actorService) {
+    public HttpCaracalApiClient(RestClient caracalRestClient) {
         this.caracalRestClient = caracalRestClient;
-        this.actorService = actorService;
     }
 
     // TODO: Remove the X-Actor: system header from each api request except
@@ -232,7 +229,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             return request.get();
         } catch (ResourceAccessException ex) {
             throw new CaracalUnavailableException(
-                    "Unable to reach the Caracal platform. Please verify the service is running.", ex);
+                    "Unable to reach the Caracal platform.", ex);
         } catch (RestClientResponseException ex) {
             throw new CaracalApiException(
                     "Caracal API error (" + ex.getStatusCode().value() + ") while " + actionDescription + ".", ex);

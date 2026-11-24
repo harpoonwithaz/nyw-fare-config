@@ -1,10 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -13,18 +13,19 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareDraftBatchRequest;
-import ca.sfu.cmpt276.nywfareconfig.fare.service.*;
-import ca.sfu.cmpt276.nywfareconfig.tenant.model.*;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import jakarta.validation.Valid;
-
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Controller
 @RequestMapping("/fares")
@@ -60,21 +61,37 @@ public class FareController {
             }
 
             if (secondaryFilter != null) {
-                tenantContext.setSecondaryFilter(secondaryFilter.isBlank() ? null : secondaryFilter);
+                String normalizedFilter = secondaryFilter.trim().toUpperCase(Locale.ROOT);
+                tenantContext.setSecondaryFilter(normalizedFilter.isBlank() ? null : normalizedFilter);
             }
 
             if (pricingDate != null) {
-                tenantContext.setSelectedDate(pricingDate.isBlank() ? null : pricingDate);
+                if (pricingDate.isBlank()) {
+                    tenantContext.setSelectedDate(null);
+                } else {
+                    try {
+                        tenantContext.setSelectedDate(FareService.normalizePricingDate(pricingDate));
+                    } catch (IllegalArgumentException ex) {
+                        log.warn("Invalid pricingDate query parameter '{}': {}", pricingDate, ex.getMessage());
+                        model.addAttribute("caracalGridErrorMessage", ex.getMessage());
+                        return "fare/fare";
+                    }
+                }
             }
 
             String activeFilter = tenantContext.getSecondaryFilter();
             String activePricingDate = tenantContext.getSelectedDate();
             if (activeFilter != null && !activeFilter.isBlank()) {
                 try {
-                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, activeFilter, activePricingDate));
+                    model.addAttribute("gridView",
+                            fareService.buildGrid(currentTenant, activeFilter, activePricingDate));
                 } catch (CaracalApiException ex) {
                     log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
-
+                    model.addAttribute("caracalGridErrorMessage", ex.getMessage());
+                    return "fare/fare";
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Invalid pricing date '{}' in session: {}", activePricingDate, ex.getMessage());
+                    tenantContext.setSelectedDate(null);
                     model.addAttribute("caracalGridErrorMessage", ex.getMessage());
                     return "fare/fare";
                 }
@@ -85,8 +102,7 @@ public class FareController {
     }
 
     /**
-     * Stages a batch of validated rate changes into the PostgreSQL fare_drafts
-     * table.
+     * Stages a batch of validated rate changes into the PostgreSQL fare_drafts table.
      */
     @PostMapping("/drafts")
     @ResponseBody
@@ -100,7 +116,10 @@ public class FareController {
         }
 
         try {
-            int savedCount = fareDraftService.stageChanges(activeTenant, batchRequest.getChanges());
+            String activePricingDate = tenantContext.getSelectedDate();
+            int savedCount = (activePricingDate == null || activePricingDate.isBlank())
+                    ? fareDraftService.stageChanges(activeTenant, batchRequest.getChanges())
+                    : fareDraftService.stageChanges(activeTenant, batchRequest.getChanges(), activePricingDate);
             long totalPendingCount = fareDraftService.countPendingDrafts(activeTenant.getCode());
 
             return ResponseEntity.ok(Map.of(
@@ -114,8 +133,7 @@ public class FareController {
     }
 
     /**
-     * Returns HTTP 400 with the first Bean Validation error message when a payload
-     * is invalid.
+     * Returns HTTP 400 with the first Bean Validation error message when a payload is invalid.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseBody
@@ -131,8 +149,7 @@ public class FareController {
     }
 
     /**
-     * Returns HTTP 400 when FareDraftService rejects an invalid or locked route
-     * coordinate.
+     * Returns HTTP 400 when FareDraftService rejects an invalid or locked route coordinate.
      */
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseBody

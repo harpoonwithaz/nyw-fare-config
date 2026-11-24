@@ -32,7 +32,7 @@
 
     return {
       tenant: table?.dataset.tenant || 'DEFAULT',
-      origin: table?.dataset.filterValue || document.getElementById('originSelect')?.value || 'DEFAULT'
+      origin: table?.dataset.filterValue || document.getElementById('secondarySelect')?.value || 'DEFAULT'
     };
   }
 
@@ -247,11 +247,11 @@
   }
 
   /**
-   * Intercepts dropdown switches (#globalTenantSelect in navbar.html and #originSelect in fare.html)
+   * Intercepts dropdown switches (#globalTenantSelect in navbar.html and #secondarySelect in fare.html)
    * without requiring HTML edits to fragments/navbar.html.
    */
   function bindContextSwitchGuards() {
-    ['globalTenantSelect', 'originSelect', 'productSelect'].forEach((selectId) => {
+    ['globalTenantSelect', 'secondarySelect', 'productSelect'].forEach((selectId) => {
       const selectEl = document.getElementById(selectId);
       if (!selectEl) return;
 

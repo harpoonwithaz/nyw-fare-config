@@ -56,7 +56,7 @@
                   <option selected>Unavailable</option>
                 </select>
 
-                <select th:if="${caracalSecondaryFilterErrorMessage == null}" name="secondaryFilter" class="form-select"
+                <select th:if="${caracalSecondaryFilterErrorMessage == null}" name="secondaryFilter" id="secondarySelect" class="form-select"
                   onchange="this.form.submit()">
                   <option value="" th:selected="${tenantContext.secondaryFilter == null}"
                     th:text="${tenantContext.selectedTenant.odMode ? 'Select Terminal' : 'Select Ticket'}"></option>
@@ -66,10 +66,7 @@
                   </option>
                 </select>
 
-                <input type="date" name="pricingDate" class="form-control" onchange="this.form.submit()" th:value="${tenantContext.selectedDate}">
-                <!-- <select name="pricingDate" class="form-select" onchange="this.form.submit()">
-
-                </select> -->
+                <input type="date" name="pricingDate" class="form-control" onchange="this.form.submit()" th:value="${tenantContext.selectedDate}" th:disabled="${caracalSecondaryFilterErrorMessage != null}">
               </div>
 
             </div>
