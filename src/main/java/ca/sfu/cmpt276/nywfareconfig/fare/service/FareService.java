@@ -19,6 +19,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
@@ -40,8 +42,7 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 @Service
 public class FareService {
 
-    private final FareDraftRepository fareDraftRepository;
-    private final CaracalApiClient caracalApiClient;
+    private static final Logger log = LoggerFactory.getLogger(FareService.class);
 
     // Price simulate can return 4xx.
     // Lowercased constants to match against lowercased Caracal error messages:
@@ -49,14 +50,18 @@ public class FareService {
     private static final String NOT_SOLD = "not sold";
     private static final String CONDITION = "no rate assignment's condition matches the requested moment or channel";
 
+    private final FareDraftRepository fareDraftRepository;
+    private final CaracalApiClient caracalApiClient;
+
     public FareService(FareDraftRepository fareDraftRepository, CaracalApiClient caracalApiClient) {
         this.fareDraftRepository = fareDraftRepository;
         this.caracalApiClient = caracalApiClient;
     }
 
     /**
-     * Validates and normalizes an incoming pricingDate string (YYYY-MM-DD or ISO-8601 offset datetime)
-     * without making any external API calls. Returns null for null/blank input.
+     * Validates and normalizes an incoming UI pricingDate string (YYYY-MM-DD or ISO-8601 offset datetime)
+     * into a YYYY-MM-DD date string compatible with HTML date inputs without making any external API calls.
+     * Returns null for null/blank input.
      */
     public static String normalizePricingDate(String at) {
         if (at == null || at.isBlank()) {
@@ -64,17 +69,12 @@ public class FareService {
         }
         String trimmed = at.trim();
         try {
-            return OffsetDateTime.parse(trimmed).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            return OffsetDateTime.parse(trimmed).toLocalDate().toString();
         } catch (DateTimeParseException ignored) {
             // Fall through and validate as YYYY-MM-DD
         }
 
-        try {
-            return LocalDate.parse(trimmed).toString();
-        } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException(
-                    "Invalid pricing date format (expected YYYY-MM-DD or ISO-8601 offset datetime): " + at, ex);
-        }
+        return parseLocalDate(trimmed, at).toString();
     }
 
     /**
@@ -86,16 +86,17 @@ public class FareService {
             return null;
         }
         String trimmed = at.trim();
-        try {
-            return OffsetDateTime.parse(trimmed).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        } catch (DateTimeParseException ignored) {
-            // Input is not yet an offset timestamp; look up the site's timezone and format it.
+        String offsetTimestamp = tryFormatOffsetDateTime(trimmed);
+        if (offsetTimestamp != null) {
+            return offsetTimestamp;
         }
 
+        // Validate date format before making any network call to Caracal
+        LocalDate date = parseLocalDate(trimmed, at);
         ZoneId siteZone = findSiteZoneId(
                 caracalApiClient.fetchSites(normalizeCode(tenantCode)),
                 normalizeCode(originSiteCode));
-        return formatAt(trimmed, siteZone);
+        return formatLocalDateAtZone(date, siteZone);
     }
 
     /**
@@ -208,6 +209,8 @@ public class FareService {
      * - Columns: Ticket Products
      */
     private FareGrid buildOdGrid(Tenant tenant, String originSiteCode, String at) {
+        validateAtFormat(at);
+
         String normalizedTenant = normalizeCode(tenant.getCode());
         String normalizedOrigin = normalizeCode(originSiteCode);
 
@@ -311,15 +314,9 @@ public class FareService {
             return List.of();
         }
 
-        String normalizedTenant = normalizeCode(tenantCode);
-        String normalizedOrigin = normalizeCode(originSiteCode);
-        List<CaracalCatalogDtos.SiteSummary> sites = caracalApiClient.fetchSites(normalizedTenant);
-        List<CatalogOption> destinations = toOutboundDestinations(sites, normalizedOrigin);
-        List<CatalogOption> products = getOdProducts(normalizedTenant);
-        String formattedAt = formatAt(at, findSiteZoneId(sites, normalizedOrigin));
-
-        return getOdFareRulesWithFormattedAt(
-                normalizedTenant, normalizedOrigin, destinations, products, formattedAt);
+        List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, at);
+        applyPendingDraftsToRules(normalizeCode(tenantCode), rules);
+        return rules;
     }
 
     private List<FareRule> getOdFareRulesWithFormattedAt(
@@ -345,6 +342,7 @@ public class FareService {
         if (isBlank(tenantCode) || isBlank(originSiteCode)) {
             return List.of();
         }
+        validateAtFormat(at);
 
         String normalizedTenant = normalizeCode(tenantCode);
         String normalizedOrigin = normalizeCode(originSiteCode);
@@ -568,10 +566,10 @@ public class FareService {
                         null, null, FareStatus.NOT_SOLD));
             }
 
-            if (msg.contains(NO_PRICE_RULE)) {
-                return Optional.of(FareRule.od(
+            if (!msg.contains(NO_PRICE_RULE)) {
+                log.warn("Unrecognized Caracal 4xx response for {} {}->{} ({}): {}",
                         normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
-                        null, null, FareStatus.NA));
+                        simulatedPrice.errorMessage());
             }
 
             return Optional.of(FareRule.od(
@@ -580,8 +578,15 @@ public class FareService {
         }
 
         CaracalSimulationDtos.PricingDetail fare = simulatedPrice.response().pricing();
-        BigDecimal total = fare.total() != null ? fare.total().setScale(2, RoundingMode.HALF_UP) : null;
+        if (fare.total() == null) {
+            log.warn("Caracal returned null total for {} {}->{} ({}); treating as N/A.",
+                    normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct);
+            return Optional.of(FareRule.od(
+                    normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
+                    fare.priceRuleSetName(), null, FareStatus.NA));
+        }
 
+        BigDecimal total = fare.total().setScale(2, RoundingMode.HALF_UP);
         return Optional.of(FareRule.od(
                 normalizedTenant,
                 normalizedOrigin,
@@ -632,27 +637,53 @@ public class FareService {
         return ZoneOffset.UTC;
     }
 
+    private static void validateAtFormat(String at) {
+        if (at == null || at.isBlank()) {
+            return;
+        }
+        String trimmed = at.trim();
+        if (tryFormatOffsetDateTime(trimmed) != null) {
+            return;
+        }
+        parseLocalDate(trimmed, at);
+    }
+
     private String formatAt(String at, ZoneId zoneId) {
         if (isBlank(at)) {
             return null;
         }
         String trimmed = at.trim();
+        String offsetTimestamp = tryFormatOffsetDateTime(trimmed);
+        if (offsetTimestamp != null) {
+            return offsetTimestamp;
+        }
+
+        LocalDate date = parseLocalDate(trimmed, at);
+        return formatLocalDateAtZone(date, zoneId);
+    }
+
+    private static String tryFormatOffsetDateTime(String trimmed) {
         try {
             return OffsetDateTime.parse(trimmed).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         } catch (DateTimeParseException ignored) {
-            // Fall through and parse as YYYY-MM-DD
+            return null;
         }
+    }
 
+    private static LocalDate parseLocalDate(String trimmed, String rawInput) {
         try {
-            LocalDate date = LocalDate.parse(trimmed);
-            ZoneId effectiveZone = zoneId != null ? zoneId : ZoneOffset.UTC;
-            return date.atTime(LocalTime.of(10, 0))
-                    .atZone(effectiveZone)
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            return LocalDate.parse(trimmed);
         } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException(
-                    "Invalid pricing date format (expected YYYY-MM-DD or ISO-8601 offset datetime): " + at, ex);
+                    "Invalid pricing date format (expected YYYY-MM-DD or ISO-8601 offset datetime): " + rawInput, ex);
         }
+    }
+
+    private static String formatLocalDateAtZone(LocalDate date, ZoneId zoneId) {
+        ZoneId effectiveZone = zoneId != null ? zoneId : ZoneOffset.UTC;
+        return date.atTime(LocalTime.of(10, 0))
+                .atZone(effectiveZone)
+                .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
     private boolean isBlank(String value) {

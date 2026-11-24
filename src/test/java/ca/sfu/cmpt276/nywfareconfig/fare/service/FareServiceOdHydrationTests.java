@@ -73,7 +73,7 @@ class FareServiceOdHydrationTests {
         assertNull(FareService.normalizePricingDate("   "));
         assertEquals("2026-10-24", FareService.normalizePricingDate("  2026-10-24  "));
         assertEquals(
-                "2026-10-24T10:00:00-04:00",
+                "2026-10-24",
                 FareService.normalizePricingDate("2026-10-24T10:00:00-04:00"));
 
         assertThrows(IllegalArgumentException.class, () -> FareService.normalizePricingDate("not-a-date"));
@@ -276,5 +276,15 @@ class FareServiceOdHydrationTests {
         assertEquals("2026-10-24T10:00:00-04:00", captor.getValue().at());
         assertEquals(Map.of("DEST", "PIER11"), captor.getValue().dimensions());
         verifyNoInteractions(fareDraftRepository);
+    }
+
+    @Test
+    void buildGridAndResolvePricingTimestampFailFastOnInvalidDateWithoutCallingApi() {
+        assertThrows(IllegalArgumentException.class,
+                () -> fareService.buildGrid(odTenant, "MIDTOWN", "not-a-date"));
+        assertThrows(IllegalArgumentException.class,
+                () -> fareService.resolvePricingTimestamp("NYW_SANDBOX", "MIDTOWN", "not-a-date"));
+
+        verifyNoInteractions(caracalApiClient, fareDraftRepository);
     }
 }

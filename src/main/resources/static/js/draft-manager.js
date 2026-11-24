@@ -247,11 +247,11 @@
   }
 
   /**
-   * Intercepts dropdown switches (#globalTenantSelect in navbar.html and #secondarySelect in fare.html)
+   * Intercepts context switches (#globalTenantSelect in navbar.html, #secondarySelect and #pricingDateInput in fare.html)
    * without requiring HTML edits to fragments/navbar.html.
    */
   function bindContextSwitchGuards() {
-    ['globalTenantSelect', 'secondarySelect', 'productSelect'].forEach((selectId) => {
+    ['globalTenantSelect', 'secondarySelect', 'productSelect', 'pricingDateInput'].forEach((selectId) => {
       const selectEl = document.getElementById(selectId);
       if (!selectEl) return;
 

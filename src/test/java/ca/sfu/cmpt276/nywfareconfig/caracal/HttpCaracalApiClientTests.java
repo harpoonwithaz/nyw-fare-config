@@ -44,7 +44,6 @@ class HttpCaracalApiClientTests {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         mockServer = MockRestServiceServer.bindTo(builder).build();
-        // If your HttpCaracalApiClient constructor also takes ActorService, pass mock(ActorService.class) as the 2nd arg.
         apiClient = new HttpCaracalApiClient(builder.build());
     }
 
@@ -211,6 +210,15 @@ class HttpCaracalApiClientTests {
         // 200 with missing pricing block
         mockServer.expect(requestTo(BASE_URL + "/price-simulate"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        assertThrows(CaracalApiException.class, () -> apiClient.simulatePrice(new PriceSimulateRequest(
+                "NYW_SANDBOX", "ADULT_ONEWAY", "MIDTOWN", Map.of("DEST", "EDGEWTR"), null)));
+
+        // 200 with null total inside pricing block
+        mockServer.reset();
+        mockServer.expect(requestTo(BASE_URL + "/price-simulate"))
+                .andRespond(withSuccess(
+                        "{\"pricing\":{\"priceRuleSetName\":\"PRS_ADULT\",\"base\":null,\"total\":null}}",
+                        MediaType.APPLICATION_JSON));
         assertThrows(CaracalApiException.class, () -> apiClient.simulatePrice(new PriceSimulateRequest(
                 "NYW_SANDBOX", "ADULT_ONEWAY", "MIDTOWN", Map.of("DEST", "EDGEWTR"), null)));
 

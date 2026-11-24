@@ -34,7 +34,8 @@
             </th>
 
             <!-- Column Headers (Products or Destination Zones) -->
-            <th th:each="col : ${gridView.columnHeaders}" th:text="${col.displayName} + ' (' + ${col.code} + ')'"
+            <th th:each="col : ${gridView.columnHeaders}"
+              th:text="${col.displayName != null and !col.displayName.isBlank() and !#strings.equalsIgnoreCase(col.displayName, col.code) ? col.displayName + ' (' + col.code + ')' : col.code}"
               class="text-secondary small text-uppercase" style="min-width: 130px;">
             </th>
           </tr>

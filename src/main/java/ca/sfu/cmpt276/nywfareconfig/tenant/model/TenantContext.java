@@ -21,6 +21,10 @@ public class TenantContext implements Serializable {
     public TenantContext() {
     }
 
+    public TenantContext(Tenant selectedTenant, String secondaryFilter) {
+        this(selectedTenant, secondaryFilter, null);
+    }
+
     public TenantContext(Tenant selectedTenant, String secondaryFilter, String selectedDate) {
         this.selectedTenant = selectedTenant;
         this.secondaryFilter = secondaryFilter;

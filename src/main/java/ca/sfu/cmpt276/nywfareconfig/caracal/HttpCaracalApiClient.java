@@ -186,7 +186,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                         .retrieve()
                         .body(CaracalSimulationDtos.PriceSimulateResponse.class);
 
-                if (response == null || response.pricing() == null) {
+                if (response == null || response.pricing() == null || response.pricing().total() == null) {
                     throw new CaracalApiException(
                             "Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
