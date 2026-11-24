@@ -209,8 +209,6 @@ public class FareService {
      * - Columns: Ticket Products
      */
     private FareGrid buildOdGrid(Tenant tenant, String originSiteCode, String at) {
-        validateAtFormat(at);
-
         String normalizedTenant = normalizeCode(tenant.getCode());
         String normalizedOrigin = normalizeCode(originSiteCode);
 
@@ -342,8 +340,6 @@ public class FareService {
         if (isBlank(tenantCode) || isBlank(originSiteCode)) {
             return List.of();
         }
-        validateAtFormat(at);
-
         String normalizedTenant = normalizeCode(tenantCode);
         String normalizedOrigin = normalizeCode(originSiteCode);
         List<CaracalCatalogDtos.SiteSummary> sites = caracalApiClient.fetchSites(normalizedTenant);
@@ -635,17 +631,6 @@ public class FareService {
             }
         }
         return ZoneOffset.UTC;
-    }
-
-    private static void validateAtFormat(String at) {
-        if (at == null || at.isBlank()) {
-            return;
-        }
-        String trimmed = at.trim();
-        if (tryFormatOffsetDateTime(trimmed) != null) {
-            return;
-        }
-        parseLocalDate(trimmed, at);
     }
 
     private String formatAt(String at, ZoneId zoneId) {
