@@ -4,9 +4,12 @@ import ca.sfu.cmpt276.nywfareconfig.availability.dto.AvailabilityDraftDTO;
 import ca.sfu.cmpt276.nywfareconfig.availability.dto.ProductAvailabilityView;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.service.AvailabilityService;
+import ca.sfu.cmpt276.nywfareconfig.availability.service.AvailabilityService.RouteOption;
 import ca.sfu.cmpt276.nywfareconfig.availability.service.AvailabilityService.StationOption;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +38,8 @@ public class AvailabilityController {
 
     @GetMapping
     public String showAvailabilityPage(@RequestParam(value = "site", required = false) String siteParam,
-                                       @RequestParam(value = "dest", defaultValue = "ALL") String destParam,
+                                       @RequestParam(value = "dest", required = false) String destParam,
+                                       @RequestParam(value = "route", required = false) String routeParam,
                                        Model model) {
         List<StationOption> terminals = FALLBACK_STATIONS;
         String tenantCode = null;
@@ -55,17 +59,28 @@ public class AvailabilityController {
         boolean siteExists = terminals.stream().anyMatch(t -> t.code().equalsIgnoreCase(candidateSite));
         final String resolvedSite = siteExists ? candidateSite : terminals.get(0).code();
 
-        String resolvedDest = (destParam == null || destParam.isBlank()
-                || AvailabilityRule.ALL_ROUTES.equalsIgnoreCase(destParam)
-                || resolvedSite.equalsIgnoreCase(destParam))
+        String derivedDest = destParam;
+        if ((derivedDest == null || derivedDest.isBlank()) && routeParam != null && routeParam.contains("->")) {
+            String[] parts = routeParam.split("->", 2);
+            if (parts.length == 2) {
+                derivedDest = parts[1];
+            }
+        }
+
+        String resolvedDest = (derivedDest == null || derivedDest.isBlank()
+                || AvailabilityRule.ALL_ROUTES.equalsIgnoreCase(derivedDest)
+                || resolvedSite.equalsIgnoreCase(derivedDest))
                 ? AvailabilityRule.ALL_ROUTES
-                : destParam;
+                : derivedDest;
 
         String routeCode = AvailabilityRule.ALL_ROUTES.equals(resolvedDest)
                 ? AvailabilityRule.ALL_ROUTES
                 : resolvedSite + "->" + resolvedDest;
 
+        List<RouteOption> routes = availabilityService.getRoutesForStation(tenantCode, resolvedSite, terminals);
+
         model.addAttribute("terminals", terminals);
+        model.addAttribute("routes", routes);
         model.addAttribute("siteCode", resolvedSite);
         model.addAttribute("destCode", resolvedDest);
         model.addAttribute("routeCode", routeCode);
@@ -89,11 +104,37 @@ public class AvailabilityController {
             ));
         }
 
+        try {
+            String tenantCode = tenantContext.getSelectedTenant().getCode();
+            availabilityService.stageAvailabilityDrafts(tenantCode, drafts);
+            return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "message", drafts.size() + " availability rules saved to DB."
+            ));
+        } catch (AccessDeniedException ex) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "status", "ERROR",
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/api/sync")
+    @ResponseBody
+    public ResponseEntity<?> syncAvailabilityToCaracal() {
+        if (tenantContext.getSelectedTenant() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "ERROR",
+                "message", "No active tenant selected."
+            ));
+        }
+
         String tenantCode = tenantContext.getSelectedTenant().getCode();
-        availabilityService.stageAvailabilityDrafts(tenantCode, drafts);
+        int syncedCount = availabilityService.syncAvailabilityRulesToCaracal(tenantCode);
         return ResponseEntity.ok(Map.of(
             "status", "SUCCESS",
-            "message", drafts.size() + " availability rules saved to DB."
+            "syncedCount", syncedCount,
+            "message", syncedCount + " availability rules synced to Caracal."
         ));
     }
 }

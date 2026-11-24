@@ -5,16 +5,18 @@ import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepo
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
+import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
+import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,11 +48,23 @@ class AvailabilityControllerMockMvcTests {
     @MockitoBean
     private CaracalApiClient caracalApiClient;
 
-    private MockHttpSession sessionWithTenant;
+    @MockitoBean
+    private TenantContext tenantContext;
+
+    @MockitoBean
+    private TenantService tenantService;
+
+    private AppUserDetails operatorUser;
+    private AppUserDetails adminUser;
 
     @BeforeEach
     void setUp() {
         availabilityRuleRepository.deleteAll();
+
+        AppUser opEntity = new AppUser("op@nyw.example", "operator", "hashed", Role.OPERATOR, true);
+        AppUser adminEntity = new AppUser("admin@nyw.example", "admin", "hashed", Role.CLIENT_SERVICES, true);
+        operatorUser = new AppUserDetails(opEntity);
+        adminUser = new AppUserDetails(adminEntity);
 
         Tenant sandboxTenant = new Tenant(
                 "NYW_SANDBOX",
@@ -59,11 +74,10 @@ class AvailabilityControllerMockMvcTests {
                 GridMode.OD,
                 true,
                 List.of("en-US"));
-        TenantContext context = new TenantContext();
-        context.setSelectedTenant(sandboxTenant);
 
-        sessionWithTenant = new MockHttpSession();
-        sessionWithTenant.setAttribute("scopedTarget.tenantContext", context);
+        when(tenantContext.getSelectedTenant()).thenReturn(sandboxTenant);
+        when(tenantService.getAvailableTenants()).thenReturn(List.of(sandboxTenant));
+        when(tenantService.getTenantByCode("NYW_SANDBOX")).thenReturn(sandboxTenant);
 
         when(caracalApiClient.fetchTenants()).thenReturn(List.of(
                 new CaracalCatalogDtos.TenantSummary("NYW_SANDBOX", "NY Waterway Sandbox")));
@@ -81,12 +95,11 @@ class AvailabilityControllerMockMvcTests {
     }
 
     @Test
-    @WithMockUser(username = "operator", roles = "OPERATOR")
     void getAvailabilityPageRendersStationsRoutesAndProducts() throws Exception {
         mockMvc.perform(get("/availability")
+                        .with(user(operatorUser))
                         .param("site", "MIDTOWN")
-                        .param("route", "MIDTOWN->PIER11")
-                        .session(sessionWithTenant))
+                        .param("route", "MIDTOWN->PIER11"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("availability/availability"))
                 .andExpect(model().attribute("siteCode", "MIDTOWN"))
@@ -95,7 +108,6 @@ class AvailabilityControllerMockMvcTests {
     }
 
     @Test
-    @WithMockUser(username = "operator", roles = "OPERATOR")
     void operatorCannotReactivatePermanentlyPhasedOutProduct() throws Exception {
         AvailabilityRule phasedOutRule = new AvailabilityRule("NYW_SANDBOX", "MIDTOWN", "ALL", "FULL_MONTHLY", false);
         phasedOutRule.setPhasedOut(true);
@@ -114,8 +126,8 @@ class AvailabilityControllerMockMvcTests {
                 """;
 
         mockMvc.perform(post("/availability/api/stage")
+                        .with(user(operatorUser))
                         .with(csrf())
-                        .session(sessionWithTenant)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isForbidden())
@@ -123,7 +135,6 @@ class AvailabilityControllerMockMvcTests {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "CLIENT_SERVICES")
     void clientServicesAdminCanReactivatePhasedOutProductAndSyncToCaracal() throws Exception {
         AvailabilityRule phasedOutRule = new AvailabilityRule("NYW_SANDBOX", "MIDTOWN", "ALL", "ADULT_ONEWAY", false);
         phasedOutRule.setPhasedOut(true);
@@ -148,16 +159,16 @@ class AvailabilityControllerMockMvcTests {
                 """;
 
         mockMvc.perform(post("/availability/api/stage")
+                        .with(user(adminUser))
                         .with(csrf())
-                        .session(sessionWithTenant)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"));
 
         mockMvc.perform(post("/availability/api/sync")
-                        .with(csrf())
-                        .session(sessionWithTenant))
+                        .with(user(adminUser))
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"));
 
