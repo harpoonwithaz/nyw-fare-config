@@ -16,13 +16,15 @@ public class TenantContext implements Serializable {
 
     private Tenant selectedTenant;
     private String secondaryFilter;
+    private String selectedDate;
 
     public TenantContext() {
     }
 
-    public TenantContext(Tenant selectedTenant, String secondaryFilter) {
+    public TenantContext(Tenant selectedTenant, String secondaryFilter, String selectedDate) {
         this.selectedTenant = selectedTenant;
         this.secondaryFilter = secondaryFilter;
+        this.selectedDate = selectedDate;
     }
 
     public Tenant getSelectedTenant() {
@@ -40,5 +42,14 @@ public class TenantContext implements Serializable {
     public void setSecondaryFilter(String secondaryFilter) {
         this.secondaryFilter = secondaryFilter;
     }
+
+    public String getSelectedDate() {
+        return selectedDate;
+    }
+
+    public void setSelectedDate(String selectedDate) {
+        this.selectedDate = selectedDate;
+    }
+
 
 }

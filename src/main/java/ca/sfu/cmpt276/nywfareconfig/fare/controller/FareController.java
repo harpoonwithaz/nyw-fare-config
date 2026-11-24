@@ -44,6 +44,7 @@ public class FareController {
     @GetMapping
     public String getFares(
             @RequestParam(required = false) String secondaryFilter,
+            @RequestParam(required = false) String pricingDate,
             Model model) {
 
         Tenant currentTenant = tenantContext.getSelectedTenant();
@@ -62,10 +63,15 @@ public class FareController {
                 tenantContext.setSecondaryFilter(secondaryFilter.isBlank() ? null : secondaryFilter);
             }
 
+            if (pricingDate != null) {
+                tenantContext.setSelectedDate(pricingDate.isBlank() ? null : pricingDate);
+            }
+
             String activeFilter = tenantContext.getSecondaryFilter();
+            String activePricingDate = tenantContext.getSelectedDate();
             if (activeFilter != null && !activeFilter.isBlank()) {
                 try {
-                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, activeFilter));
+                    model.addAttribute("gridView", fareService.buildGrid(currentTenant, activeFilter, activePricingDate));
                 } catch (CaracalApiException ex) {
                     log.warn("Unable to build grid from Caracal API: {}", ex.getMessage(), ex);
 

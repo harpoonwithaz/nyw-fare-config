@@ -2,6 +2,13 @@ package ca.sfu.cmpt276.nywfareconfig.fare.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,9 +44,9 @@ public class FareService {
 
     // Price simulate can return 4xx.
     // When it is not sold you get a 4xx with a reason, which is represented as-is:
-    private static final String NO_PRICE = "no PriceRule matched the resolved dimension context";
+    private static final String NO_PRICE_RULE = "no PriceRule matched the resolved dimension context";
     private static final String NOT_SOLD = "not sold";
-    private static final String NOT_SOLD_CURRENTLY = "no rate assignment's condition matches the requested moment or channel";
+    private static final String CONDITION = "no rate assignment's condition matches the requested moment or channel";
 
     public FareService(FareDraftRepository fareDraftRepository, CaracalApiClient caracalApiClient) {
         this.fareDraftRepository = fareDraftRepository;
@@ -51,12 +58,17 @@ public class FareService {
      * Never queries FareDraftRepository; returns hasPendingDraft = false.
      */
     public Optional<FareRule> getBaselineFareRule(Tenant tenant, String origin, String dest, String product) {
+        return getBaselineFareRule(tenant, origin, dest, product, null);
+    }
+
+    public Optional<FareRule> getBaselineFareRule(
+            Tenant tenant, String origin, String dest, String product, String at) {
         if (tenant == null || tenant.getCode() == null || origin == null || dest == null || product == null) {
             return Optional.empty();
         }
 
         if (tenant.getGridMode() == GridMode.OD) {
-            return simulateOdFareRule(tenant.getCode(), origin, dest, product);
+            return simulateOdFareRule(tenant.getCode(), origin, dest, product, at);
         }
 
         // TODO: Swap with Caracal API call for ZONAL
@@ -68,7 +80,12 @@ public class FareService {
      * Returns baseline rule overlaid with any PENDING FareDraft from PostgreSQL.
      */
     public Optional<FareRule> getFareRule(Tenant tenant, String origin, String dest, String product) {
-        Optional<FareRule> ruleOpt = getBaselineFareRule(tenant, origin, dest, product);
+        return getFareRule(tenant, origin, dest, product, null);
+    }
+
+    public Optional<FareRule> getFareRule(
+            Tenant tenant, String origin, String dest, String product, String at) {
+        Optional<FareRule> ruleOpt = getBaselineFareRule(tenant, origin, dest, product, at);
         if (ruleOpt.isEmpty()) {
             return Optional.empty();
         }
@@ -118,6 +135,10 @@ public class FareService {
      */
 
     public FareGrid buildGrid(Tenant tenant, String filterValue) {
+        return buildGrid(tenant, filterValue, null);
+    }
+
+    public FareGrid buildGrid(Tenant tenant, String filterValue, String at) {
         if (tenant == null || tenant.getCode() == null || tenant.getCode().isBlank()
                 || filterValue == null || filterValue.isBlank()) {
             return null;
@@ -126,20 +147,22 @@ public class FareService {
         if (tenant.getGridMode() == GridMode.ZONAL) {
             return buildZonalGrid(tenant, filterValue);
         }
-        return buildOdGrid(tenant, filterValue);
+        return buildOdGrid(tenant, filterValue, at);
     }
 
     /**
-     * Builds Point-to-Point (O-D) matrix from normalized FareRule entities.
-     * - Rows: Outbound Destination Terminals
-     * - Columns: Ticket Products
+- Builds Point-to-Point (O-D) matrix from normalized FareRule entities.
+- - Rows: Outbound Destination Terminals
+- - Columns: Ticket Products
      */
-    private FareGrid buildOdGrid(Tenant tenant, String originSiteCode) {
+    private FareGrid buildOdGrid(Tenant tenant, String originSiteCode, String at) {
         List<CatalogOption> colHeaders = getOdProducts(tenant.getCode()).reversed();
         // follow conventions of the NYW spreadsheet
-        List<CatalogOption> outboundDestinations = getOutboundDestinations(tenant.getCode(), originSiteCode);
+        List<CaracalCatalogDtos.SiteSummary> sites = caracalApiClient.fetchSites(tenant.getCode());
+        List<CatalogOption> outboundDestinations = toOutboundDestinations(sites, originSiteCode);
+        String formattedAt = formatAt(at, findSiteZoneId(sites, originSiteCode));
         Map<String, FareRule> ruleMap = indexRulesByCoordinates(
-                getOdFareRules(tenant.getCode(), originSiteCode, outboundDestinations, colHeaders));
+                getOdFareRules(tenant.getCode(), originSiteCode, outboundDestinations, colHeaders, formattedAt));
 
         List<CatalogOption> visibleRowHeaders = new ArrayList<>();
         List<List<FareCell>> rows = new ArrayList<>();
@@ -220,6 +243,10 @@ public class FareService {
      * Returns O-D FareRule entities overlaid with any PENDING drafts in PostgreSQL.
      */
     public List<FareRule> getOdFareRules(String tenantCode, String originSiteCode) {
+        return getOdFareRules(tenantCode, originSiteCode, null);
+    }
+
+    public List<FareRule> getOdFareRules(String tenantCode, String originSiteCode, String at) {
         if (tenantCode == null || tenantCode.isBlank()
                 || originSiteCode == null || originSiteCode.isBlank()) {
             return List.of();
@@ -227,15 +254,16 @@ public class FareService {
 
         List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
         List<CatalogOption> products = getOdProducts(tenantCode);
-        return getOdFareRules(tenantCode, originSiteCode, destinations, products);
+        return getOdFareRules(tenantCode, originSiteCode, destinations, products, at);
     }
 
     private List<FareRule> getOdFareRules(
             String tenantCode,
             String originSiteCode,
             List<CatalogOption> destinations,
-            List<CatalogOption> products) {
-        List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
+            List<CatalogOption> products,
+            String at) {
+        List<FareRule> rules = getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products, at);
         applyPendingDraftsToRules(tenantCode.toUpperCase(), rules);
         return rules;
     }
@@ -245,6 +273,10 @@ public class FareService {
      * drafts).
      */
     public List<FareRule> getBaselineOdFareRules(String tenantCode, String originSiteCode) {
+        return getBaselineOdFareRules(tenantCode, originSiteCode, null);
+    }
+
+    public List<FareRule> getBaselineOdFareRules(String tenantCode, String originSiteCode, String at) {
         if (tenantCode == null || tenantCode.isBlank()
                 || originSiteCode == null || originSiteCode.isBlank()) {
             return List.of();
@@ -252,19 +284,21 @@ public class FareService {
 
         List<CatalogOption> destinations = getOutboundDestinations(tenantCode, originSiteCode);
         List<CatalogOption> products = getOdProducts(tenantCode);
-        return getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products);
+        return getBaselineOdFareRules(tenantCode, originSiteCode, destinations, products, at);
     }
 
     private List<FareRule> getBaselineOdFareRules(
             String tenantCode,
             String originSiteCode,
             List<CatalogOption> destinations,
-            List<CatalogOption> products) {
+            List<CatalogOption> products,
+            String at) {
         Set<String> soldProductCodes = getRateTable(tenantCode, originSiteCode);
         if (soldProductCodes.isEmpty()) {
             return List.of();
         }
 
+        String formattedAt = formatAtForSite(tenantCode, originSiteCode, at);
         List<FareRule> rules = new ArrayList<>();
 
         for (CatalogOption dest : destinations) {
@@ -281,7 +315,7 @@ public class FareService {
                     continue;
                 }
 
-                simulateOdFareRule(tenantCode, originSiteCode, dest.code(), prod.code())
+                simulateOdFareRule(tenantCode, originSiteCode, dest.code(), prod.code(), formattedAt)
                         .ifPresent(rules::add);
             }
         }
@@ -413,7 +447,7 @@ public class FareService {
     private Set<String> getRateTable(String tenantCode, String originTerminal) {
         Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> rateAssignmentList = caracalApiClient.fetchRateTable(
                 new RateTableGetRequest(tenantCode, "RT-" + originTerminal));
-        if (rateAssignmentList.isEmpty()) {
+        if (rateAssignmentList == null || rateAssignmentList.isEmpty()) {
             return Set.of();
         }
 
@@ -436,11 +470,13 @@ public class FareService {
             String tenantCode,
             String originSiteCode,
             String destSiteCode,
-            String productCode) {
+            String productCode,
+            String at) {
         Map<String, String> dimensions = Map.of("DEST", destSiteCode);
+        String normalizedAt = formatAtForSite(tenantCode, originSiteCode, at);
 
         CaracalSimulationDtos.PriceSimulationResult simulatedPrice = caracalApiClient.simulatePrice(
-                new PriceSimulateRequest(tenantCode, productCode, originSiteCode, dimensions, "")); // for now omitted
+                new PriceSimulateRequest(tenantCode, productCode, originSiteCode, dimensions, normalizedAt));
         if (simulatedPrice == null) {
             return Optional.empty();
         }
@@ -450,12 +486,16 @@ public class FareService {
                     ? simulatedPrice.errorMessage().toLowerCase()
                     : "";
 
-            if (msg.contains(NOT_SOLD)) {
+            if (msg.contains(NOT_SOLD) || msg.contains(CONDITION)) {
                 return Optional.of(FareRule.od(
                         tenantCode, originSiteCode, destSiteCode, productCode, null, null, FareStatus.NOT_SOLD));
             }
 
-            // TODO: Add distinct handling for NOT_SOLD_CURRENTLY / temporal conditions
+            if (msg.contains(NO_PRICE_RULE)) {
+                return Optional.of(FareRule.od(
+                        tenantCode, originSiteCode, destSiteCode, productCode, null, null, FareStatus.NA));
+            }
+
             return Optional.of(FareRule.od(
                     tenantCode, originSiteCode, destSiteCode, productCode, null, null, FareStatus.NA));
         }
@@ -477,6 +517,76 @@ public class FareService {
     // =========================================================================
     // INTERNAL HELPERS & COORDINATE INDEXING
     // =========================================================================
+
+    private List<CatalogOption> toOutboundDestinations(
+            List<CaracalCatalogDtos.SiteSummary> siteList,
+            String originSiteCode) {
+        if (siteList == null) {
+            return List.of();
+        }
+
+        List<CatalogOption> destinations = new ArrayList<>();
+        for (CaracalCatalogDtos.SiteSummary site : siteList) {
+            if (site.siteCode() == null || site.siteCode().isBlank()
+                    || site.siteCode().equalsIgnoreCase(originSiteCode)) {
+                continue;
+            }
+            destinations.add(new CatalogOption(site.siteCode(), site.name()));
+        }
+        return destinations;
+    }
+
+    private ZoneId findSiteZoneId(List<CaracalCatalogDtos.SiteSummary> sites, String siteCode) {
+        if (sites == null || siteCode == null || siteCode.isBlank()) {
+            return ZoneOffset.UTC;
+        }
+        for (CaracalCatalogDtos.SiteSummary site : sites) {
+            if (site.siteCode() != null
+                    && site.siteCode().equalsIgnoreCase(siteCode)
+                    && site.timezone() != null) {
+                return site.timezone();
+            }
+        }
+        return ZoneOffset.UTC;
+    }
+
+    private String formatAtForSite(String tenantCode, String originSiteCode, String at) {
+        if (at == null || at.isBlank()) {
+            return null;
+        }
+        String trimmed = at.trim();
+        try {
+            return OffsetDateTime.parse(trimmed).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException ignored) {
+            // Input is not yet an offset timestamp; look up the site's timezone and format it.
+        }
+
+        ZoneId siteZone = findSiteZoneId(caracalApiClient.fetchSites(tenantCode), originSiteCode);
+        return formatAt(trimmed, siteZone);
+    }
+
+    private String formatAt(String at, ZoneId zoneId) {
+        if (at == null || at.isBlank()) {
+            return null;
+        }
+        String trimmed = at.trim();
+        try {
+            return OffsetDateTime.parse(trimmed).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException ignored) {
+            // Fall through and parse as YYYY-MM-DD
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(trimmed);
+            ZoneId effectiveZone = zoneId != null ? zoneId : ZoneOffset.UTC;
+            return date.atTime(LocalTime.of(10, 0))
+                    .atZone(effectiveZone)
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException(
+                    "Invalid pricing date format (expected YYYY-MM-DD or ISO-8601 offset datetime): " + at, ex);
+        }
+    }
 
     private Map<String, FareRule> indexRulesByCoordinates(List<FareRule> rules) {
         Map<String, FareRule> map = new LinkedHashMap<>();
