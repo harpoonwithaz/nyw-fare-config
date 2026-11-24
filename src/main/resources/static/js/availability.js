@@ -59,12 +59,12 @@ document.addEventListener("DOMContentLoaded", function () {
     function updateModalVisibility() {
         if (typeRecurring && typeRecurring.checked) {
             sectionDaysOfWeek.classList.remove("d-none");
-            sectionTimeRange.classList.remove("d-none");
             sectionDateRange.classList.add("d-none");
+            sectionTimeRange.classList.remove("d-none");
         } else if (typePromo && typePromo.checked) {
             sectionDaysOfWeek.classList.add("d-none");
-            sectionTimeRange.classList.add("d-none");
             sectionDateRange.classList.remove("d-none");
+            sectionTimeRange.classList.remove("d-none");
         }
     }
 
@@ -124,9 +124,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (row) {
                 const badgeContainer = row.querySelector(".temporal-condition-badge-container");
                 if (badgeContainer) {
+                    const timeSuffix = (startTime && endTime) ? ` (${startTime}-${endTime})` : "";
                     const badgeText = conditionType === "RECURRING_WEEKLY"
-                        ? `${selectedDays.length} Days (${startTime}-${endTime})`
-                        : `Promo (${startDate || 'Start'} to ${endDate || 'End'})`;
+                        ? `${selectedDays.length} Days${timeSuffix}`
+                        : `Promo (${startDate || 'Start'} to ${endDate || 'End'})${timeSuffix}`;
                     badgeContainer.innerHTML = `
                         <span class="badge bg-warning-subtle text-warning-emphasis border border-warning condition-badge">
                             <i class="bi bi-clock-history me-1"></i>${badgeText}

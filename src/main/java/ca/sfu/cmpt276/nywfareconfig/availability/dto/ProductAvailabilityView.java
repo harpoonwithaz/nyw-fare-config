@@ -60,16 +60,20 @@ public class ProductAvailabilityView {
             return (activeWhen != null && !activeWhen.isBlank()) ? activeWhen : "All Days Active";
         }
 
+        String timeSuffix = (tc.getStartTime() != null && tc.getEndTime() != null)
+                ? " (" + tc.getStartTime() + "-" + tc.getEndTime() + ")"
+                : "";
+
         if ("TEMPORARY_PROMO".equals(tc.getConditionType())) {
             String start = tc.getStartDate() != null ? tc.getStartDate().toString() : "Now";
             String end = tc.getEndDate() != null ? tc.getEndDate().toString() : "Ongoing";
-            return "Promo (" + start + " to " + end + ")";
+            return "Promo (" + start + " to " + end + ")" + timeSuffix;
         }
 
         if ("RECURRING_MONTHLY".equals(tc.getConditionType())
                 && tc.getDayOfMonthStart() != null
                 && tc.getDayOfMonthEnd() != null) {
-            return "Days " + tc.getDayOfMonthStart() + "-" + tc.getDayOfMonthEnd() + " of Month";
+            return "Days " + tc.getDayOfMonthStart() + "-" + tc.getDayOfMonthEnd() + " of Month" + timeSuffix;
         }
 
         String daysText = "All Days";
@@ -80,10 +84,7 @@ public class ProductAvailabilityView {
                     .collect(Collectors.joining(", "));
         }
 
-        if (tc.getStartTime() != null && tc.getEndTime() != null) {
-            return daysText + " (" + tc.getStartTime() + "-" + tc.getEndTime() + ")";
-        }
-        return daysText;
+        return daysText + timeSuffix;
     }
 
     public String getSiteCode() {

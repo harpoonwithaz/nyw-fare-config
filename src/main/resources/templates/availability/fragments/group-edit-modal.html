@@ -85,19 +85,7 @@
                         <div class="form-text">Uncheck days on which this ticket offering should be automatically disabled.</div>
                     </div>
 
-                    <!-- Section 2: Time Range Inputs (Recurring) -->
-                    <div id="sectionTimeRange" class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label for="inputStartTime" class="form-label fw-bold">Daily Start Time</label>
-                            <input type="time" class="form-control" id="inputStartTime" value="06:00">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="inputEndTime" class="form-label fw-bold">Daily End Time</label>
-                            <input type="time" class="form-control" id="inputEndTime" value="22:00">
-                        </div>
-                    </div>
-
-                    <!-- Section 3: Date Range Inputs (Temporary Promo) -->
+                    <!-- Section 2: Date Range Inputs (Temporary Promo) -->
                     <div id="sectionDateRange" class="row g-3 mb-4 d-none">
                         <div class="col-md-6">
                             <label for="inputStartDate" class="form-label fw-bold">Effective Start Date</label>
@@ -106,6 +94,18 @@
                         <div class="col-md-6">
                             <label for="inputEndDate" class="form-label fw-bold">Effective End Date</label>
                             <input type="date" class="form-control" id="inputEndDate">
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Time Window Inputs (Shared for Recurring & Date-Range Promo) -->
+                    <div id="sectionTimeRange" class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="inputStartTime" class="form-label fw-bold">Start Time (Hours)</label>
+                            <input type="time" class="form-control" id="inputStartTime" step="3600" value="06:00">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="inputEndTime" class="form-label fw-bold">End Time (Hours)</label>
+                            <input type="time" class="form-control" id="inputEndTime" step="3600" value="22:00">
                         </div>
                     </div>
                 </form>
