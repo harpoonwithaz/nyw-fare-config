@@ -6,7 +6,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,14 +48,18 @@ public class FareDraftService {
             throw new IllegalArgumentException("tenantCode is required.");
         }
         return fareDraftRepository.findByTenantCodeAndDraftStatus(
-            tenantCode.toUpperCase(), DraftStatus.PENDING);
+                tenantCode.trim().toUpperCase(Locale.ROOT), DraftStatus.PENDING);
     }
 
-    // Validates against baseline rules, resolves server-side originalPrice and
-    // actorEmail,
+    // Validates against baseline rules, resolves server-side originalPrice and actorEmail,
     // and batch-upserts (or self-cancels) FareDraft rows in PostgreSQL.
     @Transactional
     public int stageChanges(Tenant activeTenant, List<FareChangeRequest> requests) {
+        return stageChanges(activeTenant, requests, null);
+    }
+
+    @Transactional
+    public int stageChanges(Tenant activeTenant, List<FareChangeRequest> requests, String pricingDate) {
         if (activeTenant == null || activeTenant.getCode() == null || activeTenant.getCode().isBlank()) {
             throw new IllegalArgumentException("An active tenant must be selected before staging fare changes.");
         }
@@ -61,9 +67,10 @@ public class FareDraftService {
             throw new IllegalArgumentException("At least one fare change is required.");
         }
 
-        String tenantCode = activeTenant.getCode();
+        String tenantCode = activeTenant.getCode().trim().toUpperCase(Locale.ROOT);
         GridMode gridMode = activeTenant.getGridMode();
         String actorEmail = actorService.currentActorHeader();
+        boolean hasPricingDate = pricingDate != null && !pricingDate.isBlank();
 
         // Deduplicates incoming request list by (origin, dest, product)
         Map<String, FareChangeRequest> deduplicatedRequests = new LinkedHashMap<>();
@@ -72,7 +79,7 @@ public class FareDraftService {
             deduplicatedRequests.put(key, req);
         }
 
-        // loads all PENDING FareDrafts for tenant into HashMap
+        // Loads all PENDING FareDrafts for tenant into HashMap
         List<FareDraft> existingPending = fareDraftRepository.findByTenantCodeAndDraftStatus(
                 tenantCode, DraftStatus.PENDING);
         Map<String, FareDraft> existingByCoord = new HashMap<>();
@@ -84,16 +91,38 @@ public class FareDraftService {
             existingByCoord.put(key, draft);
         }
 
+        // Cache resolved ISO-8601 offset timestamps per origin to avoid repeated fetchSites calls
+        Map<String, String> resolvedAtByOrigin = new HashMap<>();
         List<FareDraft> toSave = new ArrayList<>();
         List<FareDraft> toDelete = new ArrayList<>();
 
         // Resolve baseline prices in memory and build batch upsert/delete lists
         for (FareChangeRequest req : deduplicatedRequests.values()) {
-            FareRule baselineRule = fareService.getBaselineFareRule(
-                    activeTenant,
-                    req.getOriginIdentifier(),
-                    req.getDestIdentifier(),
-                    req.getProductCode())
+            Optional<FareRule> baselineRuleOpt;
+            if (!hasPricingDate) {
+                baselineRuleOpt = fareService.getBaselineFareRule(
+                        activeTenant,
+                        req.getOriginIdentifier(),
+                        req.getDestIdentifier(),
+                        req.getProductCode());
+            } else {
+                String resolvedAt = pricingDate;
+                if (gridMode == GridMode.OD && req.getOriginIdentifier() != null) {
+                    String originKey = req.getOriginIdentifier().trim().toUpperCase(Locale.ROOT);
+                    resolvedAt = resolvedAtByOrigin.computeIfAbsent(originKey, origin -> {
+                        String formatted = fareService.resolvePricingTimestamp(tenantCode, origin, pricingDate);
+                        return formatted != null ? formatted : pricingDate;
+                    });
+                }
+                baselineRuleOpt = fareService.getBaselineFareRule(
+                        activeTenant,
+                        req.getOriginIdentifier(),
+                        req.getDestIdentifier(),
+                        req.getProductCode(),
+                        resolvedAt);
+            }
+
+            FareRule baselineRule = baselineRuleOpt
                     .orElseThrow(() -> new IllegalArgumentException(String.format(
                             "Invalid fare coordinate: %s -> %s (%s)",
                             req.getOriginIdentifier(), req.getDestIdentifier(), req.getProductCode())));
@@ -118,8 +147,7 @@ public class FareDraftService {
                     baselineRule.getProductCode());
             FareDraft existingDraft = existingByCoord.get(coordKey);
 
-            // Preserve originalPrice if a PENDING draft already exists; otherwise use
-            // baseline
+            // Preserve originalPrice if a PENDING draft already exists; otherwise use baseline
             BigDecimal originalPrice = (existingDraft != null)
                     ? existingDraft.getOriginalPrice()
                     : baselineRule.getPrice();
@@ -132,8 +160,7 @@ public class FareDraftService {
                     ? req.getTierCode().trim()
                     : baselineRule.getTierCode();
 
-            // Self-canceling edit guard: if edited back to baseline price and status,
-            // delete existing draft
+            // Self-canceling edit guard: if edited back to baseline price and status, delete existing draft
             if (isSamePrice(normalizedNewPrice, originalPrice)
                     && req.getTargetStatus() == baselineRule.getStatus()) {
                 if (existingDraft != null) {
@@ -185,7 +212,7 @@ public class FareDraftService {
             return 0L;
         }
         return fareDraftRepository.countByTenantCodeAndDraftStatus(
-                tenantCode.toUpperCase(), DraftStatus.PENDING);
+                tenantCode.trim().toUpperCase(Locale.ROOT), DraftStatus.PENDING);
     }
 
     private boolean isSamePrice(BigDecimal a, BigDecimal b) {
@@ -199,8 +226,8 @@ public class FareDraftService {
     }
 
     private String coordinateKey(String origin, String dest, String product) {
-        return origin.trim().toUpperCase()
-                + "::" + dest.trim().toUpperCase()
-                + "::" + product.trim().toUpperCase();
+        return origin.trim().toUpperCase(Locale.ROOT)
+                + "::" + dest.trim().toUpperCase(Locale.ROOT)
+                + "::" + product.trim().toUpperCase(Locale.ROOT);
     }
 }

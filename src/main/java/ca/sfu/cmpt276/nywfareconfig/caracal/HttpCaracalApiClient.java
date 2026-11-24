@@ -18,17 +18,14 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
-import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 @Service
 public class HttpCaracalApiClient implements CaracalApiClient {
 
     private final RestClient caracalRestClient;
-    private final ActorService actorService;
 
-    public HttpCaracalApiClient(RestClient caracalRestClient, ActorService actorService) {
+    public HttpCaracalApiClient(RestClient caracalRestClient) {
         this.caracalRestClient = caracalRestClient;
-        this.actorService = actorService;
     }
 
     // ==============================================================================
@@ -185,6 +182,12 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 || requestPayload.dimensions() == null) {
             throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
         }
+        
+        /*
+        For debugging:
+        System.out.println("Price simulate called for product: *" + requestPayload.productCode() +
+                            "* site: *" + requestPayload.siteCode() + "* at: *" + requestPayload.at() + "*.");
+        */
 
         String actionDescription = "simulating price for product "
                 + requestPayload.productCode() + " at site " + requestPayload.siteCode();
@@ -200,7 +203,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                         .retrieve()
                         .body(CaracalSimulationDtos.PriceSimulateResponse.class);
 
-                if (response == null || response.pricing() == null) {
+                if (response == null || response.pricing() == null || response.pricing().total() == null) {
                     throw new CaracalApiException(
                             "Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
@@ -343,7 +346,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             return request.get();
         } catch (ResourceAccessException ex) {
             throw new CaracalUnavailableException(
-                    "Unable to reach the Caracal platform. Please verify the service is running.", ex);
+                    "Unable to reach the Caracal platform.", ex);
         } catch (RestClientResponseException ex) {
             throw new CaracalApiException(
                     "Caracal API error (" + ex.getStatusCode().value() + ") while " + actionDescription + ".", ex);

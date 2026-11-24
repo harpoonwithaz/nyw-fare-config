@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal.dto;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +27,7 @@ public class CaracalCatalogDtos {
 
     // GET /functions/site-list?tenantCode=
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record SiteSummary(String siteCode, String name) {
+    public record SiteSummary(String siteCode, String name, ZoneId timezone) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
