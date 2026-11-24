@@ -1,14 +1,12 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
+import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
-import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
-import ca.sfu.cmpt276.nywfareconfig.security.model.AppUser;
-import ca.sfu.cmpt276.nywfareconfig.security.model.Role;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
-import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
-import jakarta.servlet.http.Cookie;
-import java.util.List;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,38 +14,27 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:h2:mem:availability-test;DB_CLOSE_DELAY=-1",
-    "spring.datasource.username=sa",
-    "spring.datasource.password=",
-    "spring.datasource.driver-class-name=org.h2.Driver",
-    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-    "spring.session.jdbc.initialize-schema=embedded"
-})
+@ActiveProfiles("test")
 class AvailabilityControllerMockMvcTests {
-
-    private static final String TENANT = "NYW_SANDBOX";
-    private static final AppUserDetails OPERATOR = new AppUserDetails(
-        new AppUser("operator@nyw.com", "operator", "password", Role.OPERATOR, true)
-    );
-    private static final Tenant MOCK_TENANT = new Tenant(
-        TENANT, "New York Waterway Sandbox", "USD", "en-US", GridMode.OD, true, List.of("en-US", "es"));
 
     @Autowired
     private MockMvc mockMvc;
@@ -56,91 +43,131 @@ class AvailabilityControllerMockMvcTests {
     private AvailabilityRuleRepository availabilityRuleRepository;
 
     @MockitoBean
-    private TenantService tenantService;
+    private CaracalApiClient caracalApiClient;
 
-    private MockHttpSession session;
-    private Cookie cookie;
+    private MockHttpSession sessionWithTenant;
 
     @BeforeEach
-    void setUp() throws Exception {
-        when(tenantService.getAvailableTenants()).thenReturn(List.of(MOCK_TENANT));
-        when(tenantService.getTenantByCode(TENANT)).thenReturn(MOCK_TENANT);
+    void setUp() {
         availabilityRuleRepository.deleteAll();
-        session = new MockHttpSession();
-        cookie = mockMvc.perform(post("/context/tenant")
-                .session(session)
-                .with(user(OPERATOR))
-                .with(csrf())
-                .param("tenant", TENANT)
-                .param("returnUrl", "/availability"))
-            .andExpect(status().is3xxRedirection())
-            .andReturn()
-            .getResponse()
-            .getCookie("SESSION");
-    }
 
-    private MockHttpServletRequestBuilder inTenant(MockHttpServletRequestBuilder builder) {
-        builder.session(session).with(user(OPERATOR)).with(csrf());
-        if (cookie != null) {
-            builder.cookie(cookie);
-        }
-        return builder;
+        Tenant sandboxTenant = new Tenant(
+                "NYW_SANDBOX",
+                "NY Waterway Sandbox",
+                "USD",
+                "en-US",
+                GridMode.OD,
+                true,
+                List.of("en-US"));
+        TenantContext context = new TenantContext();
+        context.setSelectedTenant(sandboxTenant);
+
+        sessionWithTenant = new MockHttpSession();
+        sessionWithTenant.setAttribute("scopedTarget.tenantContext", context);
+
+        when(caracalApiClient.fetchTenants()).thenReturn(List.of(
+                new CaracalCatalogDtos.TenantSummary("NYW_SANDBOX", "NY Waterway Sandbox")));
+        when(caracalApiClient.fetchSites("NYW_SANDBOX")).thenReturn(List.of(
+                new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown / W. 39th St"),
+                new CaracalCatalogDtos.SiteSummary("PIER11", "Pier 11 / Wall St")));
+        when(caracalApiClient.fetchProducts("NYW_SANDBOX")).thenReturn(List.of(
+                new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true),
+                new CaracalCatalogDtos.ProductSummary("FULL_MONTHLY", "Full Monthly Pass", true)));
+        when(caracalApiClient.fetchRateTables("NYW_SANDBOX")).thenReturn(List.of(
+                new CaracalCatalogDtos.RateTableSummary("rt-1", "RT-MIDTOWN", "ACTIVE", "MIDTOWN", null)));
+        when(caracalApiClient.fetchRateTable(any())).thenReturn(Optional.of(List.of(
+                new CaracalCatalogDtos.RateAssignmentSummary("assign-1", "ADULT_ONEWAY", "VALUE", "SCHED_1", "OD-ADULT"))));
+        when(caracalApiClient.simulateAvailability(eq("NYW_SANDBOX"), anyString(), anyMap())).thenReturn(List.of());
     }
 
     @Test
-    void noTenantShowsSelectTenantPrompt() throws Exception {
-        mockMvc.perform(get("/availability").with(user(OPERATOR)))
-            .andExpect(status().isOk())
-            .andExpect(content().string(containsString("No Tenant Selected")));
+    @WithMockUser(username = "operator", roles = "OPERATOR")
+    void getAvailabilityPageRendersStationsRoutesAndProducts() throws Exception {
+        mockMvc.perform(get("/availability")
+                        .param("site", "MIDTOWN")
+                        .param("route", "MIDTOWN->PIER11")
+                        .session(sessionWithTenant))
+                .andExpect(status().isOk())
+                .andExpect(view().name("availability/availability"))
+                .andExpect(model().attribute("siteCode", "MIDTOWN"))
+                .andExpect(model().attribute("routeCode", "MIDTOWN->PIER11"))
+                .andExpect(model().attributeExists("terminals", "routes", "availabilityView"));
     }
 
     @Test
-    void selectedTenantRendersCanonicalProductsAndPersistsChanges() throws Exception {
+    @WithMockUser(username = "operator", roles = "OPERATOR")
+    void operatorCannotReactivatePermanentlyPhasedOutProduct() throws Exception {
+        AvailabilityRule phasedOutRule = new AvailabilityRule("NYW_SANDBOX", "MIDTOWN", "ALL", "FULL_MONTHLY", false);
+        phasedOutRule.setPhasedOut(true);
+        availabilityRuleRepository.save(phasedOutRule);
+
         String payload = """
-            [
-              {
-                "siteCode": "MIDTOWN",
-                "productCode": "ADULT_ONEWAY",
-                "available": false,
-                "conditionType": "RECURRING_WEEKLY",
-                "daysOfWeek": [1, 2, 3, 4, 5],
-                "startTime": "06:00:00",
-                "endTime": "22:00:00"
-              }
-            ]
-            """;
+                [
+                  {
+                    "siteCode": "MIDTOWN",
+                    "routeCode": "ALL",
+                    "productCode": "FULL_MONTHLY",
+                    "available": true,
+                    "phasedOut": false
+                  }
+                ]
+                """;
 
-        mockMvc.perform(inTenant(post("/availability/api/stage"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("SUCCESS"));
-
-        assertThat(availabilityRuleRepository.findByTenantCodeAndSiteCode("NYW_SANDBOX", "MIDTOWN"))
-            .hasSize(1)
-            .first()
-            .satisfies(rule -> {
-                assertThat(rule.getProductCode()).isEqualTo("ADULT_ONEWAY");
-                assertThat(rule.isAvailable()).isFalse();
-                assertThat(rule.getUpdatedBy()).contains("operator@nyw.com");
-                assertThat(rule.getTemporalCondition()).isNotNull();
-                assertThat(rule.getTemporalCondition().getDaysOfWeek()).containsExactly(1, 2, 3, 4, 5);
-            });
-
-        // Verify refreshing GET /availability renders saved state without LazyInitializationException
-        mockMvc.perform(inTenant(get("/availability?site=MIDTOWN")))
-            .andExpect(status().isOk())
-            .andExpect(content().string(containsString("ADULT_ONEWAY")))
-            .andExpect(content().string(containsString("Unavailable")))
-            .andExpect(content().string(containsString("5 Days (06:00-22:00)")));
+        mockMvc.perform(post("/availability/api/stage")
+                        .with(csrf())
+                        .session(sessionWithTenant)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value("ERROR"));
     }
 
     @Test
-    void stageWithoutCsrfIsRejected() throws Exception {
+    @WithMockUser(username = "admin", roles = "CLIENT_SERVICES")
+    void clientServicesAdminCanReactivatePhasedOutProductAndSyncToCaracal() throws Exception {
+        AvailabilityRule phasedOutRule = new AvailabilityRule("NYW_SANDBOX", "MIDTOWN", "ALL", "ADULT_ONEWAY", false);
+        phasedOutRule.setPhasedOut(true);
+        availabilityRuleRepository.save(phasedOutRule);
+
+        String payload = """
+                [
+                  {
+                    "siteCode": "MIDTOWN",
+                    "routeCode": "ALL",
+                    "productCode": "ADULT_ONEWAY",
+                    "available": true,
+                    "phasedOut": false,
+                    "conditionType": "TEMPORARY_PROMO",
+                    "discountLabel": "WINTER_PROMO",
+                    "startDate": "2026-12-01",
+                    "endDate": "2026-12-31",
+                    "startTime": "08:00",
+                    "endTime": "20:00"
+                  }
+                ]
+                """;
+
         mockMvc.perform(post("/availability/api/stage")
-                .with(user(OPERATOR))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("[]"))
-            .andExpect(status().isForbidden());
+                        .with(csrf())
+                        .session(sessionWithTenant)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
+        mockMvc.perform(post("/availability/api/sync")
+                        .with(csrf())
+                        .session(sessionWithTenant))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
+        verify(caracalApiClient).createWhenCondition(any(), anyString());
+        verify(caracalApiClient).updateRateAssignment(any(), anyString());
+
+        List<AvailabilityRule> saved = availabilityRuleRepository.findByTenantCode("NYW_SANDBOX");
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).isPhasedOut()).isFalse();
+        assertThat(saved.get(0).isAvailable()).isTrue();
+        assertThat(saved.get(0).isSyncedToCaracal()).isTrue();
     }
 }

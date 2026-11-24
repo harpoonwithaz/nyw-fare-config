@@ -30,12 +30,13 @@
                     <!-- Hidden Target Fields -->
                     <input type="hidden" id="modalProductCode" name="productCode" value="ADULT_ONEWAY">
                     <input type="hidden" id="modalSiteCode" name="siteCode" th:value="${siteCode}">
+                    <input type="hidden" id="modalRouteCode" name="routeCode" th:value="${routeCode}">
 
                     <!-- Selected Target Badge -->
                     <div class="mb-4 p-3 bg-light rounded border d-flex align-items-center justify-content-between gap-3">
                         <div>
                             <span class="text-muted small d-block">Target Configuration</span>
-                            <strong class="text-dark fs-6" id="modalTargetLabel">Product: ADULT | Site: MIDTOWN</strong>
+                            <strong class="text-dark fs-6" id="modalTargetLabel">Product: ADULT_ONEWAY | Origin: MIDTOWN | Dest: ALL</strong>
                         </div>
                         <span class="badge bg-light text-dark border">Epic 3 Rule Engine</span>
                     </div>

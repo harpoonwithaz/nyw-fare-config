@@ -1,14 +1,25 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // client state manager so we don't spam requests on every click
+    const tableEl = document.getElementById("availabilityTable");
     const stagedAvailabilityDrafts = {
-        siteCode: document.querySelector("[data-site]")?.getAttribute("data-site") || "MIDTOWN",
+        siteCode: tableEl?.getAttribute("data-site") || "MIDTOWN",
+        destCode: tableEl?.getAttribute("data-dest") || "ALL",
+        routeCode: tableEl?.getAttribute("data-route") || "ALL",
         drafts: {},
         isDirty: false
     };
 
     const btnSave = document.getElementById("btnSaveAvailabilityDrafts");
+    const btnDiscard = document.getElementById("discardDraftsBtn");
+    const changesCounter = document.getElementById("changesCounter");
     const alertBanner = document.getElementById("availabilityAlert");
     const alertText = document.getElementById("availabilityAlertText");
+
+    function formatTargetLabel(productCode) {
+        const destDisplay = stagedAvailabilityDrafts.destCode === "ALL"
+            ? "All Destinations"
+            : stagedAvailabilityDrafts.destCode;
+        return `Product: ${productCode} | Origin: ${stagedAvailabilityDrafts.siteCode} | Dest: ${destDisplay}`;
+    }
 
     // --- 1. handle toggle switches (story 3.1) ---
     document.querySelectorAll(".availability-toggle").forEach(toggle => {
@@ -16,17 +27,16 @@ document.addEventListener("DOMContentLoaded", function () {
             const productCode = this.getAttribute("data-product");
             const isAvailable = this.checked;
 
-            // update the row label visually
             const row = this.closest("tr");
             const statusLabel = row.querySelector(".status-label");
             if (statusLabel) {
                 statusLabel.textContent = isAvailable ? "Available" : "Unavailable";
             }
 
-            // add or update state in local object
             if (!stagedAvailabilityDrafts.drafts[productCode]) {
                 stagedAvailabilityDrafts.drafts[productCode] = {
                     siteCode: stagedAvailabilityDrafts.siteCode,
+                    routeCode: stagedAvailabilityDrafts.routeCode,
                     productCode: productCode,
                     available: isAvailable
                 };
@@ -39,14 +49,13 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // --- 2. modal condition builder stuff (story 3.3) ---
+    // --- 2. modal condition builder (story 3.3) ---
     const typeRecurring = document.getElementById("typeRecurring");
     const typePromo = document.getElementById("typePromo");
     const sectionDaysOfWeek = document.getElementById("sectionDaysOfWeek");
     const sectionTimeRange = document.getElementById("sectionTimeRange");
     const sectionDateRange = document.getElementById("sectionDateRange");
 
-    // swap modal fields depending on selected radio button
     function updateModalVisibility() {
         if (typeRecurring && typeRecurring.checked) {
             sectionDaysOfWeek.classList.remove("d-none");
@@ -64,27 +73,23 @@ document.addEventListener("DOMContentLoaded", function () {
         typePromo.addEventListener("change", updateModalVisibility);
     }
 
-    // top header button defaults cleanly to ADULT_ONEWAY
     const btnOpenConditionModal = document.getElementById("btnOpenConditionModal");
     if (btnOpenConditionModal) {
         btnOpenConditionModal.addEventListener("click", function () {
-            document.getElementById("modalProductCode").value = "ADULT_ONEWAY";
-            document.getElementById("modalTargetLabel").textContent =
-                `Product: ADULT_ONEWAY | Site: ${stagedAvailabilityDrafts.siteCode}`;
+            const firstProduct = document.querySelector("[data-product]")?.getAttribute("data-product") || "ADULT_ONEWAY";
+            document.getElementById("modalProductCode").value = firstProduct;
+            document.getElementById("modalTargetLabel").textContent = formatTargetLabel(firstProduct);
         });
     }
 
-    // open modal for specific product row
     document.querySelectorAll(".btn-configure-rule").forEach(btn => {
         btn.addEventListener("click", function () {
             const productCode = this.getAttribute("data-product");
             document.getElementById("modalProductCode").value = productCode;
-            document.getElementById("modalTargetLabel").textContent =
-                `Product: ${productCode} | Site: ${stagedAvailabilityDrafts.siteCode}`;
+            document.getElementById("modalTargetLabel").textContent = formatTargetLabel(productCode);
         });
     });
 
-    // grab values from modal and save into staged state object
     const btnApplyCondition = document.getElementById("btnApplyCondition");
     if (btnApplyCondition) {
         btnApplyCondition.addEventListener("click", function () {
@@ -101,6 +106,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const toggleState = document.getElementById(`toggle-${productCode}`)?.checked ?? true;
                 stagedAvailabilityDrafts.drafts[productCode] = {
                     siteCode: stagedAvailabilityDrafts.siteCode,
+                    routeCode: stagedAvailabilityDrafts.routeCode,
                     productCode: productCode,
                     available: toggleState
                 };
@@ -114,7 +120,6 @@ document.addEventListener("DOMContentLoaded", function () {
             draft.startDate = startDate || null;
             draft.endDate = endDate || null;
 
-            // update table row badge text
             const row = document.querySelector(`tr[data-product="${productCode}"]`);
             if (row) {
                 const badgeContainer = row.querySelector(".temporal-condition-badge-container");
@@ -133,14 +138,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             enableSaveButton();
 
-            // close modal
             const modalEl = document.getElementById("conditionBuilderModal");
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
             if (modalInstance) modalInstance.hide();
         });
     }
 
-    // --- 3. quick helpers & batch save handler ---
+    // --- 3. helpers, discard & batch save handler ---
     function markRowStaged(row) {
         if (!row) return;
         const stagedBadge = row.querySelector(".staged-badge");
@@ -152,16 +156,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function enableSaveButton() {
         stagedAvailabilityDrafts.isDirty = true;
+        const count = Object.keys(stagedAvailabilityDrafts.drafts).length;
+        if (changesCounter) {
+            changesCounter.textContent = String(count);
+        }
         if (btnSave) {
             btnSave.classList.remove("disabled");
             btnSave.removeAttribute("disabled");
+        }
+        if (btnDiscard) {
+            btnDiscard.classList.remove("disabled");
+            btnDiscard.removeAttribute("disabled");
         }
         if (alertBanner) {
             alertBanner.classList.remove("d-none");
         }
     }
 
-    // post batch to spring boot when save button clicked
+    if (btnDiscard) {
+        btnDiscard.addEventListener("click", function () {
+            window.location.reload();
+        });
+    }
+
     if (btnSave) {
         btnSave.addEventListener("click", function () {
             const payload = Object.values(stagedAvailabilityDrafts.drafts);
@@ -191,17 +208,18 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 stagedAvailabilityDrafts.isDirty = false;
                 stagedAvailabilityDrafts.drafts = {};
+                if (changesCounter) changesCounter.textContent = "0";
+                if (btnDiscard) btnDiscard.setAttribute("disabled", "true");
 
                 if (alertText) alertText.textContent = data.message || "availability rules saved!";
                 if (alertBanner) {
-                    alertBanner.className = "alert alert-success alert-dismissible fade show mb-4 shadow-sm";
+                    alertBanner.className = "alert alert-success alert-dismissible fade show mb-3 shadow-sm";
                 }
 
-                // update row badges so user knows DB has it
                 document.querySelectorAll(".staged-badge").forEach(badge => {
                     if (badge.textContent.includes("STAGED")) {
-                        badge.className = "badge bg-info-subtle text-info border staged-badge";
-                        badge.innerHTML = `<i class="bi bi-clock-fill me-1"></i>SAVED IN DB`;
+                        badge.className = "badge bg-info-subtle text-info-emphasis border border-info-subtle staged-badge";
+                        badge.innerHTML = `<i class="bi bi-database-check me-1"></i>Saved in DB`;
                     }
                 });
             })
@@ -210,7 +228,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 btnSave.classList.remove("disabled");
                 btnSave.removeAttribute("disabled");
                 if (alertBanner) {
-                    alertBanner.className = "alert alert-danger alert-dismissible fade show mb-4 shadow-sm";
+                    alertBanner.className = "alert alert-danger alert-dismissible fade show mb-3 shadow-sm";
                 }
                 if (alertText) alertText.textContent = "error saving availability changes. try again.";
             });

@@ -1,65 +1,188 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.dto;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.TemporalCondition;
 
-import java.util.HashMap;
+import java.time.DayOfWeek;
+import java.time.format.TextStyle;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ProductAvailabilityView {
+
     private String siteCode;
-    private List<String> ticketProducts;
-    private Map<String, Boolean> activeToggles;
-    private Map<String, TemporalCondition> temporalConditions = new HashMap<>();
+    private String routeCode = AvailabilityRule.ALL_ROUTES;
+    private String rateTableName;
+    private List<String> allProducts;
+    private Map<String, String> productNames = new LinkedHashMap<>();
+    private Map<String, Boolean> productToggles = new LinkedHashMap<>();
+    private Map<String, Boolean> phasedOutProducts = new LinkedHashMap<>();
+    private Map<String, String> rateAssignmentIds = new LinkedHashMap<>();
+    private Map<String, String> activeWhenConditions = new LinkedHashMap<>();
+    private Map<String, String> caracalStatuses = new LinkedHashMap<>();
+    private Map<String, Boolean> savedInDb = new LinkedHashMap<>();
+    private Map<String, TemporalCondition> temporalConditions = new LinkedHashMap<>();
 
-    public ProductAvailabilityView() {}
-
-    public ProductAvailabilityView(String siteCode, List<String> ticketProducts, Map<String, Boolean> activeToggles) {
+    public ProductAvailabilityView(
+            String siteCode,
+            List<String> allProducts,
+            Map<String, Boolean> productToggles,
+            Map<String, TemporalCondition> temporalConditions) {
         this.siteCode = siteCode;
-        this.ticketProducts = ticketProducts;
-        this.activeToggles = activeToggles;
-    }
-
-    public ProductAvailabilityView(String siteCode,
-                                   List<String> ticketProducts,
-                                   Map<String, Boolean> activeToggles,
-                                   Map<String, TemporalCondition> temporalConditions) {
-        this.siteCode = siteCode;
-        this.ticketProducts = ticketProducts;
-        this.activeToggles = activeToggles;
-        this.temporalConditions = temporalConditions != null ? temporalConditions : new HashMap<>();
-    }
-
-    public boolean isProductAvailable(String prod) {
-        return activeToggles != null && activeToggles.getOrDefault(prod, true);
-    }
-
-    public TemporalCondition getConditionForProduct(String prod) {
-        return temporalConditions != null ? temporalConditions.get(prod) : null;
-    }
-
-    public String getConditionSummary(String prod) {
-        TemporalCondition cond = getConditionForProduct(prod);
-        if (cond == null) return "All Days Active";
-        if ("TEMPORARY_PROMO".equals(cond.getConditionType())) {
-            return "Promo (" + (cond.getStartDate() != null ? cond.getStartDate() : "Start")
-                    + " to " + (cond.getEndDate() != null ? cond.getEndDate() : "End") + ")";
+        this.allProducts = allProducts;
+        if (productToggles != null) {
+            this.productToggles = productToggles;
         }
-        int days = cond.getDaysOfWeek() != null ? cond.getDaysOfWeek().size() : 0;
-        String start = cond.getStartTime() != null ? cond.getStartTime().toString() : "00:00";
-        String end = cond.getEndTime() != null ? cond.getEndTime().toString() : "23:59";
-        return days + " Days (" + start + "-" + end + ")";
+        if (temporalConditions != null) {
+            this.temporalConditions = temporalConditions;
+        }
     }
 
-    public String getSiteCode() { return siteCode; }
-    public void setSiteCode(String siteCode) { this.siteCode = siteCode; }
+    public boolean isProductAvailable(String productCode) {
+        return Boolean.TRUE.equals(productToggles.get(productCode));
+    }
 
-    public List<String> getTicketProducts() { return ticketProducts; }
-    public void setTicketProducts(List<String> ticketProducts) { this.ticketProducts = ticketProducts; }
+    public boolean isProductPhasedOut(String productCode) {
+        return Boolean.TRUE.equals(phasedOutProducts.get(productCode));
+    }
 
-    public Map<String, Boolean> getActiveToggles() { return activeToggles; }
-    public void setActiveToggles(Map<String, Boolean> activeToggles) { this.activeToggles = activeToggles; }
+    public TemporalCondition getConditionForProduct(String productCode) {
+        return temporalConditions.get(productCode);
+    }
 
-    public Map<String, TemporalCondition> getTemporalConditions() { return temporalConditions; }
-    public void setTemporalConditions(Map<String, TemporalCondition> temporalConditions) { this.temporalConditions = temporalConditions; }
+    public String getConditionSummary(String productCode) {
+        TemporalCondition tc = temporalConditions.get(productCode);
+        if (tc == null) {
+            String activeWhen = activeWhenConditions.get(productCode);
+            return (activeWhen != null && !activeWhen.isBlank()) ? activeWhen : "All Days Active";
+        }
+
+        if ("TEMPORARY_PROMO".equals(tc.getConditionType())) {
+            String start = tc.getStartDate() != null ? tc.getStartDate().toString() : "Now";
+            String end = tc.getEndDate() != null ? tc.getEndDate().toString() : "Ongoing";
+            return "Promo (" + start + " to " + end + ")";
+        }
+
+        if ("RECURRING_MONTHLY".equals(tc.getConditionType())
+                && tc.getDayOfMonthStart() != null
+                && tc.getDayOfMonthEnd() != null) {
+            return "Days " + tc.getDayOfMonthStart() + "-" + tc.getDayOfMonthEnd() + " of Month";
+        }
+
+        String daysText = "All Days";
+        if (tc.getDaysOfWeek() != null && !tc.getDaysOfWeek().isEmpty() && tc.getDaysOfWeek().size() < 7) {
+            daysText = tc.getDaysOfWeek().stream()
+                    .sorted()
+                    .map(d -> DayOfWeek.of(d).getDisplayName(TextStyle.SHORT, Locale.ENGLISH))
+                    .collect(Collectors.joining(", "));
+        }
+
+        if (tc.getStartTime() != null && tc.getEndTime() != null) {
+            return daysText + " (" + tc.getStartTime() + "-" + tc.getEndTime() + ")";
+        }
+        return daysText;
+    }
+
+    public String getSiteCode() {
+        return siteCode;
+    }
+
+    public void setSiteCode(String siteCode) {
+        this.siteCode = siteCode;
+    }
+
+    public String getRouteCode() {
+        return routeCode;
+    }
+
+    public void setRouteCode(String routeCode) {
+        this.routeCode = routeCode;
+    }
+
+    public String getRateTableName() {
+        return rateTableName;
+    }
+
+    public void setRateTableName(String rateTableName) {
+        this.rateTableName = rateTableName;
+    }
+
+    public List<String> getAllProducts() {
+        return allProducts;
+    }
+
+    public List<String> getTicketProducts() {
+        return allProducts;
+    }
+
+    public void setAllProducts(List<String> allProducts) {
+        this.allProducts = allProducts;
+    }
+
+    public Map<String, String> getProductNames() {
+        return productNames;
+    }
+
+    public void setProductNames(Map<String, String> productNames) {
+        this.productNames = productNames;
+    }
+
+    public Map<String, Boolean> getProductToggles() {
+        return productToggles;
+    }
+
+    public void setProductToggles(Map<String, Boolean> productToggles) {
+        this.productToggles = productToggles;
+    }
+
+    public Map<String, Boolean> getPhasedOutProducts() {
+        return phasedOutProducts;
+    }
+
+    public void setPhasedOutProducts(Map<String, Boolean> phasedOutProducts) {
+        this.phasedOutProducts = phasedOutProducts;
+    }
+
+    public Map<String, String> getRateAssignmentIds() {
+        return rateAssignmentIds;
+    }
+
+    public void setRateAssignmentIds(Map<String, String> rateAssignmentIds) {
+        this.rateAssignmentIds = rateAssignmentIds;
+    }
+
+    public Map<String, String> getActiveWhenConditions() {
+        return activeWhenConditions;
+    }
+
+    public void setActiveWhenConditions(Map<String, String> activeWhenConditions) {
+        this.activeWhenConditions = activeWhenConditions;
+    }
+
+    public Map<String, String> getCaracalStatuses() {
+        return caracalStatuses;
+    }
+
+    public void setCaracalStatuses(Map<String, String> caracalStatuses) {
+        this.caracalStatuses = caracalStatuses;
+    }
+
+    public Map<String, Boolean> getSavedInDb() {
+        return savedInDb;
+    }
+
+    public void setSavedInDb(Map<String, Boolean> savedInDb) {
+        this.savedInDb = savedInDb;
+    }
+
+    public Map<String, TemporalCondition> getTemporalConditions() {
+        return temporalConditions;
+    }
+
+    public void setTemporalConditions(Map<String, TemporalCondition> temporalConditions) {
+        this.temporalConditions = temporalConditions;
+    }
 }

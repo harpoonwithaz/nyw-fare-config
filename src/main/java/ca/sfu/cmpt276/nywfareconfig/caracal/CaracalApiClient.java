@@ -1,6 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
@@ -15,8 +16,15 @@ public interface CaracalApiClient {
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode);
     public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode);
     public List<CaracalCatalogDtos.ProductSummary> fetchProducts(String tenantCode);
+    public List<CaracalCatalogDtos.RateTableSummary> fetchRateTables(String tenantCode);
     public Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(CaracalCatalogDtos.RateTableGetRequest requestPayload);
 
     // Matrix & Availability Hydration
     public CaracalSimulationDtos.PriceSimulationResult simulatePrice(CaracalSimulationDtos.PriceSimulateRequest requestPayload);
+    public List<CaracalCatalogDtos.SimulatedProductAvailability> simulateAvailability(
+            String tenantCode, String siteCode, Map<String, String> dimensions);
+
+    // Availability & Rule Mutations (Epic 3)
+    public String createWhenCondition(CaracalCatalogDtos.WhenConditionCreateRequest requestPayload, String actorHeader);
+    public void updateRateAssignment(CaracalCatalogDtos.RateAssignmentUpdateRequest requestPayload, String actorHeader);
 }

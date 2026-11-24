@@ -1,6 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -30,15 +31,10 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         this.actorService = actorService;
     }
 
-    // TODO: Remove the X-Actor: system header from each api request except
-    // fetchTenants()
-
     // ==============================================================================
     // Catalog Discovery
     // ==============================================================================
 
-    // Queries GET /functions/tenant-list using X-Actor: system
-    // to discover active platform tenants.
     @Override
     public List<CaracalCatalogDtos.TenantSummary> fetchTenants() {
         CaracalCatalogDtos.TenantList response = get(
@@ -53,9 +49,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response.tenants();
     }
 
-    // Queries GET /functions/tenant-get?tenantCode={tenantCode} using X-Actor:
-    // operator:<email>
-    // to discover specific tenant details.
     @Override
     public CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode) {
         if (isNullOrBlank(tenantCode)) {
@@ -75,8 +68,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response;
     }
 
-    // Queries GET /functions/site-list to populate O-D terminals and Zonal station
-    // directories.
     @Override
     public List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode) {
         if (isNullOrBlank(tenantCode)) {
@@ -115,7 +106,33 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return response.products();
     }
 
-    // Queries POST /functions/rate-table-get to populate O-D tenants
+    @Override
+    public List<CaracalCatalogDtos.RateTableSummary> fetchRateTables(String tenantCode) {
+        if (isNullOrBlank(tenantCode)) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        String actionDescription = "listing rate tables for tenant " + tenantCode;
+        CaracalCatalogDtos.RateTableListRequest payload =
+                new CaracalCatalogDtos.RateTableListRequest(tenantCode, null, 200);
+
+        return execute(actionDescription, () -> {
+            CaracalCatalogDtos.RateTableListResponse response = caracalRestClient
+                    .post()
+                    .uri("/rate-table-list")
+                    .attribute("useSystemActor", false)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(CaracalCatalogDtos.RateTableListResponse.class);
+
+            if (response == null || response.items() == null) {
+                return List.of();
+            }
+            return response.items();
+        });
+    }
+
     @Override
     public Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(
             CaracalCatalogDtos.RateTableGetRequest requestPayload) {
@@ -200,9 +217,111 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         });
     }
 
+    @Override
+    public List<CaracalCatalogDtos.SimulatedProductAvailability> simulateAvailability(
+            String tenantCode, String siteCode, Map<String, String> dimensions) {
+        if (isNullOrBlank(tenantCode) || isNullOrBlank(siteCode)) {
+            throw new IllegalArgumentException("Tenant code and site code must not be blank.");
+        }
+
+        String actionDescription = "simulating product availability at site " + siteCode;
+        CaracalCatalogDtos.AvailabilitySimulateRequest payload =
+                new CaracalCatalogDtos.AvailabilitySimulateRequest(
+                        tenantCode,
+                        siteCode,
+                        null,
+                        null,
+                        null,
+                        (dimensions != null && !dimensions.isEmpty()) ? dimensions : null);
+
+        return execute(actionDescription, () -> {
+            CaracalCatalogDtos.AvailabilitySimulateResponse response = caracalRestClient
+                    .post()
+                    .uri("/availability-simulate")
+                    .attribute("useSystemActor", false)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(CaracalCatalogDtos.AvailabilitySimulateResponse.class);
+
+            if (response == null || response.products() == null) {
+                return List.of();
+            }
+            return response.products();
+        });
+    }
+
+    // ==============================================================================
+    // Availability & Rule Mutations (Epic 3)
+    // ==============================================================================
+
+    @Override
+    public String createWhenCondition(
+            CaracalCatalogDtos.WhenConditionCreateRequest requestPayload, String actorHeader) {
+        if (requestPayload == null || isNullOrBlank(requestPayload.tenantCode()) || isNullOrBlank(requestPayload.name())) {
+            throw new IllegalArgumentException("Invalid request payload for when-condition-create.");
+        }
+
+        String resolvedActor = resolveHeader(actorHeader);
+        String actionDescription = "creating when-condition " + requestPayload.name();
+
+        return execute(actionDescription, () -> {
+            CaracalCatalogDtos.CaracalIdResponse response = caracalRestClient
+                    .post()
+                    .uri("/when-condition-create")
+                    .header("X-Actor", resolvedActor)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestPayload)
+                    .retrieve()
+                    .body(CaracalCatalogDtos.CaracalIdResponse.class);
+
+            return response != null ? response.id() : null;
+        });
+    }
+
+    @Override
+    public void updateRateAssignment(
+            CaracalCatalogDtos.RateAssignmentUpdateRequest requestPayload, String actorHeader) {
+        if (requestPayload == null
+                || isNullOrBlank(requestPayload.tenantCode())
+                || isNullOrBlank(requestPayload.assignmentId())) {
+            throw new IllegalArgumentException("Invalid request payload for rate-assignment-update.");
+        }
+
+        String resolvedActor = resolveHeader(actorHeader);
+        String actionDescription = "updating rate assignment " + requestPayload.assignmentId();
+
+        execute(actionDescription, () -> {
+            caracalRestClient
+                    .post()
+                    .uri("/rate-assignment-update")
+                    .header("X-Actor", resolvedActor)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestPayload)
+                    .retrieve()
+                    .toBodilessEntity();
+            return null;
+        });
+    }
+
     // ==============================================================================
     // Helper Methods
     // ==============================================================================
+
+    private String resolveHeader(String actorHeader) {
+        String raw = actorHeader;
+        if (isNullOrBlank(raw)) {
+            try {
+                raw = actorService.currentActorHeader();
+            } catch (IllegalStateException ex) {
+                return "system";
+            }
+        }
+        if ("system".equalsIgnoreCase(raw) || raw.startsWith("operator:")) {
+            return raw;
+        }
+        return "operator:" + raw;
+    }
 
     private <T> T get(
             String uri,
@@ -214,8 +333,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return execute(actionDescription, () -> caracalRestClient
                 .get()
                 .uri(uri, uriVars)
-                // If using CaracalActorInterceptor, pass the flag as an attribute;
-                // otherwise set .header("X-Actor", ...) directly here.
                 .attribute("useSystemActor", useSystemActor)
                 .retrieve()
                 .body(responseType));
@@ -252,7 +369,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 return errorResponse.error();
             }
         } catch (RestClientException ignored) {
-            // Fall back to raw response body if 4xx payload is not valid JSON
         }
         return ex.getResponseBodyAsString();
     }

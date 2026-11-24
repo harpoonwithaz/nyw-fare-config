@@ -3,7 +3,8 @@
 <body>
 
 <div th:fragment="availabilityTable" class="table-responsive">
-    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable">
+    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable"
+           th:data-site="${siteCode}" th:data-dest="${destCode}" th:data-route="${routeCode}">
         <thead class="table-light">
             <tr>
                 <th scope="col" class="text-secondary small text-uppercase text-start ps-3"
@@ -25,7 +26,11 @@
             </tr>
         </thead>
         <tbody>
-            <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
+            <tr th:each="prod : ${availabilityView.ticketProducts}"
+                th:data-product="${prod}"
+                th:data-site="${siteCode}"
+                th:data-dest="${destCode}"
+                th:data-route="${routeCode}">
                 <td class="table-light text-secondary fw-semibold text-start ps-3">
                     <div class="d-flex align-items-center gap-2">
                         <span th:text="${prod}">ADULT_ONEWAY</span>
@@ -59,7 +64,12 @@
                 </td>
 
                 <td class="py-2 px-3">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
+                    <span th:if="${availabilityView.savedInDb[prod]}"
+                          class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1 staged-badge">
+                        <i class="bi bi-database-check me-1"></i>Saved in DB
+                    </span>
+                    <span th:unless="${availabilityView.savedInDb[prod]}"
+                          class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
                         <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
                     </span>
                 </td>
