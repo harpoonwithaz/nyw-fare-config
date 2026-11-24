@@ -16,7 +16,6 @@ public class FareRule {
 
     // Caracal Rule Set & Assignment Metadata (used by Epic 3 & Epic 5)
     private String priceRuleSetName;
-    private String rateAssignmentId;
     private String matchedConditionName;
 
     // Zonal Rate Tier Abstraction (null in OD mode)
@@ -34,7 +33,6 @@ public class FareRule {
             String destIdentifier,
             String productCode,
             String priceRuleSetName,
-            String rateAssignmentId,
             String matchedConditionName,
             String tierCode,
             BigDecimal price,
@@ -46,7 +44,6 @@ public class FareRule {
         this.destIdentifier = destIdentifier;
         this.productCode = productCode;
         this.priceRuleSetName = priceRuleSetName;
-        this.rateAssignmentId = rateAssignmentId;
         this.matchedConditionName = matchedConditionName;
         this.tierCode = tierCode;
         this.price = price;
@@ -69,7 +66,6 @@ public class FareRule {
                 productCode,
                 priceRuleSetName,
                 null,
-                null,
                 price,
                 status);
     }
@@ -80,7 +76,6 @@ public class FareRule {
             String destSiteCode,
             String productCode,
             String priceRuleSetName,
-            String rateAssignmentId,
             String matchedConditionName,
             BigDecimal price,
             FareStatus status) {
@@ -91,7 +86,6 @@ public class FareRule {
                 destSiteCode,
                 productCode,
                 priceRuleSetName,
-                rateAssignmentId,
                 matchedConditionName,
                 null,
                 price,
@@ -115,7 +109,6 @@ public class FareRule {
                 destZone,
                 productCode,
                 priceRuleSetName,
-                null,
                 null,
                 tierCode,
                 price,
@@ -203,14 +196,6 @@ public class FareRule {
 
     public void setPriceRuleSetName(String priceRuleSetName) {
         this.priceRuleSetName = priceRuleSetName;
-    }
-
-    public String getRateAssignmentId() {
-        return rateAssignmentId;
-    }
-
-    public void setRateAssignmentId(String rateAssignmentId) {
-        this.rateAssignmentId = rateAssignmentId;
     }
 
     public String getMatchedConditionName() {
