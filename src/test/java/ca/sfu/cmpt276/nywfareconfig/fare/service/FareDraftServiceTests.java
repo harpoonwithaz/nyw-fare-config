@@ -2,9 +2,11 @@ package ca.sfu.cmpt276.nywfareconfig.fare.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,9 +66,9 @@ class FareDraftServiceTests {
     }
 
     private void stubBaselineLookup(String dest, String prod, FareRule rule) {
-        lenient().when(fareService.getBaselineFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
-        lenient().when(fareService.getFareRule("NYW_SANDBOX", "EDGEWTR", dest, prod))
+        lenient().when(fareService.getFareRule(nywTenant, "EDGEWTR", dest, prod))
                 .thenReturn(Optional.ofNullable(rule));
     }
 
@@ -241,5 +243,65 @@ class FareDraftServiceTests {
         assertEquals(4L, fareDraftService.countPendingDrafts("nyw_sandbox"));
 
         assertThrows(IllegalArgumentException.class, () -> fareDraftService.getPendingDrafts(""));
+    }
+
+    @Test
+    void stageChangesWithPricingDateResolvesTimestampOncePerOriginAndValidatesTimeGatedFares() {
+        String resolvedAt = "2026-10-24T10:00:00-04:00";
+
+        when(actorService.currentActorHeader()).thenReturn("operator:operator@nyw.com");
+        when(fareDraftRepository.findByTenantCodeAndDraftStatus("NYW_SANDBOX", DraftStatus.PENDING))
+                .thenReturn(List.of());
+        when(fareService.resolvePricingTimestamp("NYW_SANDBOX", "EDGEWTR", "2026-10-24"))
+                .thenReturn(resolvedAt);
+
+        FareRule midtownWeekend = FareRule.od(
+                "NYW_SANDBOX", "EDGEWTR", "MIDTOWN", "WEEKEND_TICKET",
+                "PRS_WKND", new BigDecimal("6.50"), FareStatus.ACTIVE);
+        FareRule pier11Weekend = FareRule.od(
+                "NYW_SANDBOX", "EDGEWTR", "PIER11", "WEEKEND_TICKET",
+                "PRS_WKND", new BigDecimal("8.00"), FareStatus.ACTIVE);
+
+        when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", "MIDTOWN", "WEEKEND_TICKET", resolvedAt))
+                .thenReturn(Optional.of(midtownWeekend));
+        when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", "PIER11", "WEEKEND_TICKET", resolvedAt))
+                .thenReturn(Optional.of(pier11Weekend));
+
+        List<FareChangeRequest> requests = List.of(
+                new FareChangeRequest("NYW_SANDBOX", GridMode.OD, "EDGEWTR", "MIDTOWN",
+                        "WEEKEND_TICKET", new BigDecimal("7.25"), FareStatus.ACTIVE, FareAction.INLINE_EDIT, null),
+                new FareChangeRequest("NYW_SANDBOX", GridMode.OD, "EDGEWTR", "PIER11",
+                        "WEEKEND_TICKET", new BigDecimal("8.75"), FareStatus.ACTIVE, FareAction.INLINE_EDIT, null));
+
+        int savedCount = fareDraftService.stageChanges(nywTenant, requests, "2026-10-24");
+
+        assertEquals(2, savedCount);
+        verify(fareService, times(1)).resolvePricingTimestamp("NYW_SANDBOX", "EDGEWTR", "2026-10-24");
+        verify(fareService).getBaselineFareRule(nywTenant, "EDGEWTR", "MIDTOWN", "WEEKEND_TICKET", resolvedAt);
+        verify(fareService).getBaselineFareRule(nywTenant, "EDGEWTR", "PIER11", "WEEKEND_TICKET", resolvedAt);
+        verify(fareDraftRepository).saveAll(anyList());
+    }
+
+    @Test
+    void stageChangesWithBlankPricingDateUsesFourArgBaselineLookupWithoutResolvingTimestamp() {
+        when(actorService.currentActorHeader()).thenReturn("operator:operator@nyw.com");
+        when(fareDraftRepository.findByTenantCodeAndDraftStatus("NYW_SANDBOX", DraftStatus.PENDING))
+                .thenReturn(List.of());
+
+        FareRule baseline = FareRule.od(
+                "NYW_SANDBOX", "EDGEWTR", "MIDTOWN", "ADULT_ONEWAY",
+                "PRS_ADULT", new BigDecimal("13.25"), FareStatus.ACTIVE);
+        when(fareService.getBaselineFareRule(nywTenant, "EDGEWTR", "MIDTOWN", "ADULT_ONEWAY"))
+                .thenReturn(Optional.of(baseline));
+
+        FareChangeRequest request = new FareChangeRequest(
+                "NYW_SANDBOX", GridMode.OD, "EDGEWTR", "MIDTOWN",
+                "ADULT_ONEWAY", new BigDecimal("14.00"), FareStatus.ACTIVE, FareAction.INLINE_EDIT, null);
+
+        int savedCount = fareDraftService.stageChanges(nywTenant, List.of(request), "   ");
+
+        assertEquals(1, savedCount);
+        verify(fareService, never()).resolvePricingTimestamp(any(), any(), any());
+        verify(fareService).getBaselineFareRule(nywTenant, "EDGEWTR", "MIDTOWN", "ADULT_ONEWAY");
     }
 }

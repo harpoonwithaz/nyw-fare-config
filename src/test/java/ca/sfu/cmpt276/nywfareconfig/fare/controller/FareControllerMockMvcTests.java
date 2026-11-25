@@ -1,6 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -9,7 +10,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
@@ -72,7 +72,7 @@ class FareControllerMockMvcTests {
         when(tenantService.getAvailableTenants()).thenReturn(List.of(testTenant));
         when(tenantService.getTenantByCode(anyString())).thenReturn(testTenant);
         when(fareService.getSecondaryFilterOptions(any(), any())).thenReturn(List.of());
-        when(fareService.buildMockGrid(any(), anyString())).thenReturn(mock(FareGrid.class));
+        when(fareService.buildGrid(any(), anyString(), nullable(String.class))).thenReturn(mock(FareGrid.class));
     }
 
     private Cookie selectTenant(MockHttpSession session, String tenantCode) throws Exception {

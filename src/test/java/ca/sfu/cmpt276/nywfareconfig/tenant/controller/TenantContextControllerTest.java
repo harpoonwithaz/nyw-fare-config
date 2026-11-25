@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -49,6 +50,14 @@ class TenantContextControllerTest {
         tenant.setDisplayName(displayName);
         tenant.setActive(true);
         return tenant;
+    }
+
+    @Test
+    void globalTenantAdvice_AddsCurrentRequestUriAsReturnUrl() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/availability");
+        GlobalTenantAdvice advice = new GlobalTenantAdvice(tenantContext);
+
+        assertEquals("/availability", advice.getCurrentUri(request));
     }
 
     @Test

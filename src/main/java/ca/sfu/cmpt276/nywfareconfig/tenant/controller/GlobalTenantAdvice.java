@@ -1,5 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.tenant.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -17,5 +19,10 @@ public class GlobalTenantAdvice {
     @ModelAttribute("tenantContext")
     public TenantContext getTenantContext() {
         return tenantContext;
+    }
+
+    @ModelAttribute("currentUri")
+    public String getCurrentUri(HttpServletRequest request) {
+        return request.getRequestURI();
     }
 }
