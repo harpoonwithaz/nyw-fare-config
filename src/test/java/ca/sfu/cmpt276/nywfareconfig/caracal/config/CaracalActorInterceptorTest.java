@@ -1,4 +1,4 @@
-package ca.sfu.cmpt276.nywfareconfig.caracal;
+package ca.sfu.cmpt276.nywfareconfig.caracal.config;
 
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import org.junit.jupiter.api.Test;
@@ -15,7 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class ActorHeaderInterceptorTest {
+class CaracalActorInterceptorTest {
 
     private MockClientHttpRequest newRequest() {
         return new MockClientHttpRequest(HttpMethod.GET, URI.create("http://localhost/site-list"));
@@ -25,7 +25,7 @@ class ActorHeaderInterceptorTest {
     void addsOperatorPrefixedHeader() throws Exception {
         ActorService actorService = mock(ActorService.class);
         when(actorService.currentActorHeader()).thenReturn("admin@caracal.com");
-        ActorHeaderInterceptor interceptor = new ActorHeaderInterceptor(actorService);
+        CaracalActorInterceptor interceptor = new CaracalActorInterceptor(actorService);
         MockClientHttpRequest request = newRequest();
         ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
         byte[] body = new byte[0];
@@ -40,7 +40,7 @@ class ActorHeaderInterceptorTest {
     void overwritesAHeaderThatWasAlreadySet() throws Exception {
         ActorService actorService = mock(ActorService.class);
         when(actorService.currentActorHeader()).thenReturn("admin@caracal.com");
-        ActorHeaderInterceptor interceptor = new ActorHeaderInterceptor(actorService);
+        CaracalActorInterceptor interceptor = new CaracalActorInterceptor(actorService);
         MockClientHttpRequest request = newRequest();
         request.getHeaders().set("X-Actor", "operator:someone.else@example.com");
         ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
@@ -54,11 +54,25 @@ class ActorHeaderInterceptorTest {
     void refusesToSendWhenNobodyIsSignedIn() throws Exception {
         ActorService actorService = mock(ActorService.class);
         when(actorService.currentActorHeader()).thenThrow(new IllegalStateException("No authenticated operator"));
-        ActorHeaderInterceptor interceptor = new ActorHeaderInterceptor(actorService);
+        CaracalActorInterceptor interceptor = new CaracalActorInterceptor(actorService);
         MockClientHttpRequest request = newRequest();
         ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
 
         assertThrows(IllegalStateException.class, () -> interceptor.intercept(request, new byte[0], execution));
         verify(execution, never()).execute(request, new byte[0]);
+    }
+
+    @Test
+    void sendsSystemWhenTheRequestAsksForIt() throws Exception {
+        ActorService actorService = mock(ActorService.class);
+        CaracalActorInterceptor interceptor = new CaracalActorInterceptor(actorService);
+        MockClientHttpRequest request = newRequest();
+        request.getAttributes().put(CaracalActorInterceptor.USE_SYSTEM_ACTOR, true);
+        ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
+
+        interceptor.intercept(request, new byte[0], execution);
+
+        assertEquals("system", request.getHeaders().getFirst("X-Actor"));
+        verify(actorService, never()).currentActorHeader();
     }
 }

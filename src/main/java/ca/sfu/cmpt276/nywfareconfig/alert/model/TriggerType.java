@@ -1,31 +1,31 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.model;
 
-// Each trigger suggests a continue label (Story 4.5). [Day] / [día] is left for the operator to fill in.
+import java.util.Map;
+
+// Each trigger suggests a continue label per language (Story 4.5). [Day] / [día] is left for the operator to fill in.
 public enum TriggerType {
-    WEEKENDS("Weekends", "Buy for [Day]", "Comprar para [día]"),
-    OUTSIDE_SERVICE_HOURS("Outside service hours", "Buy for [Day]", "Comprar para [día]"),
-    BEFORE_START_DATE("Before the start date", "Buy now", "Comprar ahora");
+    WEEKENDS("Weekends", Map.of("en", "Buy for [Day]", "es", "Comprar para [día]")),
+    OUTSIDE_SERVICE_HOURS("Outside service hours", Map.of("en", "Buy for [Day]", "es", "Comprar para [día]")),
+    BEFORE_START_DATE("Before the start date", Map.of("en", "Buy now", "es", "Comprar ahora"));
 
     private final String label;
-    private final String suggestedConfirmEn;
-    private final String suggestedConfirmEs;
+    private final Map<String, String> suggestedConfirm;
 
-    TriggerType(String label, String suggestedConfirmEn, String suggestedConfirmEs) {
+    TriggerType(String label, Map<String, String> suggestedConfirm) {
         this.label = label;
-        this.suggestedConfirmEn = suggestedConfirmEn;
-        this.suggestedConfirmEs = suggestedConfirmEs;
+        this.suggestedConfirm = suggestedConfirm;
     }
 
     public String getLabel() {
         return label;
     }
 
-    public String getSuggestedConfirmEn() {
-        return suggestedConfirmEn;
+    public Map<String, String> getSuggestedConfirm() {
+        return suggestedConfirm;
     }
 
-    public String getSuggestedConfirmEs() {
-        return suggestedConfirmEs;
+    public String getSuggestedConfirm(String language) {
+        return suggestedConfirm.get(language);
     }
 
     public boolean isRequiresStartDate() {

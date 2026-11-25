@@ -14,7 +14,8 @@ public class CaracalClientConfig {
     public RestClient caracalRestClient(
             RestClient.Builder builder,
             ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-            CaracalApiProperties props) {
+            CaracalApiProperties props,
+            CaracalActorInterceptor actorInterceptor) {
 
         HttpClientSettings settings = HttpClientSettings.defaults()
                 .withTimeouts(props.connectTimeout(), props.readTimeout());
@@ -23,7 +24,7 @@ public class CaracalClientConfig {
 
         return builder
                 .baseUrl(props.baseUrl() + "/functions")
-                .defaultHeader("X-Actor", "system") // TODO: Change this to use CaracalActorInterceptor
+                .requestInterceptor(actorInterceptor)
                 .requestFactory(requestFactory)
                 .build();
     }

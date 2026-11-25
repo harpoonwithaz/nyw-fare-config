@@ -51,45 +51,48 @@
                                         th:attr="maxlength=${messageMax}" data-counter="messageEnCount"></textarea>
                                     <div class="form-text text-end"><span id="messageEnCount">0</span> / <span th:text="${messageMax}">200</span></div>
                                 </div>
-                                <div class="mb-3" th:if="${spanishEnabled}">
+                                <div class="mb-3" th:if="${languages.contains('es')}">
                                     <label for="messageEs" class="form-label">Spanish message</label>
                                     <textarea id="messageEs" th:field="*{messageEs}" class="form-control" rows="3"
                                         th:attr="maxlength=${messageMax}" data-counter="messageEsCount"></textarea>
                                     <div class="form-text text-end"><span id="messageEsCount">0</span> / <span th:text="${messageMax}">200</span></div>
                                 </div>
 
-                                <!-- Suggested continue label for the chosen trigger; filled in by the script below -->
+                                <!-- Suggested continue label for the chosen trigger, one per tenant language; filled in by the script below -->
                                 <div class="small mb-2">
                                     Suggested continue label:
                                     <button type="button" id="useSuggestion" class="btn btn-link btn-sm p-0 align-baseline">Buy for [Day]</button>
+                                    <span class="text-muted">(replace the part in brackets before saving)</span>
                                 </div>
 
                                 <div class="row g-3">
                                     <div class="col-sm-6">
                                         <label for="confirmLabelEn" class="form-label">Continue button (EN)</label>
                                         <input id="confirmLabelEn" th:field="*{confirmLabelEn}" class="form-control"
-                                            th:attr="maxlength=${labelMax}" placeholder="Continue">
+                                            th:attr="maxlength=${labelMax}" th:placeholder="${defaultConfirm['en']}">
                                     </div>
-                                    <div class="col-sm-6" th:if="${spanishEnabled}">
+                                    <div class="col-sm-6" th:if="${languages.contains('es')}">
                                         <label for="confirmLabelEs" class="form-label">Continue button (ES)</label>
                                         <input id="confirmLabelEs" th:field="*{confirmLabelEs}" class="form-control"
-                                            th:attr="maxlength=${labelMax}" placeholder="Continuar">
+                                            th:attr="maxlength=${labelMax}" th:placeholder="${defaultConfirm['es']}">
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="dismissLabelEn" class="form-label">Cancel button (EN)</label>
                                         <input id="dismissLabelEn" th:field="*{dismissLabelEn}" class="form-control"
-                                            th:attr="maxlength=${labelMax}" placeholder="Cancel">
+                                            th:attr="maxlength=${labelMax}" th:placeholder="${defaultDismiss['en']}">
                                     </div>
-                                    <div class="col-sm-6" th:if="${spanishEnabled}">
+                                    <div class="col-sm-6" th:if="${languages.contains('es')}">
                                         <label for="dismissLabelEs" class="form-label">Cancel button (ES)</label>
                                         <input id="dismissLabelEs" th:field="*{dismissLabelEs}" class="form-control"
-                                            th:attr="maxlength=${labelMax}" placeholder="Cancelar">
+                                            th:attr="maxlength=${labelMax}" th:placeholder="${defaultDismiss['es']}">
                                     </div>
                                 </div>
-                                <div class="form-text">Blank labels use Continue / Continuar and Cancel / Cancelar.</div>
+                                <div class="form-text">Blank labels use the defaults:
+                                    <th:block th:each="lang, stat : ${languages}"><span th:text="${defaultConfirm.get(lang) + ' / ' + defaultDismiss.get(lang)}">Continue / Cancel</span><th:block th:unless="${stat.last}">, </th:block></th:block>.
+                                </div>
 
                                 <!-- English-only tenant: keep any saved Spanish text instead of wiping it on save -->
-                                <th:block th:unless="${spanishEnabled}">
+                                <th:block th:unless="${languages.contains('es')}">
                                     <input type="hidden" th:field="*{messageEs}">
                                     <input type="hidden" th:field="*{confirmLabelEs}">
                                     <input type="hidden" th:field="*{dismissLabelEs}">
@@ -106,7 +109,7 @@
                                     <label for="triggerType" class="form-label">Trigger</label>
                                     <select id="triggerType" th:field="*{triggerType}" class="form-select">
                                         <option th:each="t : ${triggerTypes}" th:value="${t}" th:text="${t.label}"
-                                            th:attr="data-suggest-en=${t.suggestedConfirmEn},data-suggest-es=${t.suggestedConfirmEs}">Weekends</option>
+                                            th:attr="data-suggest-en=${t.getSuggestedConfirm('en')},data-suggest-es=${t.getSuggestedConfirm('es')}">Weekends</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
@@ -119,8 +122,8 @@
                                     <select id="productCode" th:field="*{productCode}" class="form-select">
                                         <option value="">All tickets on the route</option>
                                         <option th:each="p : ${productOptions}" th:value="${p.code()}"
-                                            th:text="${p.label() + ' (' + p.code() + ')'}">Adult One-Way (ADULT_ONEWAY)</option>
-                                        <!-- A saved ticket that is no longer in the catalog stays visible so it isn't lost silently -->
+                                            th:text="${(#strings.isEmpty(p.displayName()) ? p.code() : p.displayName()) + ' (' + p.code() + ')'}">Adult One-Way (ADULT_ONEWAY)</option>
+                                        <!-- A saved ticket that is no longer sold stays selectable so editing the alert keeps it -->
                                         <option th:if="${!#strings.isEmpty(form.productCode) and !#lists.contains(productOptions.![code()], form.productCode)}"
                                             th:value="${form.productCode}" th:text="${form.productCode + ' (not in catalog)'}">OLD</option>
                                     </select>
@@ -134,12 +137,30 @@
                                 <div th:if="${catalogMissing}" class="alert alert-warning small mb-0" role="alert">
                                     Routes could not be loaded from Caracal. Check that the Caracal API is running, then reload this page.
                                 </div>
+                                <div th:if="${noRoutes}" class="alert alert-secondary small mb-0" role="alert">
+                                    This client has fewer than two sites in Caracal, so there are no routes to pick.
+                                </div>
+                                <!-- Select all: everything, or one origin at a time. These boxes have no name, so only routes are posted. -->
+                                <div th:unless="${#maps.isEmpty(routeOptions)}" class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" id="selectAllRoutes">
+                                        <label class="form-check-label fw-semibold" for="selectAllRoutes">Select all routes</label>
+                                    </div>
+                                    <span class="small text-muted"><span id="routeCount">0</span> selected (max <span th:text="${maxRoutes}">500</span>)</span>
+                                </div>
                                 <!-- One group per origin terminal; route keys are ORIGIN:DESTINATION -->
-                                <div th:each="terminal : ${routeOptions}" class="mb-2">
-                                    <div class="small fw-semibold text-muted" th:text="${terminal.key}">PIER11</div>
-                                    <div th:each="option : ${terminal.value}" class="form-check">
+                                <div th:each="terminal : ${routeOptions}" class="mb-2"
+                                    th:with="origin=${terminal.value[0].originCode()}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" th:id="${'group-' + origin}"
+                                            th:attr="data-select-group=${origin}">
+                                        <label class="form-check-label small fw-semibold text-muted" th:for="${'group-' + origin}"
+                                            th:text="${terminal.key}">Pier 11 (PIER11)</label>
+                                    </div>
+                                    <div th:each="option : ${terminal.value}" class="form-check ms-3">
                                         <input class="form-check-input" type="checkbox" name="routeKeys"
                                             th:id="${'route-' + option.key()}" th:value="${option.key()}"
+                                            th:attr="data-group=${origin}"
                                             th:checked="${form.routeKeys.contains(option.key())}">
                                         <label class="form-check-label" th:for="${'route-' + option.key()}"
                                             th:text="${option.label()}">PIER11 to HOB14ST</label>
@@ -160,7 +181,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Live character counters for the message boxes -->
-    <script>
+    <script th:inline="javascript">
         document.querySelectorAll("textarea[data-counter]").forEach(function (box) {
             const counter = document.getElementById(box.dataset.counter);
             const update = function () { counter.textContent = box.value.length; };
@@ -168,30 +189,73 @@
             update();
         });
 
-        // Suggested continue label follows the trigger; clicking it fills both language boxes
+        // Suggested continue label follows the trigger, shown for each of the tenant's languages
+        const languages = /*[[${languages}]]*/ ["en"];
+        const suffix = function (lang) { return lang.charAt(0).toUpperCase() + lang.slice(1); };
         const trigger = document.getElementById("triggerType");
         const suggestion = document.getElementById("useSuggestion");
         const showSuggestion = function () {
-            suggestion.textContent = trigger.selectedOptions[0].dataset.suggestEn;
+            const option = trigger.selectedOptions[0];
+            suggestion.textContent = languages
+                .map(function (lang) { return option.dataset["suggest" + suffix(lang)]; })
+                .filter(Boolean)
+                .join(" / ");
         };
         trigger.addEventListener("change", showSuggestion);
         showSuggestion();
 
+        // Fills the continue box for every visible language, then selects the [Day] placeholder in English
         suggestion.addEventListener("click", function () {
             const option = trigger.selectedOptions[0];
+            languages.forEach(function (lang) {
+                const box = document.getElementById("confirmLabel" + suffix(lang));
+                const text = option.dataset["suggest" + suffix(lang)];
+                if (box && box.type !== "hidden" && text) {
+                    box.value = text;
+                }
+            });
             const en = document.getElementById("confirmLabelEn");
-            const es = document.getElementById("confirmLabelEs");
-            if (es.type !== "hidden") {
-                es.value = option.dataset.suggestEs;
-            }
-            en.value = option.dataset.suggestEn;
-            // Select [Day] so the operator can type the real day straight over it
-            const day = en.value.indexOf("[Day]");
+            const placeholder = en.value.match(/\[.*?\]/);
             en.focus();
-            if (day >= 0) {
-                en.setSelectionRange(day, day + "[Day]".length);
+            if (placeholder) {
+                en.setSelectionRange(placeholder.index, placeholder.index + placeholder[0].length);
             }
         });
+
+        // Select all routes, or all routes from one origin (Eldon, Nov 23)
+        const routeBoxes = Array.from(document.querySelectorAll("input[name=routeKeys]"));
+        const groupBoxes = Array.from(document.querySelectorAll("input[data-select-group]"));
+        const allBox = document.getElementById("selectAllRoutes");
+        const routeCount = document.getElementById("routeCount");
+        const inGroup = function (origin) {
+            return routeBoxes.filter(function (box) { return box.dataset.group === origin; });
+        };
+        const setTick = function (tick, boxes) {
+            const ticked = boxes.filter(function (box) { return box.checked; }).length;
+            tick.checked = boxes.length > 0 && ticked === boxes.length;
+            tick.indeterminate = ticked > 0 && ticked < boxes.length;
+        };
+        const syncTicks = function () {
+            groupBoxes.forEach(function (group) { setTick(group, inGroup(group.dataset.selectGroup)); });
+            if (allBox) {
+                setTick(allBox, routeBoxes);
+                routeCount.textContent = routeBoxes.filter(function (box) { return box.checked; }).length;
+            }
+        };
+        groupBoxes.forEach(function (group) {
+            group.addEventListener("change", function () {
+                inGroup(group.dataset.selectGroup).forEach(function (box) { box.checked = group.checked; });
+                syncTicks();
+            });
+        });
+        if (allBox) {
+            allBox.addEventListener("change", function () {
+                routeBoxes.forEach(function (box) { box.checked = allBox.checked; });
+                syncTicks();
+            });
+        }
+        routeBoxes.forEach(function (box) { box.addEventListener("change", syncTicks); });
+        syncTicks();
     </script>
 </body>
 

@@ -27,9 +27,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         this.caracalRestClient = caracalRestClient;
     }
 
-    // TODO: Remove the X-Actor: system header from each api request except
-    // fetchTenants()
-
     // ==============================================================================
     // Catalog Discovery
     // ==============================================================================
@@ -82,7 +79,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
         CaracalCatalogDtos.SiteList response = get(
                 "/site-list?tenantCode={tenantCode}",
-                true,
+                false,
                 CaracalCatalogDtos.SiteList.class,
                 "loading site list for tenant " + tenantCode,
                 tenantCode);
@@ -101,7 +98,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
         CaracalCatalogDtos.ProductList response = get(
                 "/product-list?tenantCode={tenantCode}",
-                true,
+                false,
                 CaracalCatalogDtos.ProductList.class,
                 "loading product list for tenant " + tenantCode,
                 tenantCode);
@@ -217,8 +214,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return execute(actionDescription, () -> caracalRestClient
                 .get()
                 .uri(uri, uriVars)
-                // If using CaracalActorInterceptor, pass the flag as an attribute;
-                // otherwise set .header("X-Actor", ...) directly here.
+                // CaracalActorInterceptor reads this to pick the X-Actor header
                 .attribute("useSystemActor", useSystemActor)
                 .retrieve()
                 .body(responseType));

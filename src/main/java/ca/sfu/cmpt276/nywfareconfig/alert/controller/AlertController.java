@@ -1,7 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.controller;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertCatalog;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
@@ -105,7 +105,7 @@ public class AlertController {
         if (tenantCode == null) {
             return LIST;
         }
-        List<String> errors = alertService.save(tenantCode, id, form, user.getEmail());
+        List<String> errors = alertService.save(tenantCode, id, form, user.getEmail(), languages());
         if (!errors.isEmpty()) {
             ServiceAlert alert = id == null ? null : alertService.get(tenantCode, id).orElse(null);
             return showForm(model, tenantCode, alert, form, errors);
@@ -159,30 +159,29 @@ public class AlertController {
 
     private String showForm(Model model, String tenantCode, ServiceAlert alert, AlertForm form,
             List<String> errors) {
-        // Sites and tickets come live from the Caracal catalog; an empty site list means it couldn't be reached
-        Map<String, ?> routeOptions = alertService.routeOptionsByTerminal(tenantCode);
+        // Sites and tickets come live from Caracal through FareService
+        AlertCatalog catalog = alertService.formCatalog(tenantCode);
         model.addAttribute("alert", alert);
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
-        model.addAttribute("routeOptions", routeOptions);
-        model.addAttribute("catalogMissing", routeOptions.isEmpty());
-        model.addAttribute("productOptions", alertService.productOptions(tenantCode));
-        model.addAttribute("spanishEnabled", supportsSpanish());
+        model.addAttribute("routeOptions", catalog.routes());
+        model.addAttribute("productOptions", catalog.products());
+        model.addAttribute("catalogMissing", !catalog.loaded());
+        model.addAttribute("noRoutes", catalog.loaded() && catalog.routes().isEmpty());
+        model.addAttribute("languages", languages());
+        model.addAttribute("defaultConfirm", AlertLimits.DEFAULT_CONFIRM);
+        model.addAttribute("defaultDismiss", AlertLimits.DEFAULT_DISMISS);
         model.addAttribute("triggerTypes", TriggerType.values());
         model.addAttribute("messageMax", AlertLimits.MESSAGE_MAX_LENGTH);
         model.addAttribute("labelMax", AlertLimits.LABEL_MAX_LENGTH);
+        model.addAttribute("maxRoutes", AlertLimits.MAX_ROUTES);
         return "alerts/form";
     }
 
-    // Spanish fields show only when the tenant lists a Spanish locale (es, es-US, ...).
-    // A tenant with no locales configured keeps both languages, like before.
-    private boolean supportsSpanish() {
+    // Alert languages follow the selected tenant's supported locales
+    private List<String> languages() {
         Tenant tenant = tenantContext.getSelectedTenant();
-        List<String> locales = tenant == null ? null : tenant.getSupportedLocales();
-        if (locales == null || locales.isEmpty()) {
-            return true;
-        }
-        return locales.stream().anyMatch(locale -> locale != null && locale.toLowerCase().startsWith("es"));
+        return AlertLimits.languagesFor(tenant == null ? null : tenant.getSupportedLocales());
     }
 
     private String tenantCode() {

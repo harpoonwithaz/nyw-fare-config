@@ -1,15 +1,18 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.service;
 
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertCatalog;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertChange;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
-import ca.sfu.cmpt276.nywfareconfig.alert.dto.ProductOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.RouteOption;
-import ca.sfu.cmpt276.nywfareconfig.alert.dto.SiteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.RouteScheduleRepository;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.ServiceAlertRepository;
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,15 +35,17 @@ import java.util.regex.Pattern;
 public class AlertService {
 
     private static final Pattern ROUTE_KEY = Pattern.compile("^[A-Z0-9_-]+:[A-Z0-9_-]+$");
+    // A suggestion like "Buy for [Day]" that still has its bracketed placeholder in it
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\[[^\\]]*\\]");
 
     private final ServiceAlertRepository alerts;
     private final RouteScheduleRepository schedules;
-    private final CatalogLookup catalog;
+    private final FareService fares;
 
-    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules, CatalogLookup catalog) {
+    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules, FareService fares) {
         this.alerts = alerts;
         this.schedules = schedules;
-        this.catalog = catalog;
+        this.fares = fares;
     }
 
     public List<ServiceAlert> list(String tenantCode, String search, AlertStatus status, String routeKey) {
@@ -89,8 +94,9 @@ public class AlertService {
         return alert != null && alert.getStatus() == AlertStatus.DRAFT;
     }
 
+    // languages: the tenant's alert languages (AlertLimits.languagesFor); blank labels get defaults only in these
     @Transactional
-    public List<String> save(String tenantCode, Long id, AlertForm form, String actor) {
+    public List<String> save(String tenantCode, Long id, AlertForm form, String actor, List<String> languages) {
         List<String> errors = new ArrayList<>();
 
         if (isBlank(tenantCode)) {
@@ -153,11 +159,17 @@ public class AlertService {
                 || tooLong(dismissEs, AlertLimits.LABEL_MAX_LENGTH)) {
             errors.add("Label must be " + AlertLimits.LABEL_MAX_LENGTH + " characters or fewer.");
         }
+        if (hasPlaceholder(confirmEn) || hasPlaceholder(confirmEs)
+                || hasPlaceholder(dismissEn) || hasPlaceholder(dismissEs)) {
+            errors.add("Replace the placeholder in brackets, like [Day], in the button label before saving.");
+        }
 
+        // A ticket that has since been retired stays allowed when it is the one already saved on this alert
+        String savedProduct = existing == null ? null : existing.getProductCode();
         if (!routeKeys.isEmpty() || productCode != null) {
             try {
-                productCode = checkCatalog(tenantCode, routeKeys, productCode, errors);
-            } catch (CatalogUnavailableException ex) {
+                productCode = checkCatalog(tenantCode, routeKeys, productCode, savedProduct, errors);
+            } catch (CaracalApiException ex) {
                 errors.add("The Caracal catalog is not available right now. Try again in a moment.");
             }
         }
@@ -167,10 +179,12 @@ public class AlertService {
         }
 
         // Blank labels fall back to the defaults so the popup never shows an empty button
-        confirmEn = confirmEn == null ? AlertLimits.DEFAULT_CONFIRM_EN : confirmEn;
-        confirmEs = confirmEs == null ? AlertLimits.DEFAULT_CONFIRM_ES : confirmEs;
-        dismissEn = dismissEn == null ? AlertLimits.DEFAULT_DISMISS_EN : dismissEn;
-        dismissEs = dismissEs == null ? AlertLimits.DEFAULT_DISMISS_ES : dismissEs;
+        // Only for languages the tenant uses; an English-only tenant keeps Spanish blank
+        List<String> langs = languages == null ? AlertLimits.LANGUAGES : languages;
+        confirmEn = withDefault(confirmEn, AlertLimits.DEFAULT_CONFIRM, "en", langs);
+        confirmEs = withDefault(confirmEs, AlertLimits.DEFAULT_CONFIRM, "es", langs);
+        dismissEn = withDefault(dismissEn, AlertLimits.DEFAULT_DISMISS, "en", langs);
+        dismissEs = withDefault(dismissEs, AlertLimits.DEFAULT_DISMISS, "es", langs);
 
         ServiceAlert target;
         if (existing == null) {
@@ -286,73 +300,100 @@ public class AlertService {
         return true;
     }
 
+    // Routes grouped by origin, keyed by the heading shown on the page ("Pier 11 (PIER11)").
+    // Empty when Caracal can't be reached or the tenant has fewer than two sites.
     public Map<String, List<RouteOption>> routeOptionsByTerminal(String tenantCode) {
-        Map<String, List<RouteOption>> options = new LinkedHashMap<>();
         if (isBlank(tenantCode)) {
-            return options;
+            return new LinkedHashMap<>();
         }
-
-        List<SiteOption> sites;
         try {
-            sites = catalog.sites(tenantCode).stream()
-                    .sorted(Comparator.comparing(SiteOption::label, String.CASE_INSENSITIVE_ORDER))
-                    .toList();
-        } catch (CatalogUnavailableException ex) {
-            return options;
+            return buildRoutes(sites(tenantCode));
+        } catch (CaracalApiException ex) {
+            return new LinkedHashMap<>();
         }
+    }
 
-        for (SiteOption origin : sites) {
+    // Routes and tickets for the alert form, with a flag for whether Caracal answered both
+    public AlertCatalog formCatalog(String tenantCode) {
+        if (isBlank(tenantCode)) {
+            return new AlertCatalog(new LinkedHashMap<>(), List.of(), false);
+        }
+        boolean loaded = true;
+        Map<String, List<RouteOption>> routes = new LinkedHashMap<>();
+        List<CatalogOption> products = List.of();
+        try {
+            routes = buildRoutes(sites(tenantCode));
+        } catch (CaracalApiException ex) {
+            loaded = false;
+        }
+        try {
+            products = fares.getOdProducts(tenantCode);
+        } catch (CaracalApiException ex) {
+            loaded = false;
+        }
+        return new AlertCatalog(routes, products, loaded);
+    }
+
+    private List<CatalogOption> sites(String tenantCode) {
+        return fares.getSecondaryFilterOptions(tenantCode, GridMode.OD);
+    }
+
+    // ponytail: every pair of sites, not only routes Caracal actually serves; swap in a served-routes lookup when one exists
+    private static Map<String, List<RouteOption>> buildRoutes(List<CatalogOption> siteList) {
+        List<CatalogOption> sorted = siteList.stream()
+                .sorted(Comparator.comparing(AlertService::nameOf, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        Map<String, List<RouteOption>> options = new LinkedHashMap<>();
+        for (CatalogOption origin : sorted) {
             List<RouteOption> routes = new ArrayList<>();
-            for (SiteOption destination : sites) {
-                if (!origin.code().equalsIgnoreCase(destination.code())) {
-                    routes.add(new RouteOption(
-                            origin.code().toUpperCase(),
-                            destination.code().toUpperCase(),
-                            origin.label() + " to " + destination.label()));
+            for (CatalogOption destination : sorted) {
+                if (!origin.code().equals(destination.code())) {
+                    routes.add(new RouteOption(origin.code(), destination.code(),
+                            nameOf(origin) + " to " + nameOf(destination)));
                 }
             }
-            options.put(origin.code().toUpperCase(), routes);
+            if (!routes.isEmpty()) {
+                options.put(nameOf(origin) + " (" + origin.code() + ")", routes);
+            }
         }
         return options;
     }
 
-    public List<ProductOption> productOptions(String tenantCode) {
-        if (isBlank(tenantCode)) {
-            return List.of();
-        }
-        try {
-            return catalog.products(tenantCode);
-        } catch (CatalogUnavailableException ex) {
-            return List.of();
-        }
+    private static String nameOf(CatalogOption option) {
+        return isBlank(option.displayName()) ? option.code() : option.displayName();
     }
 
-    private String checkCatalog(String tenantCode, Set<String> routeKeys, String productCode, List<String> errors) {
-        Set<String> siteCodes = new HashSet<>();
-        for (SiteOption site : catalog.sites(tenantCode)) {
-            siteCodes.add(site.code().toUpperCase());
-        }
-
-        Set<String> unknownSites = new LinkedHashSet<>();
-        for (String key : routeKeys) {
-            String[] parts = key.split(":");
-            if (parts.length != 2) {
-                continue;
+    private String checkCatalog(String tenantCode, Set<String> routeKeys, String productCode, String savedProduct,
+            List<String> errors) {
+        if (!routeKeys.isEmpty()) {
+            Set<String> siteCodes = new HashSet<>();
+            for (CatalogOption site : sites(tenantCode)) {
+                siteCodes.add(site.code());
             }
-            for (String part : parts) {
-                if (!siteCodes.contains(part)) {
-                    unknownSites.add(part);
+            Set<String> unknownSites = new LinkedHashSet<>();
+            for (String key : routeKeys) {
+                String[] parts = key.split(":");
+                if (parts.length != 2) {
+                    continue;
+                }
+                for (String part : parts) {
+                    if (!siteCodes.contains(part)) {
+                        unknownSites.add(part);
+                    }
                 }
             }
-        }
-        for (String code : unknownSites) {
-            errors.add("Unknown site code: " + code + ".");
+            for (String code : unknownSites) {
+                errors.add("Unknown site code: " + code + ".");
+            }
         }
 
         if (productCode == null || productCode.length() > AlertLimits.PRODUCT_CODE_MAX_LENGTH) {
             return productCode;
         }
-        for (ProductOption product : catalog.products(tenantCode)) {
+        if (productCode.equalsIgnoreCase(savedProduct)) {
+            return savedProduct;
+        }
+        for (CatalogOption product : fares.getOdProducts(tenantCode)) {
             if (product.code().equalsIgnoreCase(productCode)) {
                 return product.code();
             }
@@ -417,6 +458,15 @@ public class AlertService {
 
     private static boolean contains(String value, String query) {
         return value != null && value.toLowerCase().contains(query);
+    }
+
+    private static boolean hasPlaceholder(String value) {
+        return value != null && PLACEHOLDER.matcher(value).find();
+    }
+
+    private static String withDefault(String value, Map<String, String> defaults, String language,
+            List<String> languages) {
+        return value == null && languages.contains(language) ? defaults.get(language) : value;
     }
 
     private static boolean tooLong(String value, int max) {
