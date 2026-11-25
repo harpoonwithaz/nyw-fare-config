@@ -289,7 +289,6 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 || requestPayload.dimensions() == null) {
             throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
         }
-        
         /*
         For debugging:
         System.out.println("Price simulate called for product: *" + requestPayload.productCode() +
