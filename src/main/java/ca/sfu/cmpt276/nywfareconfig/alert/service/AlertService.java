@@ -2,7 +2,9 @@ package ca.sfu.cmpt276.nywfareconfig.alert.service;
 
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertChange;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.ProductOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.RouteOption;
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.SiteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
@@ -16,6 +18,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,15 +31,16 @@ import java.util.regex.Pattern;
 @Service
 public class AlertService {
 
-    private static final Pattern ROUTE_KEY = Pattern.compile("^[A-Z0-9]+:[A-Z0-9]+$");
-    private static final Pattern PRODUCT_CODE = Pattern.compile("^[A-Z0-9_]{1,40}$");
+    private static final Pattern ROUTE_KEY = Pattern.compile("^[A-Z0-9_-]+:[A-Z0-9_-]+$");
 
     private final ServiceAlertRepository alerts;
     private final RouteScheduleRepository schedules;
+    private final CatalogLookup catalog;
 
-    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules) {
+    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules, CatalogLookup catalog) {
         this.alerts = alerts;
         this.schedules = schedules;
+        this.catalog = catalog;
     }
 
     public List<ServiceAlert> list(String tenantCode, String search, AlertStatus status, String routeKey) {
@@ -123,12 +128,8 @@ public class AlertService {
         }
 
         String productCode = clean(form.getProductCode());
-        if (productCode != null) {
-            productCode = productCode.toUpperCase();
-            if (!PRODUCT_CODE.matcher(productCode).matches()) {
-                errors.add("The ticket code may only contain letters, numbers and underscores, up to "
-                        + AlertLimits.PRODUCT_CODE_MAX_LENGTH + " characters.");
-            }
+        if (productCode != null && productCode.length() > AlertLimits.PRODUCT_CODE_MAX_LENGTH) {
+            errors.add("The ticket code must be " + AlertLimits.PRODUCT_CODE_MAX_LENGTH + " characters or fewer.");
         }
 
         String messageEn = clean(form.getMessageEn());
@@ -151,6 +152,14 @@ public class AlertService {
                 || tooLong(dismissEn, AlertLimits.LABEL_MAX_LENGTH)
                 || tooLong(dismissEs, AlertLimits.LABEL_MAX_LENGTH)) {
             errors.add("Label must be " + AlertLimits.LABEL_MAX_LENGTH + " characters or fewer.");
+        }
+
+        if (!routeKeys.isEmpty() || productCode != null) {
+            try {
+                productCode = checkCatalog(tenantCode, routeKeys, productCode, errors);
+            } catch (CatalogUnavailableException ex) {
+                errors.add("The Caracal catalog is not available right now. Try again in a moment.");
+            }
         }
 
         if (!errors.isEmpty()) {
@@ -273,9 +282,77 @@ public class AlertService {
 
     public Map<String, List<RouteOption>> routeOptionsByTerminal(String tenantCode) {
         Map<String, List<RouteOption>> options = new LinkedHashMap<>();
-        options.put("PIER11", List.of(new RouteOption("PIER11", "HOB14ST", "PIER11 to HOB14ST")));
-        options.put("HOB14ST", List.of(new RouteOption("HOB14ST", "PIER11", "HOB14ST to PIER11")));
+        if (isBlank(tenantCode)) {
+            return options;
+        }
+
+        List<SiteOption> sites;
+        try {
+            sites = catalog.sites(tenantCode).stream()
+                    .sorted(Comparator.comparing(SiteOption::label, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+        } catch (CatalogUnavailableException ex) {
+            return options;
+        }
+
+        for (SiteOption origin : sites) {
+            List<RouteOption> routes = new ArrayList<>();
+            for (SiteOption destination : sites) {
+                if (!origin.code().equalsIgnoreCase(destination.code())) {
+                    routes.add(new RouteOption(
+                            origin.code().toUpperCase(),
+                            destination.code().toUpperCase(),
+                            origin.label() + " to " + destination.label()));
+                }
+            }
+            options.put(origin.code().toUpperCase(), routes);
+        }
         return options;
+    }
+
+    public List<ProductOption> productOptions(String tenantCode) {
+        if (isBlank(tenantCode)) {
+            return List.of();
+        }
+        try {
+            return catalog.products(tenantCode);
+        } catch (CatalogUnavailableException ex) {
+            return List.of();
+        }
+    }
+
+    private String checkCatalog(String tenantCode, Set<String> routeKeys, String productCode, List<String> errors) {
+        Set<String> siteCodes = new HashSet<>();
+        for (SiteOption site : catalog.sites(tenantCode)) {
+            siteCodes.add(site.code().toUpperCase());
+        }
+
+        Set<String> unknownSites = new LinkedHashSet<>();
+        for (String key : routeKeys) {
+            String[] parts = key.split(":");
+            if (parts.length != 2) {
+                continue;
+            }
+            for (String part : parts) {
+                if (!siteCodes.contains(part)) {
+                    unknownSites.add(part);
+                }
+            }
+        }
+        for (String code : unknownSites) {
+            errors.add("Unknown site code: " + code + ".");
+        }
+
+        if (productCode == null || productCode.length() > AlertLimits.PRODUCT_CODE_MAX_LENGTH) {
+            return productCode;
+        }
+        for (ProductOption product : catalog.products(tenantCode)) {
+            if (product.code().equalsIgnoreCase(productCode)) {
+                return product.code();
+            }
+        }
+        errors.add("Unknown ticket: " + productCode + ".");
+        return productCode;
     }
 
     private Set<String> cleanRouteKeys(List<String> raw, List<String> errors) {
