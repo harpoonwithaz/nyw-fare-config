@@ -6,12 +6,6 @@
   <!-- 2D Rate Matrix Table Fragment -->
   <div th:fragment="fare-grid-table" class="card shadow-sm border-top-0 mb-4 rounded-top-0">
 
-    <th:block th:if="${gridView.rows.isEmpty()}">
-      <div
-        th:replace="~{fragments/feedback-card :: feedback-card('Origin Terminal: No active outbound routes configured for this terminal.', 'warning')}">
-      </div>
-    </th:block>
-
     <!-- Table Context Header -->
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
       <div>
@@ -40,7 +34,8 @@
             </th>
 
             <!-- Column Headers (Products or Destination Zones) -->
-            <th th:each="col : ${gridView.columnHeaders}" th:text="${col.displayName}"
+            <th th:each="col : ${gridView.columnHeaders}"
+              th:text="${col.displayName != null and !col.displayName.isBlank() and !#strings.equalsIgnoreCase(col.displayName, col.code) ? col.displayName + ' (' + col.code + ')' : col.code}"
               class="text-secondary small text-uppercase" style="min-width: 130px;">
             </th>
           </tr>

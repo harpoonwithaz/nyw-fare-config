@@ -186,4 +186,21 @@ class FareServiceDraftOverlayTests {
         assertFalse(notSoldCell.isEditable());
         assertTrue(notSoldCell.isHasPendingDraft());
     }
+
+    @Test
+    void getBaselineFareRuleReturnsUntouchedZonalRuleWithoutQueryingDependencies() {
+        Optional<FareRule> baseline = fareService.getBaselineFareRule(
+                zonalTenant, "  zone 1 ", "ZONE 2", "adult_oneway");
+
+        assertTrue(baseline.isPresent());
+        assertEquals("METRA", baseline.get().getTenantCode());
+        assertEquals("Zone 1", baseline.get().getOriginIdentifier());
+        assertEquals("Zone 2", baseline.get().getDestIdentifier());
+        assertEquals("ADULT_ONEWAY", baseline.get().getProductCode());
+        assertEquals("TIER_B", baseline.get().getTierCode());
+        assertEquals(new BigDecimal("4.00"), baseline.get().getPrice());
+        assertEquals(FareStatus.ACTIVE, baseline.get().getStatus());
+        assertFalse(baseline.get().isHasPendingDraft());
+        verifyNoInteractions(fareDraftRepository, caracalApiClient);
+    }
 }

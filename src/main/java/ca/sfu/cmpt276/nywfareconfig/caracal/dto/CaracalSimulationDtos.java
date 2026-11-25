@@ -1,4 +1,3 @@
-
 package ca.sfu.cmpt276.nywfareconfig.caracal.dto;
 
 import java.math.BigDecimal;
@@ -10,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public class CaracalSimulationDtos {
 
     // POST /functions/price-simulate request body
-    // Supports optional timestamp and channel for validation.
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PriceSimulateRequest(
             String tenantCode,
@@ -20,18 +18,30 @@ public class CaracalSimulationDtos {
             String at,
             String channel) {
 
-        // Backward-compatible constructor for existing FareService calls.
+        // Four-argument constructor
         public PriceSimulateRequest(
                 String tenantCode,
                 String productCode,
                 String siteCode,
                 Map<String, String> dimensions) {
 
-            this(tenantCode, productCode, siteCode, dimensions, null, null);
+            this(tenantCode, productCode, siteCode,
+                    dimensions, null, null);
+        }
+
+        // Five-argument constructor for main compatibility
+        public PriceSimulateRequest(
+                String tenantCode,
+                String productCode,
+                String siteCode,
+                Map<String, String> dimensions,
+                String at) {
+
+            this(tenantCode, productCode, siteCode,
+                    dimensions, at, null);
         }
     }
 
-    // Response from Caracal price simulation.
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record PricingDetail(
             String priceRuleSetName,
@@ -44,18 +54,17 @@ public class CaracalSimulationDtos {
             PricingDetail pricing) {
     }
 
-    // Error response returned by Caracal.
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record CaracalErrorResponse(
             String error) {
     }
 
-    // Shared result for fare grid and validation.
+    // Shared result for fare grid and validation
     public record PriceSimulationResult(
             PriceSimulateResponse response,
             String errorMessage,
             Integer statusCode) {
 
-        // Backward-compatible constructor for existing callers.
         public PriceSimulationResult(
                 PriceSimulateResponse response,
                 String errorMessage) {

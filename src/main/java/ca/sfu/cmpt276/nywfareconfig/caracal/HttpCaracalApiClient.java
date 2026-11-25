@@ -1,10 +1,12 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.math.BigDecimal;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -17,7 +19,6 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
-import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 import tools.jackson.databind.JsonNode;
 
@@ -25,11 +26,9 @@ import tools.jackson.databind.JsonNode;
 public class HttpCaracalApiClient implements CaracalApiClient {
 
     private final RestClient caracalRestClient;
-    private final ActorService actorService;
 
-    public HttpCaracalApiClient(RestClient caracalRestClient, ActorService actorService) {
+    public HttpCaracalApiClient(RestClient caracalRestClient) {
         this.caracalRestClient = caracalRestClient;
-        this.actorService = actorService;
     }
 
     // TODO: Remove the X-Actor: system header from each api request except
@@ -237,6 +236,46 @@ public class HttpCaracalApiClient implements CaracalApiClient {
     //     return response.path("pricing").path("total").decimalValue();
     // }
 
+    // Queries POST /functions/rate-table-get to populate O-D tenants
+    @Override
+    public Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(
+            CaracalCatalogDtos.RateTableGetRequest requestPayload) {
+        if (requestPayload == null
+                || isNullOrBlank(requestPayload.tenantCode())
+                || isNullOrBlank(requestPayload.rateTableName())) {
+            throw new IllegalArgumentException("Invalid request payload for rate table get.");
+        }
+
+        String actionDescription = "loading rate table " + requestPayload.rateTableName();
+
+        return execute(actionDescription, () -> {
+            try {
+                CaracalCatalogDtos.RateTableGetResponse response = caracalRestClient
+                        .post()
+                        .uri("/rate-table-get")
+                        .attribute("useSystemActor", false)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestPayload)
+                        .retrieve()
+                        .body(CaracalCatalogDtos.RateTableGetResponse.class);
+
+                if (response == null) {
+                    throw new CaracalApiException(
+                            "Caracal returned an empty response for rate table "
+                                    + requestPayload.rateTableName() + ".");
+                }
+                List<CaracalCatalogDtos.RateAssignmentSummary> assignments =
+                        response.assignments() != null ? response.assignments() : List.of();
+                return Optional.of(assignments);
+            } catch (RestClientResponseException ex) {
+                if (ex.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
+                    return Optional.empty();
+                }
+                throw ex;
+            }
+        });
+    }
+
     // ==============================================================================
     // Matrix & Availability Hydration
     // ==============================================================================
@@ -250,6 +289,12 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 || requestPayload.dimensions() == null) {
             throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
         }
+        
+        /*
+        For debugging:
+        System.out.println("Price simulate called for product: *" + requestPayload.productCode() +
+                            "* site: *" + requestPayload.siteCode() + "* at: *" + requestPayload.at() + "*.");
+        */
 
         String actionDescription = "simulating price for product "
                 + requestPayload.productCode() + " at site " + requestPayload.siteCode();
@@ -265,10 +310,11 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                         .retrieve()
                         .body(CaracalSimulationDtos.PriceSimulateResponse.class);
 
-                if (response == null || response.pricing() == null) {
-                    throw new CaracalApiException("Caracal returned an empty pricing response while " + actionDescription + ".");
+                if (response == null || response.pricing() == null || response.pricing().total() == null) {
+                    throw new CaracalApiException(
+                            "Caracal returned an empty pricing response while " + actionDescription + ".");
                 }
-                return new CaracalSimulationDtos.PriceSimulationResult(response, "");
+                return new CaracalSimulationDtos.PriceSimulationResult(response, null);
             } catch (RestClientResponseException ex) {
                 if (isBusiness4xx(ex)) {
                     String errorMessage = extractErrorMessage(ex);
@@ -307,7 +353,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             return request.get();
         } catch (ResourceAccessException ex) {
             throw new CaracalUnavailableException(
-                    "Unable to reach the Caracal platform. Please verify the service is running.", ex);
+                    "Unable to reach the Caracal platform.", ex);
         } catch (RestClientResponseException ex) {
             throw new CaracalApiException(
                     "Caracal API error (" + ex.getStatusCode().value() + ") while " + actionDescription + ".", ex);

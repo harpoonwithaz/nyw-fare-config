@@ -25,7 +25,7 @@ class HttpCaracalApiClientTest {
                 .baseUrl("http://localhost:8080/functions");
 
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new HttpCaracalApiClient(builder.build(), null);
+        client = new HttpCaracalApiClient(builder.build());
     }
 
     @Test

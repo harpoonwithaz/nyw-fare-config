@@ -2,6 +2,7 @@ package ca.sfu.cmpt276.nywfareconfig.caracal;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import tools.jackson.databind.JsonNode;
 
@@ -11,20 +12,24 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 // Decouples Epics 2–5 from Caracal's HTTP routing and raw JSON schemas.
 public interface CaracalApiClient {
 
+    // Catalog Discovery
+    List<CaracalCatalogDtos.TenantSummary> fetchTenants();
+
+    CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode);
+
     List<CaracalCatalogDtos.SiteSummary> fetchSites(String tenantCode);
 
     List<CaracalCatalogDtos.ProductSummary> fetchProducts(String tenantCode);
 
-    List<CaracalCatalogDtos.TenantSummary> fetchTenants();
-
-    CaracalCatalogDtos.TenantDetail fetchTenant(String tenantCode);
+    Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(
+            CaracalCatalogDtos.RateTableGetRequest requestPayload);
 
     // Publication and audit history
     JsonNode fetchPublicationHistory(String tenantCode);
 
     JsonNode fetchAuditHistory(String tenantCode, int limit);
 
-    //Active baseline pricing
+    // Active baseline pricing
     BigDecimal fetchBaselinePrice(
             String tenantCode,
             String originCode,
@@ -32,16 +37,7 @@ public interface CaracalApiClient {
             String productCode
     );
 
-    // Existing validation pricing method (to be migrated)
-    // BigDecimal fetchSimulatedPrice(
-    //         String tenantCode,
-    //         String productCode,
-    //         String originCode,
-    //         String destCode,
-    //         String at
-    // );
-
-    //Shared Caracal price simulation method
+    // Shared Caracal price simulation method
     CaracalSimulationDtos.PriceSimulationResult simulatePrice(
             CaracalSimulationDtos.PriceSimulateRequest requestPayload
     );

@@ -42,9 +42,8 @@
         <div class="card-body p-3">
           <form th:action="@{/fares}" method="get" class="row g-3 align-items-end">
 
-            <div class="col-md-3 col-sm-6">
-              <label
-                th:text="${tenantContext.selectedTenant.odMode ? 'Origin Terminal' : 'Ticket Product'}"
+            <div class="col-md-4 col-sm-6">
+              <label th:text="${tenantContext.selectedTenant.odMode ? 'Origin Terminal' : 'Ticket Product'}"
                 for="secondaryFilterDropdown" class="form-label fw-semibold small text-uppercase text-secondary">
               </label>
 
@@ -57,16 +56,17 @@
                   <option selected>Unavailable</option>
                 </select>
 
-                <select
-                  th:if="${caracalSecondaryFilterErrorMessage == null}"
-                  id="originSelect" name="secondaryFilter" class="form-select" onchange="this.form.submit()">
+                <select th:if="${caracalSecondaryFilterErrorMessage == null}" name="secondaryFilter" id="secondarySelect" class="form-select"
+                  onchange="this.form.submit()">
                   <option value="" th:selected="${tenantContext.secondaryFilter == null}"
-                    th:text="${tenantContext.selectedTenant.gridMode == T(ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode).OD ? 'Select Terminal' : 'Select Ticket'}"></option>
+                    th:text="${tenantContext.selectedTenant.odMode ? 'Select Terminal' : 'Select Ticket'}"></option>
                   <option th:each="filter : ${secondaryFilters}" th:value="${filter.code}"
                     th:text="${filter.displayName}"
                     th:selected="${tenantContext.secondaryFilter != null and tenantContext.secondaryFilter == filter.code}">
                   </option>
                 </select>
+
+                <input type="date" name="pricingDate" class="form-control" onchange="this.form.submit()" th:value="${tenantContext.selectedDate}" th:disabled="${caracalSecondaryFilterErrorMessage != null}">
               </div>
 
             </div>
@@ -123,47 +123,56 @@
         </div>
       </div>
 
-      <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
-      <div class="card shadow border-bottom-0"
-        th:if="${tenantContext.selectedTenant != null and tenantContext.secondaryFilter != null}">
-
-        <!-- Operational Controls & Save/Discard Actions -->
-        <div
-          class="card-header bg-white border-bottom py-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-
-          <!-- Context Creation & Configuration Actions -->
-          <div class="d-flex flex-wrap gap-2 align-items-center">
-
-            <!-- Zonal Actions -->
-            <th:block
-              th:if="${!tenantContext.selectedTenant.odMode}">
-              <button type="button" class="btn btn-outline-primary btn-sm" title="View all system tiers">
-                <i class="bi bi-layers me-1"></i> Manage Rate Tiers
-              </button>
-              <button type="button" class="btn btn-outline-dark btn-sm" title="Open Station to Zone Assignment Drawer">
-                <i class="bi bi-diagram-3 me-1"></i> Station Zone Mapping
-              </button>
-            </th:block>
-          </div>
-
-          <!-- Edit State Actions (Close to Grid) -->
-          <div class="d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm" disabled id="discardDraftsBtn">
-              <i class="bi bi-arrow-counterclockwise me-1"></i> Discard Drafts
-            </button>
-            <button type="button" class="btn btn-success btn-sm" disabled id="saveChangesBtn">
-              <i class="bi bi-check2-circle me-1"></i> Save Rate Changes
-              <span class="badge bg-light text-dark ms-1" id="changesCounter">0</span>
-            </button>
-          </div>
-
-        </div>
-
-      </div>
 
       <!-- Render Matrix Table Fragment When Context is Fully Resolved -->
       <div th:if="${gridView != null}">
-        <div th:replace="~{fare/fragments/fare-grid :: fare-grid-table}"></div>
+        <th:block th:if="${#lists.isEmpty(gridView.rows)}">
+          <div th:if="${tenantContext.selectedTenant.odMode}"
+            th:replace="~{fragments/feedback-card :: feedback-card('Origin Terminal: No active outbound routes configured for this terminal.', 'warning')}">
+          </div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(gridView.rows)}">
+
+          <!-- Fare Grid Card & Action Bar (Visible only when context is selected) -->
+          <div class="card shadow border-bottom-0"
+            th:if="${tenantContext.selectedTenant != null and tenantContext.secondaryFilter != null}">
+
+            <!-- Operational Controls & Save/Discard Actions -->
+            <div
+              class="card-header bg-white border-bottom py-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+              <!-- Context Creation & Configuration Actions -->
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+
+                <!-- Zonal Actions -->
+                <th:block th:if="${!tenantContext.selectedTenant.odMode}">
+                  <button type="button" class="btn btn-outline-primary btn-sm" title="View all system tiers">
+                    <i class="bi bi-layers me-1"></i> Manage Rate Tiers
+                  </button>
+                  <button type="button" class="btn btn-outline-dark btn-sm"
+                    title="Open Station to Zone Assignment Drawer">
+                    <i class="bi bi-diagram-3 me-1"></i> Station Zone Mapping
+                  </button>
+                </th:block>
+              </div>
+
+              <!-- Edit State Actions (Close to Grid) -->
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" disabled id="discardDraftsBtn">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i> Discard Drafts
+                </button>
+                <button type="button" class="btn btn-success btn-sm" disabled id="saveChangesBtn">
+                  <i class="bi bi-check2-circle me-1"></i> Save Rate Changes
+                  <span class="badge bg-light text-dark ms-1" id="changesCounter">0</span>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+          <div th:replace="~{fare/fragments/fare-grid :: fare-grid-table}"></div>
+        </th:block>
       </div>
 
     </main>

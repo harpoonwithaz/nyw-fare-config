@@ -28,8 +28,7 @@ public class TenantContextController {
             "/history",
             "/dashboard",
             "/admin",
-            "/account"
-    );
+            "/account");
 
     private final TenantContext tenantContext;
     private final TenantService tenantService;
@@ -47,6 +46,7 @@ public class TenantContextController {
         if (tenantCode == null || tenantCode.isBlank()) {
             tenantContext.setSelectedTenant(null);
             tenantContext.setSecondaryFilter(null);
+            tenantContext.setSelectedDate(null);
         } else {
             boolean isNewTenant = tenantContext.getSelectedTenant() == null ||
                     !tenantContext.getSelectedTenant().getCode().equalsIgnoreCase(tenantCode);
@@ -55,8 +55,9 @@ public class TenantContextController {
                 Tenant resolvedTenant = tenantService.getTenantByCode(tenantCode);
                 tenantContext.setSelectedTenant(resolvedTenant);
 
-                // Clear secondary filter state when switching tenants
+                // Clear secondary filter and selectedDate state when switching tenants
                 tenantContext.setSecondaryFilter(null);
+                tenantContext.setSelectedDate(null);
             }
         }
 
@@ -68,7 +69,8 @@ public class TenantContextController {
             return DEFAULT_RETURN_URL;
         }
 
-        // Reject backslashes, protocol-relative prefixes, and percent-encoded authority tricks
+        // Reject backslashes, protocol-relative prefixes, and percent-encoded authority
+        // tricks
         if (returnUrl.contains("\\") || returnUrl.startsWith("//") || returnUrl.contains("%")) {
             return DEFAULT_RETURN_URL;
         }
