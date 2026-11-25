@@ -110,7 +110,8 @@ public class AlertService {
 
         ServiceAlert existing = null;
         if (id != null) {
-            existing = alerts.findByIdAndTenantCode(id, tenantCode).orElse(null);
+            // Locked so two saves on the same live alert can't each create a draft copy
+            existing = alerts.lockByIdAndTenantCode(id, tenantCode).orElse(null);
             if (existing == null) {
                 errors.add("That alert no longer exists.");
                 return errors;
@@ -233,17 +234,32 @@ public class AlertService {
             return errors;
         }
 
+        // Drafts are locked, so a second "Make active" on the same draft waits and then sees it is no longer a draft.
+        // ponytail: publish locks draft then live alert, archive locks live alert then draft; Postgres aborts one
+        // if both hit the same alert in the same instant. Lock in one fixed order if that ever shows up.
         List<ServiceAlert> drafts = new ArrayList<>();
+        Map<Long, ServiceAlert> replaced = new LinkedHashMap<>();
         for (Long alertId : new LinkedHashSet<>(ids)) {
             Optional<ServiceAlert> found = alertId == null
                     ? Optional.empty()
-                    : alerts.findByIdAndTenantCode(alertId, tenantCode);
+                    : alerts.lockByIdAndTenantCode(alertId, tenantCode);
             if (found.isEmpty()) {
                 errors.add("Alert " + alertId + " was not found.");
             } else if (found.get().getStatus() != AlertStatus.DRAFT) {
                 errors.add("Alert " + alertId + " is not a draft.");
             } else {
-                drafts.add(found.get());
+                ServiceAlert draft = found.get();
+                if (draft.getReplacesAlertId() != null) {
+                    ServiceAlert old = alerts.lockByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
+                            .filter(a -> a.getStatus() == AlertStatus.ACTIVE)
+                            .orElse(null);
+                    if (old == null) {
+                        errors.add("Alert " + alertId + " edits a live alert that is no longer active. Delete this draft.");
+                        continue;
+                    }
+                    replaced.put(draft.getId(), old);
+                }
+                drafts.add(draft);
             }
         }
         if (!errors.isEmpty()) {
@@ -252,15 +268,12 @@ public class AlertService {
 
         Instant now = Instant.now();
         for (ServiceAlert draft : drafts) {
-            if (draft.getReplacesAlertId() != null) {
-                alerts.findByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
-                        .filter(old -> old.getStatus() == AlertStatus.ACTIVE)
-                        .ifPresent(old -> {
-                            old.setStatus(AlertStatus.ARCHIVED);
-                            old.setArchivedBy(actor);
-                            old.setArchivedAt(now);
-                            alerts.save(old);
-                        });
+            ServiceAlert old = replaced.get(draft.getId());
+            if (old != null) {
+                old.setStatus(AlertStatus.ARCHIVED);
+                old.setArchivedBy(actor);
+                old.setArchivedAt(now);
+                alerts.save(old);
             }
             draft.setStatus(AlertStatus.ACTIVE);
             draft.setPublishedBy(actor);
@@ -275,7 +288,7 @@ public class AlertService {
         if (isBlank(tenantCode) || id == null) {
             return false;
         }
-        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        Optional<ServiceAlert> found = alerts.lockByIdAndTenantCode(id, tenantCode);
         if (found.isEmpty() || found.get().getStatus() != AlertStatus.ACTIVE) {
             return false;
         }
@@ -284,6 +297,9 @@ public class AlertService {
         alert.setArchivedBy(actor);
         alert.setArchivedAt(Instant.now());
         alerts.save(alert);
+        // Unpublished edits of an archived alert have nothing left to replace, so they go too
+        alerts.findFirstByReplacesAlertIdAndTenantCodeAndStatus(id, tenantCode, AlertStatus.DRAFT)
+                .ifPresent(alerts::delete);
         return true;
     }
 
@@ -292,7 +308,7 @@ public class AlertService {
         if (isBlank(tenantCode) || id == null) {
             return false;
         }
-        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        Optional<ServiceAlert> found = alerts.lockByIdAndTenantCode(id, tenantCode);
         if (found.isEmpty() || !isDeletable(found.get())) {
             return false;
         }

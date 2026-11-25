@@ -99,10 +99,17 @@ public class AlertController {
     @PostMapping({ "/fares/alerts", "/fares/alerts/{id}" })
     public String save(@PathVariable(required = false) Long id,
             @ModelAttribute("form") AlertForm form,
+            @RequestParam(name = "tenantCode", required = false) String formTenant,
             @AuthenticationPrincipal AppUserDetails user,
             Model model, RedirectAttributes redirect) {
         String tenantCode = tenantCode();
         if (tenantCode == null) {
+            return LIST;
+        }
+        // The form was opened for another client (switched in another tab): don't save it under this one
+        if (!tenantCode.equals(formTenant)) {
+            redirect.addFlashAttribute("error",
+                    "The client changed after this form was opened, so nothing was saved. Open the alert again and redo the change.");
             return LIST;
         }
         List<String> errors = alertService.save(tenantCode, id, form, user.getEmail(), languages());
@@ -150,7 +157,7 @@ public class AlertController {
             RedirectAttributes redirect) {
         String tenantCode = tenantCode();
         if (tenantCode != null && alertService.archive(tenantCode, id, user.getEmail())) {
-            redirect.addFlashAttribute("success", "Alert archived. Riders will no longer see it.");
+            redirect.addFlashAttribute("success", "Alert archived. Riders will no longer see it, and any unpublished edits to it were discarded.");
         } else {
             redirect.addFlashAttribute("error", "Only active alerts can be archived.");
         }
@@ -161,6 +168,7 @@ public class AlertController {
             List<String> errors) {
         // Sites and tickets come live from Caracal through FareService
         AlertCatalog catalog = alertService.formCatalog(tenantCode);
+        model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("alert", alert);
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);

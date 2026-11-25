@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.caracal.config;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -58,7 +59,8 @@ class CaracalActorInterceptorTest {
         MockClientHttpRequest request = newRequest();
         ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
 
-        assertThrows(IllegalStateException.class, () -> interceptor.intercept(request, new byte[0], execution));
+        // Surfaces as a Caracal error so callers show their normal "Caracal unavailable" message
+        assertThrows(CaracalApiException.class, () -> interceptor.intercept(request, new byte[0], execution));
         verify(execution, never()).execute(request, new byte[0]);
     }
 

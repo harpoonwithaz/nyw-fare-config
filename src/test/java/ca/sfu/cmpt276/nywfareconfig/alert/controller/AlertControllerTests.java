@@ -112,7 +112,8 @@ class AlertControllerTests {
 
     // Request in the session that has NYW_SANDBOX selected
     private MockHttpServletRequestBuilder inTenant(MockHttpServletRequestBuilder builder, AppUserDetails who) {
-        builder.session(session).with(user(who)).with(csrf());
+        // tenantCode is the hidden field the alert form posts back
+        builder.session(session).with(user(who)).with(csrf()).param("tenantCode", TENANT);
         if (cookie != null) {
             builder.cookie(cookie);
         }
@@ -401,6 +402,73 @@ class AlertControllerTests {
             .andExpect(status().is3xxRedirection());
 
         assertEquals(AlertStatus.ARCHIVED, alertRepository.findById(draft.getId()).orElseThrow().getStatus());
+    }
+
+    // A form opened for one client and submitted after switching to another in a second tab
+    @Test
+    void saveIsRefusedWhenClientChangedSinceFormOpened() throws Exception {
+        mockMvc.perform(post("/fares/alerts").session(session).cookie(cookie).with(user(OPERATOR)).with(csrf())
+                .param("tenantCode", "METRA")
+                .param("routeKeys", ROUTE)
+                .param("triggerType", "WEEKENDS")
+                .param("messageEn", "Wrong client"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                .attribute("error", containsString("client changed")));
+
+        assertTrue(alertRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void formCarriesItsClient() throws Exception {
+        mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
+            .andExpect(content().string(containsString("name=\"tenantCode\" value=\"NYW_SANDBOX\"")));
+    }
+
+    @Test
+    void secondActivateOfSameDraftIsRefused() {
+        ServiceAlert draft = saveDraft("Activate twice");
+
+        assertTrue(alertService.publish(TENANT, List.of(draft.getId()), "test").isEmpty());
+        assertEquals(List.of("Alert " + draft.getId() + " is not a draft."),
+            alertService.publish(TENANT, List.of(draft.getId()), "test"));
+    }
+
+    @Test
+    void archivingLiveAlertDiscardsItsPendingEdit() throws Exception {
+        ServiceAlert live = saveDraft("Live then archived");
+        assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
+        AlertForm edit = new AlertForm();
+        edit.setRouteKeys(List.of(ROUTE));
+        edit.setMessageEn("Pending edit");
+        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", AlertLimits.LANGUAGES).isEmpty());
+        ServiceAlert pending = alertService.list(TENANT, "Pending edit", null, null).get(0);
+
+        mockMvc.perform(inTenant(post("/fares/alerts/" + live.getId() + "/archive"), ADMIN))
+            .andExpect(status().is3xxRedirection());
+
+        assertEquals(AlertStatus.ARCHIVED, alertRepository.findById(live.getId()).orElseThrow().getStatus());
+        assertTrue(alertRepository.findById(pending.getId()).isEmpty());
+    }
+
+    @Test
+    void draftOfAnAlertThatIsNoLongerLiveCannotBeActivated() {
+        ServiceAlert live = saveDraft("Parent gone");
+        assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
+        AlertForm edit = new AlertForm();
+        edit.setRouteKeys(List.of(ROUTE));
+        edit.setMessageEn("Orphan edit");
+        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", AlertLimits.LANGUAGES).isEmpty());
+        ServiceAlert orphan = alertService.list(TENANT, "Orphan edit", null, null).get(0);
+        // Parent archived directly, as old data might have it
+        ServiceAlert parent = alertRepository.findById(live.getId()).orElseThrow();
+        parent.setStatus(AlertStatus.ARCHIVED);
+        alertRepository.save(parent);
+
+        List<String> errors = alertService.publish(TENANT, List.of(orphan.getId()), "test");
+
+        assertTrue(errors.get(0).contains("no longer active"), errors.toString());
+        assertEquals(AlertStatus.DRAFT, alertRepository.findById(orphan.getId()).orElseThrow().getStatus());
     }
 
     // Draft -> Active from the alerts page

@@ -8,6 +8,7 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 // Sets X-Actor on every Caracal call. Requests marked with the useSystemActor attribute
@@ -33,8 +34,18 @@ public class CaracalActorInterceptor implements ClientHttpRequestInterceptor {
         if (Boolean.TRUE.equals(request.getAttributes().get(USE_SYSTEM_ACTOR))) {
             request.getHeaders().set(HEADER_NAME, SYSTEM_ACTOR);
         } else {
-            request.getHeaders().set(HEADER_NAME, OPERATOR_PREFIX + actorService.currentActorHeader());
+            request.getHeaders().set(HEADER_NAME, OPERATOR_PREFIX + operatorEmail());
         }
         return execution.execute(request, body);
+    }
+
+    // No signed-in operator means the call can't be attributed; report it like any other Caracal failure
+    // so pages show their "Caracal unavailable" message instead of an error page
+    private String operatorEmail() {
+        try {
+            return actorService.currentActorHeader();
+        } catch (IllegalStateException ex) {
+            throw new CaracalApiException("No signed-in operator to send to Caracal.", ex);
+        }
     }
 }

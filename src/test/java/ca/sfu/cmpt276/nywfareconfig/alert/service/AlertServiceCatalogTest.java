@@ -88,7 +88,7 @@ class AlertServiceCatalogTest {
     void keepsARetiredTicketThatWasAlreadySaved() {
         ServiceAlert existing = new ServiceAlert(TENANT);
         existing.setProductCode("OLD_PASS");
-        when(alerts.findByIdAndTenantCode(7L, TENANT)).thenReturn(Optional.of(existing));
+        when(alerts.lockByIdAndTenantCode(7L, TENANT)).thenReturn(Optional.of(existing));
 
         List<String> errors = service.save(TENANT, 7L, form("PIER11:HOB14ST", "OLD_PASS"), "admin@caracal.com", BOTH);
 

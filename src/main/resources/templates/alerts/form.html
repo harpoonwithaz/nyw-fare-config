@@ -39,6 +39,8 @@
 
             <form th:action="${alert == null} ? @{/fares/alerts} : @{/fares/alerts/{id}(id=${alert.id})}"
                 method="post" th:object="${form}">
+                <!-- Which client this form belongs to; saving is refused if the session has switched since -->
+                <input type="hidden" name="tenantCode" th:value="${tenantCode}">
 
                 <div class="row g-4">
                     <div class="col-lg-7">
