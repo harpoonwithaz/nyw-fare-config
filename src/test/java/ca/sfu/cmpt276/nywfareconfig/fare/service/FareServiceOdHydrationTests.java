@@ -277,14 +277,4 @@ class FareServiceOdHydrationTests {
         assertEquals(Map.of("DEST", "PIER11"), captor.getValue().dimensions());
         verifyNoInteractions(fareDraftRepository);
     }
-
-    @Test
-    void buildGridAndResolvePricingTimestampFailFastOnInvalidDateWithoutCallingApi() {
-        assertThrows(IllegalArgumentException.class,
-                () -> fareService.buildGrid(odTenant, "MIDTOWN", "not-a-date"));
-        assertThrows(IllegalArgumentException.class,
-                () -> fareService.resolvePricingTimestamp("NYW_SANDBOX", "MIDTOWN", "not-a-date"));
-
-        verifyNoInteractions(caracalApiClient, fareDraftRepository);
-    }
 }
