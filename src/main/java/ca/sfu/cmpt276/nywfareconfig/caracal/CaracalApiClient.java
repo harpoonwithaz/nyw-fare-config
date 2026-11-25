@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalMutationDtos;
 
 // Decouples Epics 2–5 from Caracal’s HTTP routing, threading, 
 // and raw JSON schemas by exposing normalized domain methods.
@@ -21,10 +22,10 @@ public interface CaracalApiClient {
 
     // Matrix & Availability Hydration
     public CaracalSimulationDtos.PriceSimulationResult simulatePrice(CaracalSimulationDtos.PriceSimulateRequest requestPayload);
-    public List<CaracalCatalogDtos.SimulatedProductAvailability> simulateAvailability(
+    public List<CaracalSimulationDtos.SimulatedProductAvailability> simulateAvailability(
             String tenantCode, String siteCode, Map<String, String> dimensions);
 
     // Availability & Rule Mutations (Epic 3)
-    public String createWhenCondition(CaracalCatalogDtos.WhenConditionCreateRequest requestPayload, String actorHeader);
-    public void updateRateAssignment(CaracalCatalogDtos.RateAssignmentUpdateRequest requestPayload, String actorHeader);
+    public String createWhenCondition(CaracalMutationDtos.WhenConditionCreateRequest requestPayload);
+    public void updateRateAssignment(CaracalMutationDtos.RateAssignmentUpdateRequest requestPayload);
 }

@@ -1,5 +1,8 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.service;
 
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
 import ca.sfu.cmpt276.nywfareconfig.availability.dto.AvailabilityDraftDTO;
 import ca.sfu.cmpt276.nywfareconfig.availability.dto.ProductAvailabilityView;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
@@ -7,6 +10,8 @@ import ca.sfu.cmpt276.nywfareconfig.availability.model.TemporalCondition;
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalMutationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import org.slf4j.Logger;
@@ -43,14 +48,17 @@ public class AvailabilityService {
 
     private final AvailabilityRuleRepository availabilityRuleRepository;
     private final CaracalApiClient caracalApiClient;
+    private final FareService fareService;
     private final ActorService actorService;
 
     public AvailabilityService(
             AvailabilityRuleRepository availabilityRuleRepository,
             CaracalApiClient caracalApiClient,
+            FareService fareService,
             ActorService actorService) {
         this.availabilityRuleRepository = availabilityRuleRepository;
         this.caracalApiClient = caracalApiClient;
+        this.fareService = fareService;
         this.actorService = actorService;
     }
 
@@ -59,14 +67,13 @@ public class AvailabilityService {
             return List.of();
         }
         try {
-            List<CaracalCatalogDtos.SiteSummary> sites = caracalApiClient.fetchSites(tenantCode);
-            if (sites != null && !sites.isEmpty()) {
+            List<CatalogOption> sites = fareService.getSecondaryFilterOptions(tenantCode, GridMode.OD);
+            if (!sites.isEmpty()) {
                 return sites.stream()
-                        .filter(s -> s.siteCode() != null && !s.siteCode().isBlank())
-                        .sorted(Comparator.comparing(s -> s.name() != null ? s.name() : s.siteCode()))
+                        .sorted(Comparator.comparing(s -> s.displayName() != null ? s.displayName() : s.code()))
                         .map(s -> new StationOption(
-                                s.siteCode(),
-                                (s.name() != null && !s.name().isBlank()) ? s.name() : s.siteCode(),
+                                s.code(),
+                                (s.displayName() != null && !s.displayName().isBlank()) ? s.displayName() : s.code(),
                                 "TERMINAL"))
                         .toList();
             }
@@ -122,23 +129,18 @@ public class AvailabilityService {
         String resolvedRateTableName = "RT-" + siteCode;
 
         if (tenantCode != null && !tenantCode.isBlank()) {
-            // 1. Load live product catalog from Caracal (/functions/product-list)
+            // Load live active product catalog via FareService
             try {
-                List<CaracalCatalogDtos.ProductSummary> liveProducts = caracalApiClient.fetchProducts(tenantCode);
-                if (liveProducts != null) {
-                    for (CaracalCatalogDtos.ProductSummary p : liveProducts) {
-                        if (p.code() != null && !p.code().isBlank() && p.isActive()) {
-                            orderedProducts.add(p.code());
-                            productNames.put(p.code(), p.name() != null ? p.name() : p.code());
-                            toggles.put(p.code(), true);
-                        }
-                    }
+                for (CatalogOption p : fareService.getOdProducts(tenantCode)) {
+                    orderedProducts.add(p.code());
+                    productNames.put(p.code(), p.displayName() != null ? p.displayName() : p.code());
+                    toggles.put(p.code(), true);
                 }
             } catch (CaracalApiException ex) {
                 log.warn("Caracal product-list unavailable for {}: {}", tenantCode, ex.getMessage());
             }
 
-            // 2. Fetch live rate tables (/functions/rate-table-list) & assignments (/functions/rate-table-get)
+            // Fetch live rate tables (/functions/rate-table-list) & assignments (/functions/rate-table-get)
             try {
                 List<CaracalCatalogDtos.RateTableSummary> tables = caracalApiClient.fetchRateTables(tenantCode);
                 Optional<CaracalCatalogDtos.RateTableSummary> matchedTable = tables.stream()
@@ -173,13 +175,13 @@ public class AvailabilityService {
                 log.warn("Caracal rate-table lookup unavailable for {}/{}: {}", tenantCode, siteCode, ex.getMessage());
             }
 
-            // 3. Simulate live availability (/functions/availability-simulate)
+            // Simulate live availability (/functions/availability-simulate)
             try {
                 Map<String, String> dimensions = extractRouteDimensions(normalizedRoute);
-                List<CaracalCatalogDtos.SimulatedProductAvailability> simulated =
+                List<CaracalSimulationDtos.SimulatedProductAvailability> simulated =
                         caracalApiClient.simulateAvailability(tenantCode, siteCode, dimensions);
 
-                for (CaracalCatalogDtos.SimulatedProductAvailability sim : simulated) {
+                for (CaracalSimulationDtos.SimulatedProductAvailability sim : simulated) {
                     String code = sim.productCode();
                     if (code == null || code.isBlank()) continue;
 
@@ -210,7 +212,7 @@ public class AvailabilityService {
             }
         }
 
-        // 4. Overlay staged PostgreSQL AvailabilityRule rows
+        // Overlay staged PostgreSQL AvailabilityRule rows
         if (tenantCode != null && !tenantCode.isBlank()) {
             List<AvailabilityRule> tenantRules = availabilityRuleRepository.findByTenantCode(tenantCode);
             for (AvailabilityRule tr : tenantRules) {
@@ -394,10 +396,6 @@ public class AvailabilityService {
 
         int syncedCount = 0;
         for (AvailabilityRule rule : pendingRules) {
-            String actor = (rule.getUpdatedBy() != null && !rule.getUpdatedBy().isBlank())
-                    ? rule.getUpdatedBy()
-                    : resolveActor();
-
             attachCaracalAssignmentMetadata(tenantCode, rule.getSiteCode(), rule);
 
             if (rule.getTemporalCondition() != null) {
@@ -406,8 +404,8 @@ public class AvailabilityService {
                 String uniqueConditionName = sanitizeConditionName(
                         rule.getProductCode() + "_" + rule.getSiteCode() + "_" + System.currentTimeMillis());
 
-                CaracalCatalogDtos.WhenConditionCreateRequest wcReq =
-                        new CaracalCatalogDtos.WhenConditionCreateRequest(
+                CaracalMutationDtos.WhenConditionCreateRequest wcReq =
+                        new CaracalMutationDtos.WhenConditionCreateRequest(
                                 tenantCode,
                                 uniqueConditionName,
                                 caracalCondType,
@@ -421,14 +419,14 @@ public class AvailabilityService {
                                 tc.getDayOfMonthStart(),
                                 tc.getDayOfMonthEnd());
 
-                caracalApiClient.createWhenCondition(wcReq, actor);
+                caracalApiClient.createWhenCondition(wcReq);
                 rule.setMatchedCondition(uniqueConditionName);
             }
 
             if (rule.getRateAssignmentId() != null && !rule.getRateAssignmentId().isBlank()) {
                 String cellType = rule.isAvailable() ? "VALUE" : "NOT_SOLD";
-                CaracalCatalogDtos.RateAssignmentUpdateRequest updateReq =
-                        new CaracalCatalogDtos.RateAssignmentUpdateRequest(
+                CaracalMutationDtos.RateAssignmentUpdateRequest updateReq =
+                        new CaracalMutationDtos.RateAssignmentUpdateRequest(
                                 tenantCode,
                                 rule.getRateAssignmentId(),
                                 cellType,
@@ -437,7 +435,7 @@ public class AvailabilityService {
                                 null,
                                 null,
                                 null);
-                caracalApiClient.updateRateAssignment(updateReq, actor);
+                caracalApiClient.updateRateAssignment(updateReq);
             }
 
             rule.setSyncedToCaracal(true);

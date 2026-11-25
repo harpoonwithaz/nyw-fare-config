@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -81,9 +82,10 @@ class AvailabilityControllerMockMvcTests {
 
         when(caracalApiClient.fetchTenants()).thenReturn(List.of(
                 new CaracalCatalogDtos.TenantSummary("NYW_SANDBOX", "NY Waterway Sandbox")));
+        ZoneId nyZone = ZoneId.of("America/New_York");
         when(caracalApiClient.fetchSites("NYW_SANDBOX")).thenReturn(List.of(
-                new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown / W. 39th St"),
-                new CaracalCatalogDtos.SiteSummary("PIER11", "Pier 11 / Wall St")));
+                new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown / W. 39th St", nyZone),
+                new CaracalCatalogDtos.SiteSummary("PIER11", "Pier 11 / Wall St", nyZone)));
         when(caracalApiClient.fetchProducts("NYW_SANDBOX")).thenReturn(List.of(
                 new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true),
                 new CaracalCatalogDtos.ProductSummary("FULL_MONTHLY", "Full Monthly Pass", true)));
@@ -172,8 +174,8 @@ class AvailabilityControllerMockMvcTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"));
 
-        verify(caracalApiClient).createWhenCondition(any(), anyString());
-        verify(caracalApiClient).updateRateAssignment(any(), anyString());
+        verify(caracalApiClient).createWhenCondition(any());
+        verify(caracalApiClient).updateRateAssignment(any());
 
         List<AvailabilityRule> saved = availabilityRuleRepository.findByTenantCode("NYW_SANDBOX");
         assertThat(saved).hasSize(1);

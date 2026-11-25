@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return `Product: ${productCode} | Origin: ${stagedAvailabilityDrafts.siteCode} | Dest: ${destDisplay}`;
     }
 
-    // --- 1. handle toggle switches (story 3.1) ---
+    // --- handle toggle switches (story 3.1) ---
     document.querySelectorAll(".availability-toggle").forEach(toggle => {
         toggle.addEventListener("change", function () {
             const productCode = this.getAttribute("data-product");
@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // --- 2. modal condition builder (story 3.3) ---
+    // --- modal condition builder (story 3.3) ---
     const typeRecurring = document.getElementById("typeRecurring");
     const typePromo = document.getElementById("typePromo");
     const sectionDaysOfWeek = document.getElementById("sectionDaysOfWeek");
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- 3. helpers, discard & batch save handler ---
+    // --- helpers, discard & batch save handler ---
     function markRowStaged(row) {
         if (!row) return;
         const stagedBadge = row.querySelector(".staged-badge");
