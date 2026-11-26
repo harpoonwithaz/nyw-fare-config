@@ -19,6 +19,7 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
+import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 import tools.jackson.databind.JsonNode;
 
@@ -26,9 +27,11 @@ import tools.jackson.databind.JsonNode;
 public class HttpCaracalApiClient implements CaracalApiClient {
 
     private final RestClient caracalRestClient;
+    private final ActorService actorService;
 
-    public HttpCaracalApiClient(RestClient caracalRestClient) {
+    public HttpCaracalApiClient(RestClient caracalRestClient, ActorService actorService) {
         this.caracalRestClient = caracalRestClient;
+        this.actorService = actorService;
     }
 
     // TODO: Remove the X-Actor: system header from each api request except
@@ -146,6 +149,148 @@ public class HttpCaracalApiClient implements CaracalApiClient {
             "loading audit history for tenant" + tenantCode, tenantCode, limit
         );
     }
+
+    @Override
+    public JsonNode publishCatalog(String tenantCode) {
+
+        if (isNullOrBlank(tenantCode)) {
+            throw new IllegalArgumentException(
+                    "Tenant code must not be blank.");
+        }
+
+        // Retrieve the authenticated user's identity.
+        String actor = actorService.currentActorHeader();
+
+        if (isNullOrBlank(actor) || "system".equalsIgnoreCase(actor.trim())) {
+            throw new IllegalStateException(
+                    "An authenticated actor is required for publication.");
+        }
+
+        Map<String, Object> requestBody = Map.of(
+                "tenantCode", tenantCode
+        );
+
+        return execute(
+                "publishing catalog for tenant " + tenantCode,
+                () -> caracalRestClient
+                        .post()
+                        .uri("/catalog-publish")
+                        .attribute("useSystemActor", false)
+                        .header("X-Actor", "operator:" + actor.trim())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestBody)
+                        .retrieve()
+                        .body(JsonNode.class)
+        );  
+    }
+
+    @Override
+public JsonNode updateOdMatrix(
+        String tenantCode,
+        String priceRuleSetName,
+        String originCode,
+        String destCode,
+        BigDecimal price) {
+
+    if (!"NYW_SANDBOX".equals(tenantCode)) {
+        throw new IllegalArgumentException(
+                "Fare updates are restricted to NYW_SANDBOX.");
+    }
+
+    if (isNullOrBlank(priceRuleSetName)
+            || isNullOrBlank(originCode)
+            || isNullOrBlank(destCode)
+            || price == null
+            || price.signum() < 0) {
+
+        throw new IllegalArgumentException(
+                "Invalid OD matrix update.");
+    }
+
+    Map<String, Object> requestBody = Map.of(
+            "tenantCode", tenantCode,
+            "priceRuleSetName", priceRuleSetName,
+            "originDimensionKey", "ORIGIN",
+            "destDimensionKey", "DEST",
+            "rows", List.of(
+                    Map.of(
+                            "originSiteCode", originCode,
+                            "destSiteCode", destCode,
+                            "price", price
+                    )
+            )
+    );
+
+    return executeMutation(
+            "/od-matrix-set",
+            requestBody,
+            "updating fare from " + originCode + " to " + destCode
+    );
+}
+
+@Override
+public JsonNode updateRateAssignment(
+        String tenantCode,
+        String assignmentId,
+        String cellType) {
+
+    if (!"NYW_SANDBOX".equals(tenantCode)) {
+        throw new IllegalArgumentException(
+                "Rate assignment updates are restricted to NYW_SANDBOX.");
+    }
+
+    if (isNullOrBlank(assignmentId)) {
+        throw new IllegalArgumentException(
+                "Assignment ID is required.");
+    }
+
+    if (!"VALUE".equals(cellType)
+            && !"NOT_SOLD".equals(cellType)) {
+
+        throw new IllegalArgumentException(
+                "Invalid rate assignment cell type.");
+    }
+
+    Map<String, Object> requestBody = Map.of(
+            "tenantCode", tenantCode,
+            "assignmentId", assignmentId,
+            "cellType", cellType
+    );
+
+    return executeMutation(
+            "/rate-assignment-update",
+            requestBody,
+            "updating rate assignment " + assignmentId
+    );
+}
+
+private JsonNode executeMutation(
+        String endpoint,
+        Map<String, Object> requestBody,
+        String actionDescription) {
+
+    String actor = actorService.currentActorHeader();
+
+    if (isNullOrBlank(actor)
+            || "system".equalsIgnoreCase(actor.trim())) {
+
+        throw new IllegalStateException(
+                "An authenticated actor is required.");
+    }
+
+    return execute(
+            actionDescription,
+            () -> caracalRestClient
+                    .post()
+                    .uri(endpoint)
+                    .attribute("useSystemActor", false)
+                    .header("X-Actor", "operator:" + actor.trim())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class)
+    );
+}
 
 
     @Override

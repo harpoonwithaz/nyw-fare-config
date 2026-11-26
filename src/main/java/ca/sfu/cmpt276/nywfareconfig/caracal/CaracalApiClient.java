@@ -29,7 +29,26 @@ public interface CaracalApiClient {
 
     JsonNode fetchAuditHistory(String tenantCode, int limit);
 
-    // Active baseline pricing
+// Publish the validated sandbox configuration to Caracal
+JsonNode publishCatalog(String tenantCode);
+
+// Update an origin-destination fare in Caracal.
+JsonNode updateOdMatrix(
+        String tenantCode,
+        String priceRuleSetName,
+        String originCode,
+        String destCode,
+        BigDecimal price
+);
+
+// Update ticket availability at a terminal.
+JsonNode updateRateAssignment(
+        String tenantCode,
+        String assignmentId,
+        String cellType
+);
+
+// Active baseline pricing
     BigDecimal fetchBaselinePrice(
             String tenantCode,
             String originCode,

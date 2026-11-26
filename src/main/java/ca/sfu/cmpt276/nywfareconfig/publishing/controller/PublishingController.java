@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.Authentication;
 
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
@@ -26,7 +27,9 @@ public class PublishingController {
     }
 
     @GetMapping("/publishing/review")
-    public String showReviewPage(Model model) {
+    public String showReviewPage(
+            Model model,
+            Authentication authentication) {
 
         Tenant selectedTenant = tenantContext.getSelectedTenant();
 
@@ -38,17 +41,27 @@ public class PublishingController {
                 stagingService.getConfigurationChanges(tenantCode);
 
         long totalCount = fareChanges.size();
+
         long changedCount = fareChanges.stream()
                 .filter(ConfigurationChangeView::isChanged)
                 .count();
+
         long unchangedCount = totalCount - changedCount;
 
         model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("pendingChanges", fareChanges);
-
         model.addAttribute("totalCount", totalCount);
         model.addAttribute("changedCount", changedCount);
         model.addAttribute("unchangedCount", unchangedCount);
+
+        boolean canPublish = authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                        .anyMatch(authority ->
+                                "ROLE_CLIENT_SERVICES".equals(
+                                        authority.getAuthority()));
+
+        model.addAttribute("canPublish", canPublish);
 
         return "publishing/review";
     }

@@ -1,10 +1,12 @@
-
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+
     <title>Configuration Review - NYW Fare Config</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -26,7 +28,7 @@
                     <h1 class="h3">Configuration Review</h1>
                     <p class="text-muted">
                         Review pending configuration changes, validate sandbox fares,
-                        and view configuration history.
+                        publish staged changes, and view configuration history.
                     </p>
                 </div>
 
@@ -70,7 +72,8 @@
                          id="review-content"
                          role="tabpanel"
                          aria-labelledby="review-tab"
-                         th:attr="data-tenant-code=${tenantCode}">
+                         th:attr="data-tenant-code=${tenantCode}"
+                         th:data-can-publish="${canPublish == true ? 'true' : 'false'}">
 
                         <!-- Configuration Details -->
                         <div class="card shadow-sm mb-4">
@@ -101,7 +104,7 @@
                                 <div class="card shadow-sm h-100">
                                     <div class="card-body">
                                         <h6 class="text-muted">Total Pending Changes</h6>
-                                        <h2 id="totalItemsCount" class="mb-0">—</h2>
+                                        <h2 id="totalItemsCount" class="mb-0">&mdash;</h2>
                                     </div>
                                 </div>
                             </div>
@@ -110,7 +113,7 @@
                                 <div class="card shadow-sm h-100">
                                     <div class="card-body">
                                         <h6 class="text-muted">Fare Changes</h6>
-                                        <h2 id="changedItemsCount" class="text-warning mb-0">—</h2>
+                                        <h2 id="changedItemsCount" class="text-warning mb-0">&mdash;</h2>
                                     </div>
                                 </div>
                             </div>
@@ -142,7 +145,6 @@
                                             </tr>
                                         </thead>
 
-                                        <!-- Populated by publishing-review.js -->
                                         <tbody id="fareChangesTableBody">
                                             <tr>
                                                 <td colspan="8"
@@ -173,7 +175,7 @@
                                 <p class="text-muted">
                                     Compare the selected tenant's Caracal sandbox fares
                                     against the NYW reference sheet.
-                                    Validation is read-only.
+                                    Validation is read-only and is not required before publication.
                                 </p>
 
                                 <button type="button"
@@ -190,7 +192,6 @@
                                    aria-live="polite">
                                 </p>
 
-                                <!-- Hidden until validation completes -->
                                 <div id="validationResults" class="mt-3" hidden>
 
                                     <h6>Validation Results</h6>
@@ -224,7 +225,6 @@
                                                 </tr>
                                             </thead>
 
-                                            <!-- Populated by publishing-validation.js -->
                                             <tbody id="validationTableBody"></tbody>
 
                                         </table>
@@ -252,65 +252,35 @@
 
                         </div>
 
-                        <!-- Operator Review Workflow -->
+                        <!-- Publication Controls -->
                         <div class="card shadow-sm mb-4">
 
                             <div class="card-header bg-white">
                                 <h5 class="mb-0">
-                                    <i class="bi bi-clipboard-check me-2"></i>
-                                    Operator Review Workflow
+                                    <i class="bi bi-cloud-upload me-2"></i>
+                                    Publish Configuration
                                 </h5>
                             </div>
 
                             <div class="card-body">
 
                                 <p class="text-muted">
-                                    Review and verify all staged configuration changes
-                                    before proceeding with publication.
+                                    Review the staged fare changes above before publishing.
+                                    Publication applies pending fare changes to the
+                                    Caracal sandbox and publishes the updated catalog.
                                 </p>
 
-                                <ol class="list-group list-group-numbered mb-4">
+                                <div class="alert alert-info">
+                                    Publication is restricted to authorized users
+                                    working with NYW_SANDBOX.
+                                    Validation can be run before or after publication
+                                    to check remaining discrepancies.
+                                </div>
 
-                                    <li class="list-group-item">
-                                        <strong>Review Pending Changes</strong>
-                                        <div class="text-muted small">
-                                            Examine all proposed fare updates.
-                                        </div>
-                                    </li>
-
-                                    <li class="list-group-item">
-                                        <strong>Compare Original and Proposed Values</strong>
-                                        <div class="text-muted small">
-                                            Verify the differences between original fare
-                                            values and staged draft values.
-                                        </div>
-                                    </li>
-
-                                    <li class="list-group-item">
-                                        <strong>Verify Configuration Accuracy</strong>
-                                        <div class="text-muted small">
-                                            Confirm that the proposed changes are correct
-                                            and ready for validation.
-                                        </div>
-                                    </li>
-
-                                    <li class="list-group-item">
-                                        <strong>Publish Verified Configuration</strong>
-                                        <div class="text-muted small">
-                                            Proceed with publication only after validation
-                                            and verification are complete.
-                                        </div>
-                                    </li>
-
-                                </ol>
-
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-
-                                    <span class="badge bg-secondary">
-                                        Publication Unavailable
-                                    </span>
+                                <div class="d-flex justify-content-end">
 
                                     <button type="button"
+                                            id="publishConfigurationBtn"
                                             class="btn btn-primary"
                                             disabled>
                                         <i class="bi bi-cloud-upload me-2"></i>
@@ -324,9 +294,9 @@
 
                         <p class="text-muted small">
                             Pending fare changes are retrieved from saved drafts
-                            in PostgreSQL. Schedule and availability draft review
-                            is not yet integrated. Publishing is not available
-                            in this version.
+                            in PostgreSQL. Successfully published fare drafts
+                            are marked as committed. Schedule and availability
+                            publication is not yet integrated.
                         </p>
 
                     </div>
@@ -368,7 +338,6 @@
                                             </tr>
                                         </thead>
 
-                                        <!-- Populated by publishing-history.js -->
                                         <tbody id="publicationHistoryTableBody">
                                             <tr>
                                                 <td colspan="4"
@@ -413,7 +382,6 @@
                                             </tr>
                                         </thead>
 
-                                        <!-- Populated by publishing-history.js -->
                                         <tbody id="auditLogTableBody">
                                             <tr>
                                                 <td colspan="4"
@@ -448,9 +416,11 @@
     <script th:src="@{/js/publishing-review.js}"></script>
     <script th:src="@{/js/publishing-history.js}"></script>
     <script th:src="@{/js/publication-validation.js}"></script>
+    <script th:src="@{/js/publication-publish.js}"></script>
 
 </body>
 </html>
+
 
 
 

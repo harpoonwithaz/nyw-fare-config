@@ -13,6 +13,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -32,6 +33,7 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos.RateTableGetR
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulationResult;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
+import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
 class HttpCaracalApiClientTests {
 
@@ -44,7 +46,8 @@ class HttpCaracalApiClientTests {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         mockServer = MockRestServiceServer.bindTo(builder).build();
-        apiClient = new HttpCaracalApiClient(builder.build());
+        ActorService actorService = mock(ActorService.class);
+        apiClient = new HttpCaracalApiClient(builder.build(), actorService);
     }
 
     @Test

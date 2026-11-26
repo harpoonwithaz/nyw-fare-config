@@ -8,6 +8,7 @@ import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.RouteScheduleRepository;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.ServiceAlertRepository;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.ConfigurationChangeTracker;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,10 +33,12 @@ public class AlertService {
 
     private final ServiceAlertRepository alerts;
     private final RouteScheduleRepository schedules;
+    private final ConfigurationChangeTracker changeTracker;
 
-    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules) {
+    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules, ConfigurationChangeTracker changeTracker) {
         this.alerts = alerts;
         this.schedules = schedules;
+        this.changeTracker = changeTracker;
     }
 
     public List<ServiceAlert> list(String tenantCode, String search, AlertStatus status, String routeKey) {
@@ -188,6 +191,7 @@ public class AlertService {
         target.setUpdatedBy(actor);
 
         alerts.save(target);
+        changeTracker.markChanged(tenantCode);
         return errors;
     }
 
@@ -238,6 +242,8 @@ public class AlertService {
             draft.setPublishedAt(now);
             alerts.save(draft);
         }
+        changeTracker.markChanged(tenantCode);
+
         return errors;
     }
 
@@ -255,6 +261,7 @@ public class AlertService {
         alert.setArchivedBy(actor);
         alert.setArchivedAt(Instant.now());
         alerts.save(alert);
+        changeTracker.markChanged(tenantCode);
         return true;
     }
 
@@ -268,6 +275,7 @@ public class AlertService {
             return false;
         }
         alerts.delete(found.get());
+        changeTracker.markChanged(tenantCode);
         return true;
     }
 

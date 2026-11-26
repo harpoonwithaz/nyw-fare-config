@@ -6,6 +6,7 @@ import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.availability.model.TemporalCondition;
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.ConfigurationChangeTracker;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ public class AvailabilityService {
 
     private final AvailabilityRuleRepository availabilityRuleRepository;
     private final ActorService actorService;
+    private final ConfigurationChangeTracker changeTracker;
 
     public static final List<String> CANONICAL_PRODUCTS = List.of(
         "ADULT_ONEWAY",
@@ -28,9 +30,10 @@ public class AvailabilityService {
         "FULL_MONTHLY"
     );
 
-    public AvailabilityService(AvailabilityRuleRepository availabilityRuleRepository, ActorService actorService) {
+    public AvailabilityService(AvailabilityRuleRepository availabilityRuleRepository, ActorService actorService, ConfigurationChangeTracker changeTracker) {
         this.availabilityRuleRepository = availabilityRuleRepository;
         this.actorService = actorService;
+        this.changeTracker = changeTracker;
     }
 
     public ProductAvailabilityView getProductAvailability(String tenantCode, String siteCode) {
@@ -94,6 +97,9 @@ public class AvailabilityService {
             }
 
             availabilityRuleRepository.save(rule);
+        }
+        if (!drafts.isEmpty()) {
+            changeTracker.markChanged(tenantCode);
         }
     }
 }

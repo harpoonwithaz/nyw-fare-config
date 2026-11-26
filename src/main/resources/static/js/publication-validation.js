@@ -30,18 +30,32 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = "Running validation against Caracal. Please wait...";
 
         try {
-            const url = `/api/publishing/validate?tenantCode=${encodeURIComponent(tenantCode)}`;
+            const csrfToken =
+                document.querySelector('meta[name="_csrf"]')?.content;
+
+            const csrfHeader =
+                document.querySelector('meta[name="_csrf_header"]')?.content;
+
+            if (!csrfToken || !csrfHeader) {
+                throw new Error("Missing CSRF token.");
+            }
+
+            const url =
+                `/api/publishing/validate?tenantCode=${encodeURIComponent(tenantCode)}`;
 
             const response = await fetch(url, {
-                method: "GET",
+                method: "POST",
                 headers: {
-                    "Accept": "application/json"
+                    "Accept": "application/json",
+                    [csrfHeader]: csrfToken
                 },
                 credentials: "same-origin"
             });
 
             if (!response.ok) {
-                throw new Error(`Validation request failed (HTTP ${response.status})`);
+                throw new Error(
+                    `Validation request failed (HTTP ${response.status})`
+                );
             }
 
             const data = await response.json();
@@ -67,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 for (const value of fields) {
                     const cell = document.createElement("td");
-                    cell.textContent = value ?? "—";
+                    cell.textContent = value ?? "\u2014";
                     row.appendChild(cell);
                 }
 

@@ -22,6 +22,7 @@ import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.repository.FareDraftRepository;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.ConfigurationChangeTracker;
 
 // Manages the persistence lifecycle of FareDraft entities in PostgreSQL,
 // including upserting modified cells, computing old-vs-new price deltas,
@@ -32,14 +33,17 @@ public class FareDraftService {
     private final FareDraftRepository fareDraftRepository;
     private final FareService fareService;
     private final ActorService actorService;
+    private final ConfigurationChangeTracker changeTracker;
 
     public FareDraftService(
             FareDraftRepository fareDraftRepository,
             FareService fareService,
-            ActorService actorService) {
+            ActorService actorService,
+            ConfigurationChangeTracker changeTracker) {
         this.fareDraftRepository = fareDraftRepository;
         this.fareService = fareService;
         this.actorService = actorService;
+        this.changeTracker = changeTracker;
     }
 
     @Transactional(readOnly = true)
@@ -202,6 +206,9 @@ public class FareDraftService {
         if (!toSave.isEmpty()) {
             fareDraftRepository.saveAll(toSave);
         }
+        if (!toDelete.isEmpty() || !toSave.isEmpty()) {
+            changeTracker.markChanged(tenantCode);
+        }
 
         return toSave.size();
     }
@@ -213,6 +220,50 @@ public class FareDraftService {
         }
         return fareDraftRepository.countByTenantCodeAndDraftStatus(
                 tenantCode.trim().toUpperCase(Locale.ROOT), DraftStatus.PENDING);
+    }
+
+    @Transactional
+    public void commitPublishedDrafts(List<FareDraft> publishedDrafts) {
+
+        List<FareDraft> draftsToCommit = new ArrayList<>();
+
+        for (FareDraft publishedDraft : publishedDrafts) {
+
+            FareDraft currentDraft = fareDraftRepository
+                    .findById(publishedDraft.getId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Published draft no longer exists: "
+                            + publishedDraft.getId()));
+
+            if (!"NYW_SANDBOX".equals(currentDraft.getTenantCode())
+                    || currentDraft.getDraftStatus() != DraftStatus.PENDING) {
+
+                throw new IllegalStateException(
+                        "Invalid draft for finalization: "
+                        + currentDraft.getId());
+            }
+
+            // Do not commit a draft that was edited during publication.
+            if (!java.util.Objects.equals(
+                    currentDraft.getUpdatedAt(),
+                    publishedDraft.getUpdatedAt())) {
+
+                throw new IllegalStateException(
+                        "Draft changed during publication: "
+                        + currentDraft.getId());
+            }
+
+            currentDraft.setDraftStatus(DraftStatus.COMMITTED);
+
+            draftsToCommit.add(currentDraft);
+        }
+
+        if (!draftsToCommit.isEmpty()) {
+
+            fareDraftRepository.saveAll(draftsToCommit);
+
+            changeTracker.markChanged("NYW_SANDBOX");
+        }
     }
 
     private boolean isSamePrice(BigDecimal a, BigDecimal b) {
