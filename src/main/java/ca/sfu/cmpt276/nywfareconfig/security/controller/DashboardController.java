@@ -14,6 +14,7 @@ public class DashboardController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserDetails user, Model model) {
         model.addAttribute("username", user.getUsername());
+        model.addAttribute("email", user.getEmail());
         model.addAttribute("isAdmin", user.getRole() == Role.CLIENT_SERVICES);
         return "dashboard/home";
     }

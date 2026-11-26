@@ -14,7 +14,10 @@ import org.springframework.web.client.RestClientResponseException;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.CaracalErrorResponse;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos.DimensionValueSummary;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos.SiteDimensionBinding;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableException;
 
@@ -22,9 +25,13 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalUnavailableExceptio
 public class HttpCaracalApiClient implements CaracalApiClient {
 
     private final RestClient caracalRestClient;
+    private final MetraJsonZonalMetadataProvider zonalMetadataProvider;
 
-    public HttpCaracalApiClient(RestClient caracalRestClient) {
+    private static final int SITE_LIST_LIMIT = 500;
+
+    public HttpCaracalApiClient(RestClient caracalRestClient, MetraJsonZonalMetadataProvider zonalMetadataProvider) {
         this.caracalRestClient = caracalRestClient;
+        this.zonalMetadataProvider = zonalMetadataProvider;
     }
 
     // TODO: Remove the X-Actor: system header from each api request except
@@ -81,16 +88,17 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         }
 
         CaracalCatalogDtos.SiteList response = get(
-                "/site-list?tenantCode={tenantCode}",
+                "/site-list?tenantCode={tenantCode}&limit={limit}",
                 true,
                 CaracalCatalogDtos.SiteList.class,
                 "loading site list for tenant " + tenantCode,
-                tenantCode);
+                tenantCode,
+                SITE_LIST_LIMIT);
 
         if (response == null) {
             throw new CaracalApiException("Caracal returned an empty response for tenant " + tenantCode + ".");
         }
-        return response.sites();
+        return response.sites() != null ? response.sites() : List.of();
     }
 
     @Override
@@ -140,8 +148,9 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                             "Caracal returned an empty response for rate table "
                                     + requestPayload.rateTableName() + ".");
                 }
-                List<CaracalCatalogDtos.RateAssignmentSummary> assignments =
-                        response.assignments() != null ? response.assignments() : List.of();
+                List<CaracalCatalogDtos.RateAssignmentSummary> assignments = response.assignments() != null
+                        ? response.assignments()
+                        : List.of();
                 return Optional.of(assignments);
             } catch (RestClientResponseException ex) {
                 if (ex.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
@@ -150,6 +159,33 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 throw ex;
             }
         });
+    }
+
+    @Override
+    public List<CaracalZonalDtos.DimensionValueSummary> fetchZones(String tenantCode) {
+        if (isNullOrBlank(tenantCode)) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        return zonalMetadataProvider.getZones(tenantCode);
+    }
+
+    @Override
+    public List<DimensionValueSummary> fetchFareClasses(String tenantCode) {
+        if (isNullOrBlank(tenantCode)) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        return zonalMetadataProvider.getFareClasses(tenantCode);
+    }
+
+    @Override
+    public List<SiteDimensionBinding> fetchStationZoneBindings(String tenantCode) {
+        if (isNullOrBlank(tenantCode)) {
+            throw new IllegalArgumentException("Tenant code must not be blank.");
+        }
+
+        return zonalMetadataProvider.getStationZoneBindings(tenantCode);
     }
 
     // ==============================================================================
@@ -161,19 +197,17 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         if (requestPayload == null
                 || isNullOrBlank(requestPayload.tenantCode())
                 || isNullOrBlank(requestPayload.productCode())
-                || isNullOrBlank(requestPayload.siteCode())
-                || requestPayload.dimensions() == null) {
+                || requestPayload.dimensions() == null
+                || (requestPayload.siteCode() != null && requestPayload.siteCode().isBlank())
+                || (requestPayload.siteCode() == null && requestPayload.dimensions().isEmpty())) {
             throw new IllegalArgumentException("Invalid request payload for cell price simulate.");
         }
-        
-        /*
-        For debugging:
-        System.out.println("Price simulate called for product: *" + requestPayload.productCode() +
-                            "* site: *" + requestPayload.siteCode() + "* at: *" + requestPayload.at() + "*.");
-        */
 
+        String targetDescription = requestPayload.siteCode() != null
+                ? "at site " + requestPayload.siteCode()
+                : "with dimensions " + requestPayload.dimensions();
         String actionDescription = "simulating price for product "
-                + requestPayload.productCode() + " at site " + requestPayload.siteCode();
+                + requestPayload.productCode() + " " + targetDescription;
 
         return execute(actionDescription, () -> {
             try {
