@@ -1,7 +1,10 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.controller;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -51,6 +54,10 @@ public class AlertController {
 
         model.addAttribute("alerts", alertService.list(tenantCode, search, parseStatus(status), route));
         model.addAttribute("routeOptions", alertService.routeOptionsByTerminal(tenantCode));
+        List<String> languages = languages();
+        model.addAttribute("languages", languages);
+        model.addAttribute("languageNames", languages.stream()
+                .collect(Collectors.toMap(language -> language, AlertLimits::displayName)));
 
         // Keep the filter values so the form shows what was searched
         model.addAttribute("search", search);
@@ -176,9 +183,28 @@ public class AlertController {
         model.addAttribute("productOptions", catalog.products());
         model.addAttribute("catalogMissing", !catalog.loaded());
         model.addAttribute("noRoutes", catalog.loaded() && catalog.routes().isEmpty());
-        model.addAttribute("languages", languages());
-        model.addAttribute("defaultConfirm", AlertLimits.DEFAULT_CONFIRM);
-        model.addAttribute("defaultDismiss", AlertLimits.DEFAULT_DISMISS);
+        // One field group per tenant language; saved wording in other languages rides along as hidden fields
+        List<String> languages = languages();
+        form.ensureLanguages(languages);
+        Map<String, String> names = new LinkedHashMap<>();
+        Map<String, String> confirmDefaults = new LinkedHashMap<>();
+        Map<String, String> dismissDefaults = new LinkedHashMap<>();
+        for (String language : form.getTexts().keySet()) {
+            names.put(language, AlertLimits.displayName(language));
+            confirmDefaults.put(language, AlertLimits.defaultConfirm(language));
+            dismissDefaults.put(language, AlertLimits.defaultDismiss(language));
+        }
+        Map<String, Map<String, String>> suggestions = new LinkedHashMap<>();
+        for (TriggerType trigger : TriggerType.values()) {
+            suggestions.put(trigger.name(), trigger.getSuggestedConfirm());
+        }
+        model.addAttribute("languages", languages);
+        model.addAttribute("hiddenLanguages", form.getTexts().keySet().stream()
+                .filter(language -> !languages.contains(language)).toList());
+        model.addAttribute("languageNames", names);
+        model.addAttribute("defaultConfirm", confirmDefaults);
+        model.addAttribute("defaultDismiss", dismissDefaults);
+        model.addAttribute("suggestions", suggestions);
         model.addAttribute("triggerTypes", TriggerType.values());
         model.addAttribute("messageMax", AlertLimits.MESSAGE_MAX_LENGTH);
         model.addAttribute("labelMax", AlertLimits.LABEL_MAX_LENGTH);
@@ -186,10 +212,12 @@ public class AlertController {
         return "alerts/form";
     }
 
-    // Alert languages follow the selected tenant's supported locales
+    // Alert languages follow the selected tenant's locales from Caracal's tenant-get, main language first
     private List<String> languages() {
         Tenant tenant = tenantContext.getSelectedTenant();
-        return AlertLimits.languagesFor(tenant == null ? null : tenant.getSupportedLocales());
+        return tenant == null
+                ? AlertLimits.languagesFor(null, null)
+                : AlertLimits.languagesFor(tenant.getDefaultLocale(), tenant.getSupportedLocales());
     }
 
     private String tenantCode() {

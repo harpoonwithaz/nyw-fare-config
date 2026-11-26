@@ -5,6 +5,7 @@ import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertChange;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.RouteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertText;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.RouteScheduleRepository;
@@ -94,7 +95,7 @@ public class AlertService {
         return alert != null && alert.getStatus() == AlertStatus.DRAFT;
     }
 
-    // languages: the tenant's alert languages (AlertLimits.languagesFor); blank labels get defaults only in these
+    // languages: the tenant's alert languages (AlertLimits.languagesFor), main language first
     @Transactional
     public List<String> save(String tenantCode, Long id, AlertForm form, String actor, List<String> languages) {
         List<String> errors = new ArrayList<>();
@@ -139,29 +140,37 @@ public class AlertService {
             errors.add("The ticket code must be " + AlertLimits.PRODUCT_CODE_MAX_LENGTH + " characters or fewer.");
         }
 
-        String messageEn = clean(form.getMessageEn());
-        if (messageEn == null) {
-            errors.add("English message is required.");
+        // Wording per language. The tenant's first language must have a message; languages the tenant
+        // no longer lists are kept as posted (the form sends them back as hidden fields).
+        List<String> langs = languages == null || languages.isEmpty()
+                ? List.of(AlertLimits.FALLBACK_LANGUAGE) : languages;
+        String primaryLanguage = langs.get(0);
+        Map<String, AlertText> texts = new LinkedHashMap<>();
+        for (Map.Entry<String, AlertText> entry : form.getTexts().entrySet()) {
+            AlertText posted = entry.getValue() == null ? new AlertText() : entry.getValue();
+            texts.put(entry.getKey(), new AlertText(clean(posted.getMessage()),
+                    clean(posted.getConfirmLabel()), clean(posted.getDismissLabel())));
         }
-        String messageEs = clean(form.getMessageEs());
-        String confirmEn = clean(form.getConfirmLabelEn());
-        String confirmEs = clean(form.getConfirmLabelEs());
-        String dismissEn = clean(form.getDismissLabelEn());
-        String dismissEs = clean(form.getDismissLabelEs());
-
-        if (tooLong(messageEn, AlertLimits.MESSAGE_MAX_LENGTH)) {
+        String primaryMessage = texts.containsKey(primaryLanguage) ? texts.get(primaryLanguage).getMessage() : null;
+        if (primaryMessage == null) {
+            errors.add("Message in " + AlertLimits.displayName(primaryLanguage) + " is required.");
+        }
+        boolean messageTooLong = false;
+        boolean labelTooLong = false;
+        boolean placeholderLeft = false;
+        for (AlertText text : texts.values()) {
+            messageTooLong |= tooLong(text.getMessage(), AlertLimits.MESSAGE_MAX_LENGTH);
+            labelTooLong |= tooLong(text.getConfirmLabel(), AlertLimits.LABEL_MAX_LENGTH)
+                    || tooLong(text.getDismissLabel(), AlertLimits.LABEL_MAX_LENGTH);
+            placeholderLeft |= hasPlaceholder(text.getConfirmLabel()) || hasPlaceholder(text.getDismissLabel());
+        }
+        if (messageTooLong) {
             errors.add("Message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
         }
-        if (tooLong(messageEs, AlertLimits.MESSAGE_MAX_LENGTH)) {
-            errors.add("Spanish message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
-        }
-        if (tooLong(confirmEn, AlertLimits.LABEL_MAX_LENGTH) || tooLong(confirmEs, AlertLimits.LABEL_MAX_LENGTH)
-                || tooLong(dismissEn, AlertLimits.LABEL_MAX_LENGTH)
-                || tooLong(dismissEs, AlertLimits.LABEL_MAX_LENGTH)) {
+        if (labelTooLong) {
             errors.add("Label must be " + AlertLimits.LABEL_MAX_LENGTH + " characters or fewer.");
         }
-        if (hasPlaceholder(confirmEn) || hasPlaceholder(confirmEs)
-                || hasPlaceholder(dismissEn) || hasPlaceholder(dismissEs)) {
+        if (placeholderLeft) {
             errors.add("Replace the placeholder in brackets, like [Day], in the button label before saving.");
         }
 
@@ -180,12 +189,16 @@ public class AlertService {
         }
 
         // Blank labels fall back to the defaults so the popup never shows an empty button
-        // Only for languages the tenant uses; an English-only tenant keeps Spanish blank
-        List<String> langs = languages == null ? AlertLimits.LANGUAGES : languages;
-        confirmEn = withDefault(confirmEn, AlertLimits.DEFAULT_CONFIRM, "en", langs);
-        confirmEs = withDefault(confirmEs, AlertLimits.DEFAULT_CONFIRM, "es", langs);
-        dismissEn = withDefault(dismissEn, AlertLimits.DEFAULT_DISMISS, "en", langs);
-        dismissEs = withDefault(dismissEs, AlertLimits.DEFAULT_DISMISS, "es", langs);
+        // Blank labels get the default for each tenant language so the popup never shows an empty button
+        for (String language : langs) {
+            AlertText text = texts.computeIfAbsent(language, key -> new AlertText());
+            if (text.getConfirmLabel() == null) {
+                text.setConfirmLabel(AlertLimits.defaultConfirm(language));
+            }
+            if (text.getDismissLabel() == null) {
+                text.setDismissLabel(AlertLimits.defaultDismiss(language));
+            }
+        }
 
         ServiceAlert target;
         if (existing == null) {
@@ -208,12 +221,8 @@ public class AlertService {
         target.setTriggerType(trigger);
         target.setStartDate(startDate);
         target.setProductCode(productCode);
-        target.setMessageEn(messageEn);
-        target.setMessageEs(messageEs);
-        target.setConfirmLabelEn(confirmEn);
-        target.setConfirmLabelEs(confirmEs);
-        target.setDismissLabelEn(dismissEn);
-        target.setDismissLabelEs(dismissEs);
+        target.setPrimaryMessage(primaryMessage);
+        target.setTexts(texts);
         target.setStatus(AlertStatus.DRAFT);
         target.setUpdatedBy(actor);
 
@@ -466,8 +475,8 @@ public class AlertService {
     }
 
     private boolean matchesSearch(ServiceAlert alert, String query) {
-        return contains(alert.getMessageEn(), query)
-                || contains(alert.getMessageEs(), query)
+        return contains(alert.getPrimaryMessage(), query)
+                || alert.getTexts().values().stream().anyMatch(text -> contains(text.getMessage(), query))
                 || contains(alert.getProductCode(), query)
                 || alert.getRouteKeys().stream().anyMatch(key -> contains(key, query));
     }
@@ -478,11 +487,6 @@ public class AlertService {
 
     private static boolean hasPlaceholder(String value) {
         return value != null && PLACEHOLDER.matcher(value).find();
-    }
-
-    private static String withDefault(String value, Map<String, String> defaults, String language,
-            List<String> languages) {
-        return value == null && languages.contains(language) ? defaults.get(language) : value;
     }
 
     private static boolean tooLong(String value, int max) {

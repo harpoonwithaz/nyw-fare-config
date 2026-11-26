@@ -123,8 +123,8 @@ class AlertControllerTests {
     private ServiceAlert saveDraft(String message) {
         AlertForm form = new AlertForm();
         form.setRouteKeys(List.of(ROUTE));
-        form.setMessageEn(message);
-        assertTrue(alertService.save(TENANT, null, form, "test", AlertLimits.LANGUAGES).isEmpty());
+        form.text("en").setMessage(message);
+        assertTrue(alertService.save(TENANT, null, form, "test", List.of("en", "es")).isEmpty());
         return alertService.list(TENANT, message, null, null).get(0);
     }
 
@@ -171,8 +171,8 @@ class AlertControllerTests {
         mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "No weekend service")
-                .param("messageEs", "Sin servicio el fin de semana"))
+                .param("texts[en].message", "No weekend service")
+                .param("texts[es].message", "Sin servicio el fin de semana"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/fares/alerts"));
 
@@ -188,7 +188,7 @@ class AlertControllerTests {
                 .param("triggerType", "WEEKENDS"))
             .andExpect(status().isOk())
             .andExpect(view().name("alerts/form"))
-            .andExpect(content().string(containsString("English message is required.")));
+            .andExpect(content().string(containsString("Message in English is required.")));
 
         assertTrue(alertRepository.findAll().isEmpty());
     }
@@ -198,7 +198,7 @@ class AlertControllerTests {
         mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "x".repeat(201)))
+                .param("texts[en].message", "x".repeat(201)))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("Message must be 200 characters or fewer.")));
     }
@@ -239,7 +239,7 @@ class AlertControllerTests {
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
                 .param("productCode", "OLD_PASS")
-                .param("messageEn", "Retired ticket, new wording"))
+                .param("texts[en].message", "Retired ticket, new wording"))
             .andExpect(status().is3xxRedirection());
 
         assertEquals("OLD_PASS", alertService.list(TENANT, "new wording", null, null).get(0).getProductCode());
@@ -257,9 +257,9 @@ class AlertControllerTests {
     void savedTicketIsSelectedOnEdit() throws Exception {
         AlertForm form = new AlertForm();
         form.setRouteKeys(List.of(ROUTE));
-        form.setMessageEn("Ticket kept");
+        form.text("en").setMessage("Ticket kept");
         form.setProductCode("ADULT_ONEWAY");
-        assertTrue(alertService.save(TENANT, null, form, "test", AlertLimits.LANGUAGES).isEmpty());
+        assertTrue(alertService.save(TENANT, null, form, "test", List.of("en", "es")).isEmpty());
         ServiceAlert saved = alertService.list(TENANT, "Ticket kept", null, null).get(0);
         assertEquals("ADULT_ONEWAY", saved.getProductCode());
 
@@ -284,8 +284,8 @@ class AlertControllerTests {
     void spanishFieldsShowForSpanishTenant() throws Exception {
         mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
             .andExpect(model().attribute("languages", List.of("en", "es")))
-            .andExpect(content().string(containsString("Spanish message")))
-            .andExpect(content().string(containsString("Continue button (ES)")));
+            .andExpect(content().string(containsString("name=\"texts[es].message\"")))
+            .andExpect(content().string(containsString("placeholder=\"Continuar\"")));
     }
 
     @Test
@@ -304,14 +304,14 @@ class AlertControllerTests {
 
         AlertForm form = new AlertForm();
         form.setRouteKeys(List.of(ROUTE));
-        form.setMessageEn("English only alert");
-        form.setMessageEs("Texto guardado");
+        form.text("en").setMessage("English only alert");
+        form.text("es").setMessage("Texto guardado");
         assertTrue(alertService.save(englishTenant, null, form, "test", List.of("en")).isEmpty());
         ServiceAlert saved = alertService.list(englishTenant, "English only alert", null, null).get(0);
 
         mockMvc.perform(inTenant(get("/fares/alerts/" + saved.getId() + "/edit"), OPERATOR))
             .andExpect(model().attribute("languages", List.of("en")))
-            .andExpect(content().string(not(containsString("Spanish message"))))
+            .andExpect(content().string(not(containsString("id=\"message-es\""))))
             .andExpect(content().string(containsString("value=\"Texto guardado\"")));
     }
 
@@ -321,15 +321,15 @@ class AlertControllerTests {
         mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "Default labels")
-                .param("confirmLabelEn", "  "))
+                .param("texts[en].message", "Default labels")
+                .param("texts[en].confirmLabel", "  "))
             .andExpect(status().is3xxRedirection());
 
         ServiceAlert saved = alertService.list(TENANT, "Default labels", null, null).get(0);
-        assertEquals("Continue", saved.getConfirmLabelEn());
-        assertEquals("Continuar", saved.getConfirmLabelEs());
-        assertEquals("Cancel", saved.getDismissLabelEn());
-        assertEquals("Cancelar", saved.getDismissLabelEs());
+        assertEquals("Continue", saved.getTexts().get("en").getConfirmLabel());
+        assertEquals("Continuar", saved.getTexts().get("es").getConfirmLabel());
+        assertEquals("Cancel", saved.getTexts().get("en").getDismissLabel());
+        assertEquals("Cancelar", saved.getTexts().get("es").getDismissLabel());
     }
 
     @Test
@@ -337,15 +337,15 @@ class AlertControllerTests {
         mockMvc.perform(inTenant(post("/fares/alerts"), OPERATOR)
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "Custom labels")
-                .param("confirmLabelEn", "Buy for Monday")
-                .param("confirmLabelEs", "Comprar el lunes"))
+                .param("texts[en].message", "Custom labels")
+                .param("texts[en].confirmLabel", "Buy for Monday")
+                .param("texts[es].confirmLabel", "Comprar el lunes"))
             .andExpect(status().is3xxRedirection());
 
         ServiceAlert saved = alertService.list(TENANT, "Custom labels", null, null).get(0);
-        assertEquals("Buy for Monday", saved.getConfirmLabelEn());
-        assertEquals("Comprar el lunes", saved.getConfirmLabelEs());
-        assertEquals("Cancel", saved.getDismissLabelEn());
+        assertEquals("Buy for Monday", saved.getTexts().get("en").getConfirmLabel());
+        assertEquals("Comprar el lunes", saved.getTexts().get("es").getConfirmLabel());
+        assertEquals("Cancel", saved.getTexts().get("en").getDismissLabel());
     }
 
     @Test
@@ -356,8 +356,8 @@ class AlertControllerTests {
         assertEquals("Comprar ahora", TriggerType.BEFORE_START_DATE.getSuggestedConfirm("es"));
         // Every alert language has a suggestion, and it fits on the TVM button
         for (TriggerType t : TriggerType.values()) {
-            for (String lang : AlertLimits.LANGUAGES) {
-                assertTrue(t.getSuggestedConfirm(lang).length() <= AlertLimits.LABEL_MAX_LENGTH);
+            for (String suggestion : t.getSuggestedConfirm().values()) {
+                assertTrue(suggestion.length() <= AlertLimits.LABEL_MAX_LENGTH, suggestion);
             }
         }
     }
@@ -366,10 +366,10 @@ class AlertControllerTests {
     void formOffersSuggestionForEachTrigger() throws Exception {
         mockMvc.perform(inTenant(get("/fares/alerts/new"), OPERATOR))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("data-suggest-en=\"Buy now\"")))
-            .andExpect(content().string(containsString("data-suggest-es=\"Comprar para [día]\"")))
-            .andExpect(content().string(containsString("Continue / Cancel")))
-            .andExpect(content().string(containsString("Continuar / Cancelar")));
+            // Suggestions go to the page script as a trigger -> language -> text map
+            .andExpect(content().string(containsString("\"BEFORE_START_DATE\":{")))
+            .andExpect(content().string(containsString("Buy now")))
+            .andExpect(content().string(containsString("placeholder=\"Cancelar\"")));
     }
 
     // Story 4.3
@@ -411,7 +411,7 @@ class AlertControllerTests {
                 .param("tenantCode", "METRA")
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "Wrong client"))
+                .param("texts[en].message", "Wrong client"))
             .andExpect(status().is3xxRedirection())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
                 .attribute("error", containsString("client changed")));
@@ -440,8 +440,8 @@ class AlertControllerTests {
         assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
         AlertForm edit = new AlertForm();
         edit.setRouteKeys(List.of(ROUTE));
-        edit.setMessageEn("Pending edit");
-        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", AlertLimits.LANGUAGES).isEmpty());
+        edit.text("en").setMessage("Pending edit");
+        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", List.of("en", "es")).isEmpty());
         ServiceAlert pending = alertService.list(TENANT, "Pending edit", null, null).get(0);
 
         mockMvc.perform(inTenant(post("/fares/alerts/" + live.getId() + "/archive"), ADMIN))
@@ -457,8 +457,8 @@ class AlertControllerTests {
         assertTrue(alertService.publish(TENANT, List.of(live.getId()), "test").isEmpty());
         AlertForm edit = new AlertForm();
         edit.setRouteKeys(List.of(ROUTE));
-        edit.setMessageEn("Orphan edit");
-        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", AlertLimits.LANGUAGES).isEmpty());
+        edit.text("en").setMessage("Orphan edit");
+        assertTrue(alertService.save(TENANT, live.getId(), edit, "test", List.of("en", "es")).isEmpty());
         ServiceAlert orphan = alertService.list(TENANT, "Orphan edit", null, null).get(0);
         // Parent archived directly, as old data might have it
         ServiceAlert parent = alertRepository.findById(live.getId()).orElseThrow();
@@ -492,7 +492,7 @@ class AlertControllerTests {
         mockMvc.perform(inTenant(post("/fares/alerts/" + live.getId()), OPERATOR)
                 .param("routeKeys", ROUTE)
                 .param("triggerType", "WEEKENDS")
-                .param("messageEn", "New wording"))
+                .param("texts[en].message", "New wording"))
             .andExpect(status().is3xxRedirection());
         ServiceAlert replacement = alertService.list(TENANT, "New wording", null, null).get(0);
         assertEquals(live.getId(), replacement.getReplacesAlertId());

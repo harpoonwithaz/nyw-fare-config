@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -17,7 +18,9 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 @Entity
@@ -46,23 +49,16 @@ public class ServiceAlert {
     @Column(name = "product_code", length = 40)
     private String productCode;
 
+    // Message in the tenant's main language, kept for the list page and search.
+    // The column name is from when alerts were English/Spanish only.
     @Column(name = "message_en", nullable = false, length = 500)
-    private String messageEn;
+    private String primaryMessage;
 
-    @Column(name = "message_es", length = 500)
-    private String messageEs;
-
-    @Column(name = "confirm_label_en", length = 40)
-    private String confirmLabelEn;
-
-    @Column(name = "confirm_label_es", length = 40)
-    private String confirmLabelEs;
-
-    @Column(name = "dismiss_label_en", length = 40)
-    private String dismissLabelEn;
-
-    @Column(name = "dismiss_label_es", length = 40)
-    private String dismissLabelEs;
+    // Wording per language code (en, es, fr, ...), following the tenant's supported locales
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "service_notice_texts", joinColumns = @JoinColumn(name = "notice_id"))
+    @MapKeyColumn(name = "language", length = 12)
+    private Map<String, AlertText> texts = new LinkedHashMap<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -138,28 +134,12 @@ public class ServiceAlert {
         return productCode;
     }
 
-    public String getMessageEn() {
-        return messageEn;
+    public String getPrimaryMessage() {
+        return primaryMessage;
     }
 
-    public String getMessageEs() {
-        return messageEs;
-    }
-
-    public String getConfirmLabelEn() {
-        return confirmLabelEn;
-    }
-
-    public String getConfirmLabelEs() {
-        return confirmLabelEs;
-    }
-
-    public String getDismissLabelEn() {
-        return dismissLabelEn;
-    }
-
-    public String getDismissLabelEs() {
-        return dismissLabelEs;
+    public Map<String, AlertText> getTexts() {
+        return texts;
     }
 
     public AlertStatus getStatus() {
@@ -219,28 +199,15 @@ public class ServiceAlert {
         this.productCode = productCode;
     }
 
-    public void setMessageEn(String messageEn) {
-        this.messageEn = messageEn;
+    public void setPrimaryMessage(String primaryMessage) {
+        this.primaryMessage = primaryMessage;
     }
 
-    public void setMessageEs(String messageEs) {
-        this.messageEs = messageEs;
-    }
-
-    public void setConfirmLabelEn(String confirmLabelEn) {
-        this.confirmLabelEn = confirmLabelEn;
-    }
-
-    public void setConfirmLabelEs(String confirmLabelEs) {
-        this.confirmLabelEs = confirmLabelEs;
-    }
-
-    public void setDismissLabelEn(String dismissLabelEn) {
-        this.dismissLabelEn = dismissLabelEn;
-    }
-
-    public void setDismissLabelEs(String dismissLabelEs) {
-        this.dismissLabelEs = dismissLabelEs;
+    public void setTexts(Map<String, AlertText> texts) {
+        this.texts.clear();
+        if (texts != null) {
+            this.texts.putAll(texts);
+        }
     }
 
     public void setStatus(AlertStatus status) {

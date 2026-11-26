@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 class AlertServiceCatalogTest {
 
     private static final String TENANT = "NYW_SANDBOX";
-    private static final List<String> BOTH = AlertLimits.LANGUAGES;
+    private static final List<String> BOTH = List.of("en", "es");
 
     private ServiceAlertRepository alerts;
     private FareService fares;
@@ -49,7 +49,7 @@ class AlertServiceCatalogTest {
         AlertForm form = new AlertForm();
         form.setRouteKeys(List.of(routeKey));
         form.setProductCode(productCode);
-        form.setMessageEn("No service on weekends.");
+        form.text("en").setMessage("No service on weekends.");
         return form;
     }
 
@@ -109,7 +109,7 @@ class AlertServiceCatalogTest {
     @Test
     void rejectsALabelWithItsPlaceholderLeftIn() {
         AlertForm form = form("PIER11:HOB14ST", null);
-        form.setConfirmLabelEn("Buy for [Day]");
+        form.text("en").setConfirmLabel("Buy for [Day]");
 
         List<String> errors = service.save(TENANT, null, form, "admin@caracal.com", BOTH);
 
@@ -121,9 +121,8 @@ class AlertServiceCatalogTest {
     void englishOnlyTenantGetsNoSpanishDefaults() {
         assertTrue(service.save(TENANT, null, form("PIER11:HOB14ST", null), "admin@caracal.com", List.of("en")).isEmpty());
 
-        assertEquals("Continue", savedAlert().getConfirmLabelEn());
-        assertNull(savedAlert().getConfirmLabelEs());
-        assertNull(savedAlert().getDismissLabelEs());
+        assertEquals("Continue", savedAlert().getTexts().get("en").getConfirmLabel());
+        assertFalse(savedAlert().getTexts().containsKey("es"));
     }
 
     @Test
@@ -158,8 +157,29 @@ class AlertServiceCatalogTest {
 
     @Test
     void languagesFollowTenantLocales() {
-        assertEquals(List.of("en", "es"), AlertLimits.languagesFor(List.of("en-US", "es-US")));
-        assertEquals(List.of("en"), AlertLimits.languagesFor(List.of("en-US")));
-        assertEquals(List.of("en", "es"), AlertLimits.languagesFor(List.of()));
+        assertEquals(List.of("en", "es"), AlertLimits.languagesFor("en-US", List.of("en-US", "es-US")));
+        assertEquals(List.of("en"), AlertLimits.languagesFor("en-US", List.of("en-US")));
+        assertEquals(List.of("en"), AlertLimits.languagesFor(null, List.of()));
+        // Not just English and Spanish: the default locale's language comes first
+        assertEquals(List.of("fr", "en"), AlertLimits.languagesFor("fr-CA", List.of("en-CA", "fr_CA")));
+        assertEquals("French", AlertLimits.displayName("fr"));
+        assertEquals("Continuer", AlertLimits.defaultConfirm("fr"));
+        assertEquals("Continue", AlertLimits.defaultConfirm("pl"));
+    }
+
+    @Test
+    void frenchFirstTenantRequiresFrenchMessageAndFillsFrenchDefaults() {
+        AlertForm form = new AlertForm();
+        form.setRouteKeys(List.of("PIER11:HOB14ST"));
+        form.text("en").setMessage("English only");
+
+        List<String> missing = service.save(TENANT, null, form, "admin@caracal.com", List.of("fr", "en"));
+        assertTrue(missing.contains("Message in French is required."), missing.toString());
+
+        form.text("fr").setMessage("Pas de service");
+        assertTrue(service.save(TENANT, null, form, "admin@caracal.com", List.of("fr", "en")).isEmpty());
+        assertEquals("Pas de service", savedAlert().getPrimaryMessage());
+        assertEquals("Annuler", savedAlert().getTexts().get("fr").getDismissLabel());
+        assertEquals("Cancel", savedAlert().getTexts().get("en").getDismissLabel());
     }
 }
