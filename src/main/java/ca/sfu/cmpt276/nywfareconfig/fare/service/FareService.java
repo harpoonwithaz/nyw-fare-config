@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos.RateTableGetRequest;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
@@ -43,6 +45,9 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 public class FareService {
 
     private static final Logger log = LoggerFactory.getLogger(FareService.class);
+
+    public static final String DEFAULT_FARE_CLASS = "FULL";
+    private static final String DEFAULT_CHANNEL = "UNATTENDED";
 
     // Price simulate can return 4xx.
     // Lowercased constants to match against lowercased Caracal error messages:
@@ -100,39 +105,65 @@ public class FareService {
     }
 
     /**
+     * Resolves a pricing date or offset timestamp into an ISO-8601 offset timestamp
+     * using the tenant's timezone (first non-null site timezone, e.g., America/Chicago for Metra).
+     */
+    public String resolveZonalPricingTimestamp(String tenantCode, String at) {
+        if (isBlank(at)) {
+            return null;
+        }
+        String trimmed = at.trim();
+        String offsetTimestamp = tryFormatOffsetDateTime(trimmed);
+        if (offsetTimestamp != null) {
+            return offsetTimestamp;
+        }
+
+        // Validate date format before making any network call to Caracal
+        LocalDate date = parseLocalDate(trimmed, at);
+        ZoneId tenantZone = findTenantZoneId(caracalApiClient.fetchSites(normalizeCode(tenantCode)));
+        return formatLocalDateAtZone(date, tenantZone);
+    }
+
+    /**
      * RAW BASELINE LOOKUP.
      * Never queries FareDraftRepository; returns hasPendingDraft = false.
      */
     public Optional<FareRule> getBaselineFareRule(Tenant tenant, String origin, String dest, String product) {
-        return getBaselineFareRule(tenant, origin, dest, product, null);
+        return getBaselineFareRule(tenant, origin, dest, product, null, DEFAULT_FARE_CLASS);
     }
 
     public Optional<FareRule> getBaselineFareRule(
             Tenant tenant, String origin, String dest, String product, String at) {
+        return getBaselineFareRule(tenant, origin, dest, product, at, DEFAULT_FARE_CLASS);
+    }
+
+    public Optional<FareRule> getBaselineFareRule(
+            Tenant tenant, String origin, String dest, String product, String at, String fareClass) {
         if (tenant == null || isBlank(tenant.getCode())
                 || isBlank(origin) || isBlank(dest) || isBlank(product)) {
             return Optional.empty();
         }
 
         String normalizedTenant = normalizeCode(tenant.getCode());
+        String normalizedOrigin = normalizeCode(origin);
+        String normalizedDest = normalizeCode(dest);
         String normalizedProduct = normalizeCode(product);
 
         if (tenant.getGridMode() == GridMode.OD) {
-            String normalizedOrigin = normalizeCode(origin);
-            String normalizedDest = normalizeCode(dest);
             String formattedAt = resolvePricingTimestamp(normalizedTenant, normalizedOrigin, at);
             return simulateOdFareRuleWithFormattedAt(
                     normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct, formattedAt);
         }
 
-        // TODO: Swap with Caracal API call for ZONAL
-        String trimmedOrigin = origin.trim();
-        String trimmedDest = dest.trim();
-        return getBaselineZonalFareRules(normalizedTenant, normalizedProduct).stream()
-                .filter(rule -> trimmedOrigin.equalsIgnoreCase(rule.getOriginIdentifier())
-                        && trimmedDest.equalsIgnoreCase(rule.getDestIdentifier())
-                        && normalizedProduct.equalsIgnoreCase(rule.getProductCode()))
-                .findFirst();
+        String normalizedFareClass = normalizeFareClass(fareClass);
+        String formattedAt = resolveZonalPricingTimestamp(normalizedTenant, at);
+        return simulateZonalFareRuleWithFormattedAt(
+                normalizedTenant,
+                normalizedOrigin,
+                normalizedDest,
+                normalizedProduct,
+                normalizedFareClass,
+                formattedAt);
     }
 
     /**
@@ -140,12 +171,17 @@ public class FareService {
      * Returns baseline rule overlaid with any PENDING FareDraft from PostgreSQL.
      */
     public Optional<FareRule> getFareRule(Tenant tenant, String origin, String dest, String product) {
-        return getFareRule(tenant, origin, dest, product, null);
+        return getFareRule(tenant, origin, dest, product, null, DEFAULT_FARE_CLASS);
     }
 
     public Optional<FareRule> getFareRule(
             Tenant tenant, String origin, String dest, String product, String at) {
-        Optional<FareRule> ruleOpt = getBaselineFareRule(tenant, origin, dest, product, at);
+        return getFareRule(tenant, origin, dest, product, at, DEFAULT_FARE_CLASS);
+    }
+
+    public Optional<FareRule> getFareRule(
+            Tenant tenant, String origin, String dest, String product, String at, String fareClass) {
+        Optional<FareRule> ruleOpt = getBaselineFareRule(tenant, origin, dest, product, at, fareClass);
         if (ruleOpt.isEmpty()) {
             return Optional.empty();
         }
@@ -188,17 +224,23 @@ public class FareService {
      * Builds the structured 2D FareGrid view-model based on the active mode.
      */
     public FareGrid buildGrid(Tenant tenant, String filterValue) {
-        return buildGrid(tenant, filterValue, null);
+        return buildGrid(tenant, filterValue, null, DEFAULT_FARE_CLASS);
     }
 
     public FareGrid buildGrid(Tenant tenant, String filterValue, String at) {
+        return buildGrid(tenant, filterValue, at, DEFAULT_FARE_CLASS);
+    }
+
+    public FareGrid buildGrid(Tenant tenant, String filterValue, String at, String fareClass) {
         if (tenant == null || isBlank(tenant.getCode()) || isBlank(filterValue)) {
             return null;
         }
+        // Fail fast on malformed pricingDate before making any Caracal API calls
+        normalizePricingDate(at);
 
         String normalizedFilter = normalizeCode(filterValue);
         if (tenant.getGridMode() == GridMode.ZONAL) {
-            return buildZonalGrid(tenant, normalizedFilter);
+            return buildZonalGrid(tenant, normalizedFilter, at, normalizeFareClass(fareClass));
         }
         return buildOdGrid(tenant, normalizedFilter, at);
     }
@@ -253,13 +295,20 @@ public class FareService {
      * - Rows: Origin Zones
      * - Columns: Destination Zones
      */
-    private FareGrid buildZonalGrid(Tenant tenant, String productCode) {
+    private FareGrid buildZonalGrid(Tenant tenant, String productCode, String at, String fareClass) {
         String normalizedTenant = normalizeCode(tenant.getCode());
         String normalizedProduct = normalizeCode(productCode);
+        String normalizedFareClass = normalizeFareClass(fareClass);
 
         List<CatalogOption> zones = getZones(normalizedTenant);
+        if (zones.isEmpty()) {
+            return new FareGrid(List.of(), List.of(), List.of());
+        }
+
+        String formattedAt = resolveZonalPricingTimestamp(normalizedTenant, at);
         Map<String, FareRule> ruleMap = indexRulesByCoordinates(
-                getZonalFareRules(normalizedTenant, normalizedProduct));
+                getZonalFareRulesWithFormattedAt(
+                        normalizedTenant, normalizedProduct, zones, normalizedFareClass, formattedAt));
 
         List<List<FareCell>> rows = new ArrayList<>();
 
@@ -277,14 +326,20 @@ public class FareService {
 
     /**
      * Converts a normalized FareRule into a presentation FareCell for the 2D matrix,
-     * preserving whether the cell has a staged PENDING draft in PostgreSQL.
+     * preserving tierCode and whether the cell has a staged PENDING draft in PostgreSQL.
      */
     private FareCell toFareCell(FareRule rule, String rowKey, String colKey) {
         if (rule == null || rule.getStatus() == null || rule.getStatus() == FareStatus.NA) {
-            return new FareCell(null, FareStatus.NA, false, rowKey, colKey);
+            return new FareCell(null, FareStatus.NA, false, rowKey, colKey, null);
         }
         if (rule.getStatus() == FareStatus.NOT_SOLD || rule.getPrice() == null) {
-            return new FareCell(rule.getPrice(), rule.getStatus(), rule.isHasPendingDraft(), rowKey, colKey);
+            return new FareCell(
+                    rule.getPrice(),
+                    rule.getStatus(),
+                    rule.isHasPendingDraft(),
+                    rowKey,
+                    colKey,
+                    rule.getTierCode());
         }
 
         BigDecimal price = rule.getPrice().setScale(2, RoundingMode.HALF_UP);
@@ -293,7 +348,8 @@ public class FareService {
                 rule.getStatus(),
                 rule.isHasPendingDraft(),
                 rowKey,
-                colKey);
+                colKey,
+                rule.getTierCode());
     }
 
     // =========================================================================
@@ -392,50 +448,87 @@ public class FareService {
      * Returns Zonal FareRule entities overlaid with any PENDING drafts in PostgreSQL.
      */
     public List<FareRule> getZonalFareRules(String tenantCode, String productCode) {
-        String normalizedTenant = !isBlank(tenantCode) ? normalizeCode(tenantCode) : "METRA";
-        String normalizedProduct = !isBlank(productCode) ? normalizeCode(productCode) : "ADULT_ONEWAY";
-        List<FareRule> rules = getBaselineZonalFareRules(normalizedTenant, normalizedProduct);
+        return getZonalFareRules(tenantCode, productCode, null, DEFAULT_FARE_CLASS);
+    }
+
+    public List<FareRule> getZonalFareRules(
+            String tenantCode, String productCode, String at, String fareClass) {
+        if (isBlank(tenantCode) || isBlank(productCode)) {
+            return List.of();
+        }
+
+        String normalizedTenant = normalizeCode(tenantCode);
+        List<FareRule> rules = getBaselineZonalFareRules(normalizedTenant, productCode, at, fareClass);
+        applyPendingDraftsToRules(normalizedTenant, rules);
+        return rules;
+    }
+
+    private List<FareRule> getZonalFareRulesWithFormattedAt(
+            String normalizedTenant,
+            String normalizedProduct,
+            List<CatalogOption> zones,
+            String normalizedFareClass,
+            String formattedAt) {
+        List<FareRule> rules = getBaselineZonalFareRulesWithFormattedAt(
+                normalizedTenant, normalizedProduct, zones, normalizedFareClass, formattedAt);
         applyPendingDraftsToRules(normalizedTenant, rules);
         return rules;
     }
 
     /**
-     * Returns untouched baseline Zonal FareRule entities (never overlaid with drafts).
+     * Returns untouched baseline Zonal FareRule entities (never overlaid with drafts),
+     * with rate tiers synthesized from distinct ACTIVE prices in ascending order.
      */
     public List<FareRule> getBaselineZonalFareRules(String tenantCode, String productCode) {
-        // TODO: Swap with GET /functions/rate-table-get or POST /functions/price-simulate
-        String normalizedTenant = !isBlank(tenantCode) ? normalizeCode(tenantCode) : "METRA";
-        String normalizedProduct = !isBlank(productCode) ? normalizeCode(productCode) : "ADULT_ONEWAY";
+        return getBaselineZonalFareRules(tenantCode, productCode, null, DEFAULT_FARE_CLASS);
+    }
+
+    public List<FareRule> getBaselineZonalFareRules(
+            String tenantCode, String productCode, String at, String fareClass) {
+        if (isBlank(tenantCode) || isBlank(productCode)) {
+            return List.of();
+        }
+
+        String normalizedTenant = normalizeCode(tenantCode);
+        String normalizedProduct = normalizeCode(productCode);
+        String normalizedFareClass = normalizeFareClass(fareClass);
 
         List<CatalogOption> zones = getZones(normalizedTenant);
-        BigDecimal[][] baseRates = resolveZonalBaseRates(normalizedProduct);
+        if (zones.isEmpty()) {
+            return List.of();
+        }
+
+        String formattedAt = resolveZonalPricingTimestamp(normalizedTenant, at);
+        return getBaselineZonalFareRulesWithFormattedAt(
+                normalizedTenant, normalizedProduct, zones, normalizedFareClass, formattedAt);
+    }
+
+    private List<FareRule> getBaselineZonalFareRulesWithFormattedAt(
+            String normalizedTenant,
+            String normalizedProduct,
+            List<CatalogOption> zones,
+            String normalizedFareClass,
+            String formattedAt) {
+        if (zones == null || zones.isEmpty()) {
+            return List.of();
+        }
+
         List<FareRule> rules = new ArrayList<>();
 
-        for (int r = 0; r < zones.size(); r++) {
-            for (int c = 0; c < zones.size(); c++) {
-                String originZone = zones.get(r).code();
-                String destZone = zones.get(c).code();
-                BigDecimal price = baseRates[r][c].setScale(2, RoundingMode.HALF_UP);
-
-                int zoneDistance = Math.abs(r - c);
-                String tierCode = switch (zoneDistance) {
-                    case 0 -> "TIER_A";
-                    case 1 -> "TIER_B";
-                    default -> "TIER_C";
-                };
-
-                rules.add(FareRule.zonal(
+        for (CatalogOption originZone : zones) {
+            for (CatalogOption destZone : zones) {
+                simulateZonalFareRuleWithFormattedAt(
                         normalizedTenant,
-                        originZone,
-                        destZone,
+                        originZone.code(),
+                        destZone.code(),
                         normalizedProduct,
-                        "ZONAL-" + normalizedProduct,
-                        tierCode,
-                        price,
-                        FareStatus.ACTIVE));
+                        normalizedFareClass,
+                        formattedAt)
+                        .ifPresent(rules::add);
             }
         }
 
+        assignBaselineZonalTiers(rules);
         return rules;
     }
 
@@ -464,14 +557,23 @@ public class FareService {
     }
 
     /**
-     * Returns fare zones for Zonal tenants.
+     * Returns ordered fare zones for Zonal tenants (e.g., Zone A - Zone J for Metra).
      */
     public List<CatalogOption> getZones(String tenantCode) {
-        // TODO: Call GET /functions/site-list
-        return List.of(
-                new CatalogOption("Zone 1", "Zone 1"),
-                new CatalogOption("Zone 2", "Zone 2"),
-                new CatalogOption("Zone 3", "Zone 3"));
+        if (isBlank(tenantCode)) {
+            return List.of();
+        }
+        return toCatalogOptions(caracalApiClient.fetchZones(normalizeCode(tenantCode)));
+    }
+
+    /**
+     * Returns fare class options for Zonal tenants (e.g., FULL, REDUCED, SCPP for Metra).
+     */
+    public List<CatalogOption> getFareClasses(String tenantCode) {
+        if (isBlank(tenantCode)) {
+            return List.of();
+        }
+        return toCatalogOptions(caracalApiClient.fetchFareClasses(normalizeCode(tenantCode)));
     }
 
     // =========================================================================
@@ -514,6 +616,24 @@ public class FareService {
         return sites;
     }
 
+    private List<CatalogOption> toCatalogOptions(List<CaracalZonalDtos.DimensionValueSummary> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+
+        List<CatalogOption> options = new ArrayList<>();
+        for (CaracalZonalDtos.DimensionValueSummary value : values) {
+            if (value == null || isBlank(value.key())) {
+                continue;
+            }
+            String normalizedKey = normalizeCode(value.key());
+            String displayName = isBlank(value.name()) ? normalizedKey : value.name().trim();
+            options.add(new CatalogOption(normalizedKey, displayName));
+        }
+
+        return options;
+    }
+
     private Set<String> getRateTable(String normalizedTenant, String normalizedOrigin) {
         Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> rateAssignmentList = caracalApiClient.fetchRateTable(
                 new RateTableGetRequest(normalizedTenant, "RT-" + normalizedOrigin));
@@ -547,6 +667,60 @@ public class FareService {
         CaracalSimulationDtos.PriceSimulationResult simulatedPrice = caracalApiClient.simulatePrice(
                 new PriceSimulateRequest(
                         normalizedTenant, normalizedProduct, normalizedOrigin, dimensions, formattedAt));
+
+        return classifySimulationResult(
+                simulatedPrice, normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct)
+                .map(result -> FareRule.od(
+                        normalizedTenant,
+                        normalizedOrigin,
+                        normalizedDest,
+                        normalizedProduct,
+                        result.priceRuleSetName(),
+                        null,
+                        result.price(),
+                        result.status()));
+    }
+
+    private Optional<FareRule> simulateZonalFareRuleWithFormattedAt(
+            String normalizedTenant,
+            String normalizedOriginZone,
+            String normalizedDestZone,
+            String normalizedProduct,
+            String normalizedFareClass,
+            String formattedAt) {
+        Map<String, String> dimensions = Map.of(
+                "ORIGIN_ZONE", normalizedOriginZone,
+                "DEST_ZONE", normalizedDestZone,
+                "FARE_CLASS", normalizedFareClass);
+
+        CaracalSimulationDtos.PriceSimulationResult simulatedPrice = caracalApiClient.simulatePrice(
+                new PriceSimulateRequest(
+                        normalizedTenant,
+                        normalizedProduct,
+                        null,
+                        dimensions,
+                        formattedAt,
+                        DEFAULT_CHANNEL));
+
+        return classifySimulationResult(
+                simulatedPrice, normalizedTenant, normalizedOriginZone, normalizedDestZone, normalizedProduct)
+                .map(result -> FareRule.zonal(
+                        normalizedTenant,
+                        normalizedOriginZone,
+                        normalizedDestZone,
+                        normalizedProduct,
+                        result.priceRuleSetName(),
+                        null,
+                        result.price(),
+                        result.status()));
+    }
+
+    private Optional<ClassifiedSimulation> classifySimulationResult(
+            CaracalSimulationDtos.PriceSimulationResult simulatedPrice,
+            String normalizedTenant,
+            String origin,
+            String dest,
+            String normalizedProduct) {
         if (simulatedPrice == null) {
             return Optional.empty();
         }
@@ -557,46 +731,73 @@ public class FareService {
                     : "";
 
             if (msg.contains(NOT_SOLD) || msg.contains(CONDITION)) {
-                return Optional.of(FareRule.od(
-                        normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
-                        null, null, FareStatus.NOT_SOLD));
+                return Optional.of(new ClassifiedSimulation(null, null, FareStatus.NOT_SOLD));
             }
 
             if (!msg.contains(NO_PRICE_RULE)) {
                 log.warn("Unrecognized Caracal 4xx response for {} {}->{} ({}): {}",
-                        normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
+                        normalizedTenant, origin, dest, normalizedProduct,
                         simulatedPrice.errorMessage());
             }
 
-            return Optional.of(FareRule.od(
-                    normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
-                    null, null, FareStatus.NA));
+            return Optional.of(new ClassifiedSimulation(null, null, FareStatus.NA));
         }
 
         CaracalSimulationDtos.PricingDetail fare = simulatedPrice.response().pricing();
         if (fare.total() == null) {
             log.warn("Caracal returned null total for {} {}->{} ({}); treating as N/A.",
-                    normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct);
-            return Optional.of(FareRule.od(
-                    normalizedTenant, normalizedOrigin, normalizedDest, normalizedProduct,
-                    fare.priceRuleSetName(), null, FareStatus.NA));
+                    normalizedTenant, origin, dest, normalizedProduct);
+            return Optional.of(new ClassifiedSimulation(fare.priceRuleSetName(), null, FareStatus.NA));
         }
 
         BigDecimal total = fare.total().setScale(2, RoundingMode.HALF_UP);
-        return Optional.of(FareRule.od(
-                normalizedTenant,
-                normalizedOrigin,
-                normalizedDest,
-                normalizedProduct,
-                fare.priceRuleSetName(),
-                null,
-                total,
-                FareStatus.ACTIVE));
+        return Optional.of(new ClassifiedSimulation(fare.priceRuleSetName(), total, FareStatus.ACTIVE));
     }
 
     // =========================================================================
     // INTERNAL HELPERS & COORDINATE INDEXING
     // =========================================================================
+
+    /**
+     * Synthesizes sequential rate tier codes (TIER_A, TIER_B, ...) by grouping
+     * distinct ACTIVE baseline prices in ascending order before draft overlay.
+     */
+    private void assignBaselineZonalTiers(List<FareRule> rules) {
+        if (rules == null || rules.isEmpty()) {
+            return;
+        }
+
+        TreeSet<BigDecimal> distinctPrices = new TreeSet<>();
+        for (FareRule rule : rules) {
+            if (rule.getStatus() == FareStatus.ACTIVE && rule.getPrice() != null) {
+                distinctPrices.add(rule.getPrice().setScale(2, RoundingMode.HALF_UP));
+            }
+        }
+
+        if (distinctPrices.isEmpty()) {
+            return;
+        }
+
+        Map<BigDecimal, String> priceToTierCode = new HashMap<>();
+        int index = 0;
+        for (BigDecimal price : distinctPrices) {
+            priceToTierCode.put(price, toTierCode(index++));
+        }
+
+        for (FareRule rule : rules) {
+            if (rule.getStatus() == FareStatus.ACTIVE && rule.getPrice() != null) {
+                BigDecimal scaledPrice = rule.getPrice().setScale(2, RoundingMode.HALF_UP);
+                rule.setTierCode(priceToTierCode.get(scaledPrice));
+            }
+        }
+    }
+
+    private static String toTierCode(int index) {
+        if (index < 26) {
+            return "TIER_" + (char) ('A' + index);
+        }
+        return "TIER_" + (index + 1);
+    }
 
     private List<CatalogOption> toOutboundDestinations(
             List<CaracalCatalogDtos.SiteSummary> siteList,
@@ -627,6 +828,18 @@ public class FareService {
             if (site.siteCode() != null
                     && site.siteCode().trim().equalsIgnoreCase(normalizedSiteCode)
                     && site.timezone() != null) {
+                return site.timezone();
+            }
+        }
+        return ZoneOffset.UTC;
+    }
+
+    private ZoneId findTenantZoneId(List<CaracalCatalogDtos.SiteSummary> sites) {
+        if (sites == null) {
+            return ZoneOffset.UTC;
+        }
+        for (CaracalCatalogDtos.SiteSummary site : sites) {
+            if (site != null && site.timezone() != null) {
                 return site.timezone();
             }
         }
@@ -677,6 +890,10 @@ public class FareService {
 
     private String normalizeCode(String value) {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeFareClass(String fareClass) {
+        return isBlank(fareClass) ? DEFAULT_FARE_CLASS : normalizeCode(fareClass);
     }
 
     private Map<String, FareRule> indexRulesByCoordinates(List<FareRule> rules) {
@@ -744,31 +961,6 @@ public class FareService {
         rule.setHasPendingDraft(true);
     }
 
-    /**
-     * Helper to mock 3x3 symmetric zone baseline rates matching the system rate schedule.
-     */
-    private BigDecimal[][] resolveZonalBaseRates(String normalizedProduct) {
-        return switch (normalizedProduct) {
-            case "FULL_10TRIP" -> new BigDecimal[][] {
-                    { new BigDecimal("22.50"), new BigDecimal("36.00"), new BigDecimal("58.50") },
-                    { new BigDecimal("36.00"), new BigDecimal("22.50"), new BigDecimal("36.00") },
-                    { new BigDecimal("58.50"), new BigDecimal("36.00"), new BigDecimal("22.50") }
-            };
-            case "FULL_MONTHLY" -> new BigDecimal[][] {
-                    { new BigDecimal("75.00"), new BigDecimal("120.00"), new BigDecimal("195.00") },
-                    { new BigDecimal("120.00"), new BigDecimal("75.00"), new BigDecimal("120.00") },
-                    { new BigDecimal("195.00"), new BigDecimal("120.00"), new BigDecimal("75.00") }
-            };
-            case "ADULT_ONEWAY" -> new BigDecimal[][] {
-                    { new BigDecimal("2.50"), new BigDecimal("4.00"), new BigDecimal("6.50") },
-                    { new BigDecimal("4.00"), new BigDecimal("2.50"), new BigDecimal("4.00") },
-                    { new BigDecimal("6.50"), new BigDecimal("4.00"), new BigDecimal("2.50") }
-            };
-            default -> new BigDecimal[][] {
-                    { new BigDecimal("2.50"), new BigDecimal("4.00"), new BigDecimal("6.50") },
-                    { new BigDecimal("4.00"), new BigDecimal("2.50"), new BigDecimal("4.00") },
-                    { new BigDecimal("6.50"), new BigDecimal("4.00"), new BigDecimal("2.50") }
-            };
-        };
+    private record ClassifiedSimulation(String priceRuleSetName, BigDecimal price, FareStatus status) {
     }
 }

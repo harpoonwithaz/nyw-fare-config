@@ -29,7 +29,7 @@ public class CaracalSimulationDtos {
                     dimensions, null, null);
         }
 
-        // Five-argument constructor for main compatibility
+        // Five-argument constructor
         public PriceSimulateRequest(
                 String tenantCode,
                 String productCode,
@@ -73,9 +73,8 @@ public class CaracalSimulationDtos {
         }
 
         public boolean isSuccess() {
-            return response != null && response.pricing() != null;
+            return response != null
+                    && response.pricing() != null;
         }
     }
 }
-
-

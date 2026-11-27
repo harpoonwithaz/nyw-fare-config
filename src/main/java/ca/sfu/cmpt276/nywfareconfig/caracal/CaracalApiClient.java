@@ -8,8 +8,9 @@ import tools.jackson.databind.JsonNode;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
+import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos;
 
-// Decouples Epics 2–5 from Caracal's HTTP routing and raw JSON schemas.
+// Decouples Epics 2-5 from Caracal's HTTP routing and raw JSON schemas.
 public interface CaracalApiClient {
 
     // Catalog Discovery
@@ -24,40 +25,46 @@ public interface CaracalApiClient {
     Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> fetchRateTable(
             CaracalCatalogDtos.RateTableGetRequest requestPayload);
 
-    // Publication and audit history
+    // Zonal Discovery
+    List<CaracalZonalDtos.DimensionValueSummary> fetchZones(
+            String tenantCode);
+
+    List<CaracalZonalDtos.DimensionValueSummary> fetchFareClasses(
+            String tenantCode);
+
+    List<CaracalZonalDtos.SiteDimensionBinding> fetchStationZoneBindings(
+            String tenantCode);
+
+    // Publication and Audit History
     JsonNode fetchPublicationHistory(String tenantCode);
 
     JsonNode fetchAuditHistory(String tenantCode, int limit);
 
-// Publish the validated sandbox configuration to Caracal
-JsonNode publishCatalog(String tenantCode);
+    // Publish sandbox configuration
+    JsonNode publishCatalog(String tenantCode);
 
-// Update an origin-destination fare in Caracal.
-JsonNode updateOdMatrix(
-        String tenantCode,
-        String priceRuleSetName,
-        String originCode,
-        String destCode,
-        BigDecimal price
-);
+    // Update an origin-destination fare
+    JsonNode updateOdMatrix(
+            String tenantCode,
+            String priceRuleSetName,
+            String originCode,
+            String destCode,
+            BigDecimal price);
 
-// Update ticket availability at a terminal.
-JsonNode updateRateAssignment(
-        String tenantCode,
-        String assignmentId,
-        String cellType
-);
+    // Update ticket availability at a terminal
+    JsonNode updateRateAssignment(
+            String tenantCode,
+            String assignmentId,
+            String cellType);
 
-// Active baseline pricing
+    // Baseline Pricing
     BigDecimal fetchBaselinePrice(
             String tenantCode,
             String originCode,
             String destCode,
-            String productCode
-    );
+            String productCode);
 
-    // Shared Caracal price simulation method
+    // Shared Price Simulation
     CaracalSimulationDtos.PriceSimulationResult simulatePrice(
-            CaracalSimulationDtos.PriceSimulateRequest requestPayload
-    );
+            CaracalSimulationDtos.PriceSimulateRequest requestPayload);
 }
