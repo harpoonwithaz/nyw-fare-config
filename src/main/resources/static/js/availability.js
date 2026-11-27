@@ -1,32 +1,48 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // client state manager so we don't spam requests on every click
+    const tableEl = document.getElementById("availabilityTable");
     const stagedAvailabilityDrafts = {
-        siteCode: document.querySelector("[data-site]")?.getAttribute("data-site") || "MIDTOWN",
+        siteCode: tableEl?.getAttribute("data-site") || "MIDTOWN",
+        destCode: tableEl?.getAttribute("data-dest") || "ALL",
+        routeCode: tableEl?.getAttribute("data-route") || "ALL",
         drafts: {},
         isDirty: false
     };
 
     const btnSave = document.getElementById("btnSaveAvailabilityDrafts");
+    const btnDiscard = document.getElementById("discardDraftsBtn");
+    const changesCounter = document.getElementById("changesCounter");
     const alertBanner = document.getElementById("availabilityAlert");
     const alertText = document.getElementById("availabilityAlertText");
 
-    // --- 1. handle toggle switches (story 3.1) ---
+    function formatTargetLabel(productCode) {
+        const destDisplay = stagedAvailabilityDrafts.destCode === "ALL"
+            ? "All Destinations"
+            : stagedAvailabilityDrafts.destCode;
+        return `Product: ${productCode} | Origin: ${stagedAvailabilityDrafts.siteCode} | Dest: ${destDisplay}`;
+    }
+
+    function showBanner(message, variant = "info") {
+        if (!alertBanner || !alertText) return;
+        alertText.textContent = message;
+        alertBanner.className = `alert alert-${variant} alert-dismissible fade show mb-3 shadow-sm`;
+    }
+
+    // --- 1. Handle toggle switches ---
     document.querySelectorAll(".availability-toggle").forEach(toggle => {
         toggle.addEventListener("change", function () {
             const productCode = this.getAttribute("data-product");
             const isAvailable = this.checked;
 
-            // update the row label visually
             const row = this.closest("tr");
-            const statusLabel = row.querySelector(".status-label");
+            const statusLabel = row?.querySelector(".status-label");
             if (statusLabel) {
                 statusLabel.textContent = isAvailable ? "Available" : "Unavailable";
             }
 
-            // add or update state in local object
             if (!stagedAvailabilityDrafts.drafts[productCode]) {
                 stagedAvailabilityDrafts.drafts[productCode] = {
                     siteCode: stagedAvailabilityDrafts.siteCode,
+                    routeCode: stagedAvailabilityDrafts.routeCode,
                     productCode: productCode,
                     available: isAvailable
                 };
@@ -39,23 +55,22 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // --- 2. modal condition builder stuff (story 3.3) ---
+    // --- 2. Modal condition builder with per-product preload & clean reset ---
     const typeRecurring = document.getElementById("typeRecurring");
     const typePromo = document.getElementById("typePromo");
     const sectionDaysOfWeek = document.getElementById("sectionDaysOfWeek");
     const sectionTimeRange = document.getElementById("sectionTimeRange");
     const sectionDateRange = document.getElementById("sectionDateRange");
 
-    // swap modal fields depending on selected radio button
     function updateModalVisibility() {
         if (typeRecurring && typeRecurring.checked) {
-            sectionDaysOfWeek.classList.remove("d-none");
-            sectionTimeRange.classList.remove("d-none");
-            sectionDateRange.classList.add("d-none");
+            sectionDaysOfWeek?.classList.remove("d-none");
+            sectionDateRange?.classList.add("d-none");
+            sectionTimeRange?.classList.remove("d-none");
         } else if (typePromo && typePromo.checked) {
-            sectionDaysOfWeek.classList.add("d-none");
-            sectionTimeRange.classList.add("d-none");
-            sectionDateRange.classList.remove("d-none");
+            sectionDaysOfWeek?.classList.add("d-none");
+            sectionDateRange?.classList.remove("d-none");
+            sectionTimeRange?.classList.remove("d-none");
         }
     }
 
@@ -64,43 +79,88 @@ document.addEventListener("DOMContentLoaded", function () {
         typePromo.addEventListener("change", updateModalVisibility);
     }
 
-    // top header button defaults cleanly to ADULT_ONEWAY
+    function openModalForProduct(productCode) {
+        document.getElementById("modalProductCode").value = productCode;
+        document.getElementById("modalTargetLabel").textContent = formatTargetLabel(productCode);
+
+        const staged = stagedAvailabilityDrafts.drafts[productCode];
+        const row = document.querySelector(`tr[data-product="${productCode}"]`);
+
+        const conditionType = staged?.conditionType
+            || row?.getAttribute("data-condition-type")
+            || "RECURRING_WEEKLY";
+
+        const daysList = staged?.daysOfWeek
+            ?? (row?.getAttribute("data-days")
+                ? row.getAttribute("data-days").split(",").map(v => parseInt(v, 10)).filter(n => !isNaN(n))
+                : [1, 2, 3, 4, 5]);
+
+        const startTimeRaw = staged?.startTime
+            ? staged.startTime.slice(0, 5)
+            : (row?.getAttribute("data-start-time") || "06:00");
+        const endTimeRaw = staged?.endTime
+            ? staged.endTime.slice(0, 5)
+            : (row?.getAttribute("data-end-time") || "22:00");
+
+        const startDateRaw = staged?.startDate ?? (row?.getAttribute("data-start-date") || "");
+        const endDateRaw = staged?.endDate ?? (row?.getAttribute("data-end-date") || "");
+
+        if (conditionType === "TEMPORARY_PROMO" && typePromo) {
+            typePromo.checked = true;
+        } else if (typeRecurring) {
+            typeRecurring.checked = true;
+        }
+
+        document.querySelectorAll(".day-checkbox").forEach(cb => {
+            cb.checked = daysList.includes(parseInt(cb.value, 10));
+        });
+
+        const inputStartTime = document.getElementById("inputStartTime");
+        const inputEndTime = document.getElementById("inputEndTime");
+        const inputStartDate = document.getElementById("inputStartDate");
+        const inputEndDate = document.getElementById("inputEndDate");
+
+        if (inputStartTime) inputStartTime.value = startTimeRaw;
+        if (inputEndTime) inputEndTime.value = endTimeRaw;
+        if (inputStartDate) inputStartDate.value = startDateRaw;
+        if (inputEndDate) inputEndDate.value = endDateRaw;
+
+        updateModalVisibility();
+    }
+
     const btnOpenConditionModal = document.getElementById("btnOpenConditionModal");
     if (btnOpenConditionModal) {
         btnOpenConditionModal.addEventListener("click", function () {
-            document.getElementById("modalProductCode").value = "ADULT_ONEWAY";
-            document.getElementById("modalTargetLabel").textContent =
-                `Product: ADULT_ONEWAY | Site: ${stagedAvailabilityDrafts.siteCode}`;
+            const firstProduct = document.querySelector("tr[data-product]")?.getAttribute("data-product") || "ADULT_ONEWAY";
+            openModalForProduct(firstProduct);
         });
     }
 
-    // open modal for specific product row
     document.querySelectorAll(".btn-configure-rule").forEach(btn => {
         btn.addEventListener("click", function () {
             const productCode = this.getAttribute("data-product");
-            document.getElementById("modalProductCode").value = productCode;
-            document.getElementById("modalTargetLabel").textContent =
-                `Product: ${productCode} | Site: ${stagedAvailabilityDrafts.siteCode}`;
+            openModalForProduct(productCode);
         });
     });
 
-    // grab values from modal and save into staged state object
     const btnApplyCondition = document.getElementById("btnApplyCondition");
     if (btnApplyCondition) {
         btnApplyCondition.addEventListener("click", function () {
             const productCode = document.getElementById("modalProductCode").value;
             const conditionType = document.querySelector('input[name="conditionType"]:checked')?.value || "RECURRING_WEEKLY";
 
-            const selectedDays = Array.from(document.querySelectorAll(".day-checkbox:checked")).map(cb => parseInt(cb.value));
-            const startTime = document.getElementById("inputStartTime")?.value;
-            const endTime = document.getElementById("inputEndTime")?.value;
-            const startDate = document.getElementById("inputStartDate")?.value;
-            const endDate = document.getElementById("inputEndDate")?.value;
+            const selectedDays = Array.from(document.querySelectorAll(".day-checkbox:checked"))
+                .map(cb => parseInt(cb.value, 10));
+            const startTime = document.getElementById("inputStartTime")?.value || "";
+            const endTime = document.getElementById("inputEndTime")?.value || "";
+            const startDate = document.getElementById("inputStartDate")?.value || "";
+            const endDate = document.getElementById("inputEndDate")?.value || "";
 
             if (!stagedAvailabilityDrafts.drafts[productCode]) {
                 const toggleState = document.getElementById(`toggle-${productCode}`)?.checked ?? true;
                 stagedAvailabilityDrafts.drafts[productCode] = {
                     siteCode: stagedAvailabilityDrafts.siteCode,
+                    routeCode: stagedAvailabilityDrafts.routeCode,
                     productCode: productCode,
                     available: toggleState
                 };
@@ -108,20 +168,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const draft = stagedAvailabilityDrafts.drafts[productCode];
             draft.conditionType = conditionType;
-            draft.daysOfWeek = selectedDays;
             draft.startTime = startTime ? `${startTime}:00` : null;
             draft.endTime = endTime ? `${endTime}:00` : null;
-            draft.startDate = startDate || null;
-            draft.endDate = endDate || null;
 
-            // update table row badge text
+            // Strip irrelevant hidden fields based on condition type
+            if (conditionType === "TEMPORARY_PROMO") {
+                draft.daysOfWeek = [];
+                draft.startDate = startDate || null;
+                draft.endDate = endDate || null;
+            } else {
+                draft.daysOfWeek = selectedDays;
+                draft.startDate = null;
+                draft.endDate = null;
+            }
+
             const row = document.querySelector(`tr[data-product="${productCode}"]`);
             if (row) {
                 const badgeContainer = row.querySelector(".temporal-condition-badge-container");
                 if (badgeContainer) {
+                    const timeSuffix = (startTime && endTime) ? ` (${startTime}-${endTime})` : "";
                     const badgeText = conditionType === "RECURRING_WEEKLY"
-                        ? `${selectedDays.length} Days (${startTime}-${endTime})`
-                        : `Promo (${startDate || 'Start'} to ${endDate || 'End'})`;
+                        ? `${selectedDays.length} Days${timeSuffix}`
+                        : `Promo (${startDate || "Start"} to ${endDate || "End"})${timeSuffix}`;
                     badgeContainer.innerHTML = `
                         <span class="badge bg-warning-subtle text-warning-emphasis border border-warning condition-badge">
                             <i class="bi bi-clock-history me-1"></i>${badgeText}
@@ -133,14 +201,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             enableSaveButton();
 
-            // close modal
             const modalEl = document.getElementById("conditionBuilderModal");
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
             if (modalInstance) modalInstance.hide();
         });
     }
 
-    // --- 3. quick helpers & batch save handler ---
+    // --- 3. Helpers, discard & batch save to PostgreSQL drafts ---
     function markRowStaged(row) {
         if (!row) return;
         const stagedBadge = row.querySelector(".staged-badge");
@@ -152,16 +219,31 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function enableSaveButton() {
         stagedAvailabilityDrafts.isDirty = true;
+        const count = Object.keys(stagedAvailabilityDrafts.drafts).length;
+        if (changesCounter) {
+            changesCounter.textContent = String(count);
+        }
         if (btnSave) {
             btnSave.classList.remove("disabled");
             btnSave.removeAttribute("disabled");
         }
-        if (alertBanner) {
-            alertBanner.classList.remove("d-none");
+        if (btnDiscard) {
+            btnDiscard.classList.remove("disabled");
+            btnDiscard.removeAttribute("disabled");
         }
+        showBanner(
+            'Modifications are held in client staging buffer. Click "Save Availability Drafts" to persist across pages.',
+            "info"
+        );
     }
 
-    // post batch to spring boot when save button clicked
+    if (btnDiscard) {
+        btnDiscard.addEventListener("click", function () {
+            stagedAvailabilityDrafts.isDirty = false;
+            window.location.reload();
+        });
+    }
+
     if (btnSave) {
         btnSave.addEventListener("click", function () {
             const payload = Object.values(stagedAvailabilityDrafts.drafts);
@@ -184,36 +266,131 @@ document.addEventListener("DOMContentLoaded", function () {
                 headers: headers,
                 body: JSON.stringify(payload)
             })
-            .then(response => {
-                if (!response.ok) throw new Error("failed to stage availability drafts");
-                return response.json();
+            .then(async response => {
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(body.message || `Server rejected changes (${response.status}).`);
+                }
+                return body;
             })
             .then(data => {
                 stagedAvailabilityDrafts.isDirty = false;
                 stagedAvailabilityDrafts.drafts = {};
+                if (changesCounter) changesCounter.textContent = "0";
+                if (btnDiscard) btnDiscard.setAttribute("disabled", "true");
 
-                if (alertText) alertText.textContent = data.message || "availability rules saved!";
-                if (alertBanner) {
-                    alertBanner.className = "alert alert-success alert-dismissible fade show mb-4 shadow-sm";
-                }
+                showBanner(data.message || "Availability rules saved to PostgreSQL drafts.", "success");
 
-                // update row badges so user knows DB has it
                 document.querySelectorAll(".staged-badge").forEach(badge => {
                     if (badge.textContent.includes("STAGED")) {
-                        badge.className = "badge bg-info-subtle text-info border staged-badge";
-                        badge.innerHTML = `<i class="bi bi-clock-fill me-1"></i>SAVED IN DB`;
+                        badge.className = "badge bg-info-subtle text-info-emphasis border border-info-subtle staged-badge";
+                        badge.innerHTML = `<i class="bi bi-database-check me-1"></i>Saved in DB`;
                     }
                 });
             })
             .catch(error => {
-                console.error("staging error:", error);
+                console.error("Staging error:", error);
                 btnSave.classList.remove("disabled");
                 btnSave.removeAttribute("disabled");
-                if (alertBanner) {
-                    alertBanner.className = "alert alert-danger alert-dismissible fade show mb-4 shadow-sm";
-                }
-                if (alertText) alertText.textContent = "error saving availability changes. try again.";
+                showBanner(error.message || "Error saving availability changes.", "danger");
             });
         });
     }
+
+    // --- 4. Unsaved-changes "Are you sure?" navigation & filter guard ---
+    let pendingLeaveAction = null;
+    const unsavedModalEl = document.getElementById("unsavedNavigationModal");
+    const unsavedModal = unsavedModalEl ? new bootstrap.Modal(unsavedModalEl) : null;
+    const btnConfirmLeave = document.getElementById("btnConfirmLeavePage");
+
+    function guardLeave(actionFn) {
+        if (!stagedAvailabilityDrafts.isDirty) {
+            actionFn();
+            return;
+        }
+        pendingLeaveAction = actionFn;
+        if (unsavedModal) {
+            unsavedModal.show();
+        } else if (window.confirm("You have unsaved availability changes that will not persist. Are you sure you want to leave?")) {
+            stagedAvailabilityDrafts.isDirty = false;
+            actionFn();
+        }
+    }
+
+    if (btnConfirmLeave) {
+        btnConfirmLeave.addEventListener("click", function () {
+            stagedAvailabilityDrafts.isDirty = false;
+            if (unsavedModal) unsavedModal.hide();
+            if (typeof pendingLeaveAction === "function") {
+                const fn = pendingLeaveAction;
+                pendingLeaveAction = null;
+                fn();
+            }
+        });
+    }
+
+    // Guard sidebar & navbar links
+    document.querySelectorAll("aside a.nav-link, aside a[href], header a[href]").forEach(link => {
+        link.addEventListener("click", function (event) {
+            const href = this.getAttribute("href");
+            if (!href || href.startsWith("#")) return;
+            if (stagedAvailabilityDrafts.isDirty) {
+                event.preventDefault();
+                guardLeave(() => {
+                    window.location.href = href;
+                });
+            }
+        });
+    });
+
+    // Guard origin/destination filter dropdowns
+    const filterForm = document.getElementById("availabilityFilterForm");
+    const siteSelect = document.getElementById("siteSelect");
+    const destSelect = document.getElementById("destSelect");
+
+    [siteSelect, destSelect].forEach(sel => {
+        if (!sel || !filterForm) return;
+        let previousValue = sel.value;
+        sel.addEventListener("focus", () => { previousValue = sel.value; });
+        sel.addEventListener("change", function () {
+            if (stagedAvailabilityDrafts.isDirty) {
+                const nextValue = sel.value;
+                sel.value = previousValue;
+                guardLeave(() => {
+                    sel.value = nextValue;
+                    filterForm.submit();
+                });
+            } else {
+                filterForm.submit();
+            }
+        });
+    });
+
+    // Guard global tenant switcher dropdown in navbar
+    const tenantSelect = document.getElementById("globalTenantSelect");
+    if (tenantSelect && tenantSelect.form) {
+        let prevTenant = tenantSelect.value;
+        tenantSelect.addEventListener("focus", () => { prevTenant = tenantSelect.value; });
+        tenantSelect.onchange = null;
+        tenantSelect.addEventListener("change", function () {
+            if (stagedAvailabilityDrafts.isDirty) {
+                const nextTenant = tenantSelect.value;
+                tenantSelect.value = prevTenant;
+                guardLeave(() => {
+                    tenantSelect.value = nextTenant;
+                    tenantSelect.form.submit();
+                });
+            } else {
+                tenantSelect.form.submit();
+            }
+        });
+    }
+
+    // Native browser tab close / hard refresh fallback
+    window.addEventListener("beforeunload", function (event) {
+        if (stagedAvailabilityDrafts.isDirty) {
+            event.preventDefault();
+            event.returnValue = "";
+        }
+    });
 });
