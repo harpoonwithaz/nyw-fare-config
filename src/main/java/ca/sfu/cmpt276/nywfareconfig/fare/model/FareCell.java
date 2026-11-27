@@ -14,15 +14,42 @@ public class FareCell {
     private String rowKey;
     private String colKey;
 
+    private String tierCode;
+
     public FareCell() {
     }
 
-    public FareCell(BigDecimal price, FareStatus status, boolean hasPendingDraft, String rowKey, String colKey) {
+    public FareCell(
+            BigDecimal price,
+            FareStatus status,
+            boolean hasPendingDraft,
+            String rowKey,
+            String colKey) {
+        this(price, status, hasPendingDraft, rowKey, colKey, null);
+    }
+
+    // 6-arg constructor used by FareService.toFareCell(...)
+    public FareCell(
+            BigDecimal price,
+            FareStatus status,
+            boolean hasPendingDraft,
+            String rowKey,
+            String colKey,
+            String tierCode) {
         this.price = price;
         this.status = status;
         this.hasPendingDraft = hasPendingDraft;
         this.rowKey = rowKey;
         this.colKey = colKey;
+        this.tierCode = tierCode;
+    }
+
+    public String getTierCode() {
+        return tierCode;
+    }
+
+    public void setTierCode(String tierCode) {
+        this.tierCode = tierCode;
     }
 
     public BigDecimal getPrice() {

@@ -1,29 +1,39 @@
 package ca.sfu.cmpt276.nywfareconfig.tenant.service;
 
-import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.tenant.config.TenantProperties;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
 @Service
 public class TenantService {
 
-    private final TenantContext tenantContext;
     private final CaracalApiClient caracalApiClient;
+    private final TenantProperties tenantProperties;
+
+    @Autowired
+    public TenantService(
+            CaracalApiClient caracalApiClient,
+            TenantProperties tenantProperties) {
+        this.caracalApiClient = caracalApiClient;
+        this.tenantProperties = tenantProperties != null ? tenantProperties : TenantProperties.defaults();
+    }
 
     public TenantService(CaracalApiClient caracalApiClient, TenantContext tenantContext) {
-        this.caracalApiClient = caracalApiClient;
-        this.tenantContext = tenantContext;
+        this(caracalApiClient, TenantProperties.defaults());
     }
 
     /**
-     * Returns the list of demo tenants supported by the platform.
+     * Returns the list of supported O-D and Zonal tenants returned by Caracal.
      */
     public List<Tenant> getAvailableTenants() {
         List<CaracalCatalogDtos.TenantSummary> tenantsSummaryList = caracalApiClient.fetchTenants();
@@ -36,6 +46,9 @@ public class TenantService {
             if (summary.code() == null || summary.code().isBlank()) {
                 continue;
             }
+            if (!tenantProperties.isSupported(summary.code())) {
+                continue;
+            }
 
             tenantList.add(new Tenant(summary.code(), summary.name()));
         }
@@ -43,36 +56,34 @@ public class TenantService {
     }
 
     /**
-     * Resolves a Tenant instance by its natural tenant code.
+     * Resolves a supported Tenant instance by its natural tenant code.
+     * Returns null if the tenant code is blank or not configured as an O-D or Zonal tenant.
      */
     public Tenant getTenantByCode(String tenantCode) {
-        // TODO: Call GET /functions/site-list?tenantCode=<tenant>
-        if (tenantCode == null) {
+        if (tenantCode == null || tenantCode.isBlank()) {
             return null;
         }
 
-        CaracalCatalogDtos.TenantDetail tenantDetails = caracalApiClient.fetchTenant(tenantCode);
-
-        switch (tenantDetails.code()) {
-            // HARD CODED FOR NOW
-            case "METRA":
-                return new Tenant(
-                        tenantDetails.code(),
-                        tenantDetails.name(),
-                        tenantDetails.defaultCurrency(),
-                        tenantDetails.defaultLocale(),
-                        GridMode.ZONAL,
-                        true,
-                        tenantDetails.supportedLocales());
-            default:
-                return new Tenant(
-                        tenantDetails.code(),
-                        tenantDetails.name(),
-                        tenantDetails.defaultCurrency(),
-                        tenantDetails.defaultLocale(),
-                        GridMode.OD,
-                        true,
-                        tenantDetails.supportedLocales());
+        Optional<GridMode> configuredMode = tenantProperties.resolveGridMode(tenantCode);
+        if (configuredMode.isEmpty()) {
+            return null;
         }
+
+        CaracalCatalogDtos.TenantDetail tenantDetails = caracalApiClient.fetchTenant(tenantCode.trim());
+        if (tenantDetails == null) {
+            return null;
+        }
+
+        GridMode gridMode = tenantProperties.resolveGridMode(tenantDetails.code())
+                .orElse(configuredMode.get());
+
+        return new Tenant(
+                tenantDetails.code(),
+                tenantDetails.name(),
+                tenantDetails.defaultCurrency(),
+                tenantDetails.defaultLocale(),
+                gridMode,
+                true,
+                tenantDetails.supportedLocales());
     }
 }
