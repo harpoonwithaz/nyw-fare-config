@@ -22,6 +22,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,12 +45,16 @@ public class AvailabilityController {
     @GetMapping
     public String showAvailabilityPage(@RequestParam(value = "site", required = false) String siteParam,
                                        @RequestParam(value = "dest", required = false) String destParam,
+                                       @RequestParam(value = "pricingDate", required = false) String pricingDateParam,
                                        HttpSession session,
                                        Model model) {
         Tenant activeTenant = tenantContext.getSelectedTenant();
         if (activeTenant == null) {
             return "availability/availability";
         }
+
+        LocalDate resolvedDate = resolveSelectedDate(pricingDateParam);
+        tenantContext.setSelectedDate(resolvedDate.toString());
 
         List<StationOption> terminals;
         try {
@@ -91,8 +97,19 @@ public class AvailabilityController {
             tenantContext.setSecondaryFilter(resolvedSite);
         }
 
+        List<StationOption> connectedDestinations = List.of();
         String resolvedDest = AvailabilityRule.ALL_ROUTES;
+
         if (activeTenant.getGridMode() == GridMode.OD) {
+            try {
+                connectedDestinations = availabilityService.getConnectedDestinations(
+                        activeTenant.getCode(), resolvedSite, terminals);
+            } catch (CaracalApiException ex) {
+                log.warn("Unable to filter connected destinations from Caracal API: {}", ex.getMessage(), ex);
+                model.addAttribute("caracalAvailabilityErrorMessage", ex.getMessage());
+                return "availability/availability";
+            }
+
             String destSessionKey = "availabilityDest_" + activeTenant.getCode().toUpperCase(Locale.ROOT);
             String candidateDest = (destParam != null && !destParam.isBlank())
                     ? destParam.trim().toUpperCase(Locale.ROOT)
@@ -101,8 +118,9 @@ public class AvailabilityController {
             if (candidateDest != null
                     && !AvailabilityRule.ALL_ROUTES.equals(candidateDest)
                     && !resolvedSite.equals(candidateDest)) {
-                boolean destExists = terminals.stream().anyMatch(t -> t.code().equalsIgnoreCase(candidateDest));
-                if (destExists) {
+                boolean isConnected = connectedDestinations.stream()
+                        .anyMatch(t -> t.code().equalsIgnoreCase(candidateDest));
+                if (isConnected) {
                     resolvedDest = candidateDest;
                 }
             }
@@ -114,13 +132,15 @@ public class AvailabilityController {
                 : resolvedSite + "->" + resolvedDest;
 
         model.addAttribute("terminals", terminals);
+        model.addAttribute("connectedDestinations", connectedDestinations);
         model.addAttribute("siteCode", resolvedSite);
         model.addAttribute("destCode", resolvedDest);
         model.addAttribute("routeCode", routeCode);
+        model.addAttribute("selectedDate", resolvedDate.toString());
 
         try {
             ProductAvailabilityView view = availabilityService.getProductAvailability(
-                    activeTenant, resolvedSite, routeCode);
+                    activeTenant, resolvedSite, routeCode, resolvedDate);
             model.addAttribute("availabilityView", view);
         } catch (CaracalApiException ex) {
             log.warn("Unable to load availability matrix from Caracal API: {}", ex.getMessage(), ex);
@@ -128,6 +148,25 @@ public class AvailabilityController {
         }
 
         return "availability/availability";
+    }
+
+    private LocalDate resolveSelectedDate(String pricingDateParam) {
+        if (pricingDateParam != null && !pricingDateParam.isBlank()) {
+            try {
+                return LocalDate.parse(pricingDateParam.trim());
+            } catch (DateTimeParseException ignored) {
+                // Fall back to existing TenantContext date or today
+            }
+        }
+        String contextDate = tenantContext.getSelectedDate();
+        if (contextDate != null && !contextDate.isBlank()) {
+            try {
+                return LocalDate.parse(contextDate.trim());
+            } catch (DateTimeParseException ignored) {
+                // Fall back to today
+            }
+        }
+        return LocalDate.now();
     }
 
     @PostMapping("/api/stage")

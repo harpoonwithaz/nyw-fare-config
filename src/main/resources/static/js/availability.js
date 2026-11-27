@@ -171,7 +171,6 @@ document.addEventListener("DOMContentLoaded", function () {
             draft.startTime = startTime ? `${startTime}:00` : null;
             draft.endTime = endTime ? `${endTime}:00` : null;
 
-            // Strip irrelevant hidden fields based on condition type
             if (conditionType === "TEMPORARY_PROMO") {
                 draft.daysOfWeek = [];
                 draft.startDate = startDate || null;
@@ -343,21 +342,22 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Guard origin/destination filter dropdowns
+    // Guard origin, destination, and effective date filter inputs
     const filterForm = document.getElementById("availabilityFilterForm");
     const siteSelect = document.getElementById("siteSelect");
     const destSelect = document.getElementById("destSelect");
+    const pricingDateInput = document.getElementById("pricingDateInput");
 
-    [siteSelect, destSelect].forEach(sel => {
-        if (!sel || !filterForm) return;
-        let previousValue = sel.value;
-        sel.addEventListener("focus", () => { previousValue = sel.value; });
-        sel.addEventListener("change", function () {
+    [siteSelect, destSelect, pricingDateInput].forEach(control => {
+        if (!control || !filterForm) return;
+        let previousValue = control.value;
+        control.addEventListener("focus", () => { previousValue = control.value; });
+        control.addEventListener("change", function () {
             if (stagedAvailabilityDrafts.isDirty) {
-                const nextValue = sel.value;
-                sel.value = previousValue;
+                const nextValue = control.value;
+                control.value = previousValue;
                 guardLeave(() => {
-                    sel.value = nextValue;
+                    control.value = nextValue;
                     filterForm.submit();
                 });
             } else {

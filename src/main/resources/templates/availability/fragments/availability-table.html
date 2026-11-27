@@ -61,6 +61,11 @@
                             Available
                         </label>
                     </div>
+                    <div th:if="${availabilityView.getCaracalStatus(prod) == 'OUTSIDE_WINDOW'}" class="mt-1">
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                            Closed on Selected Date
+                        </span>
+                    </div>
                 </td>
 
                 <td class="py-2 px-3">

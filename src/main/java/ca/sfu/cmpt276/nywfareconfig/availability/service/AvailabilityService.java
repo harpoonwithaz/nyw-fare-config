@@ -74,10 +74,81 @@ public class AvailabilityService {
                 .toList();
     }
 
+    /**
+     * Returns only destination stations that have at least one active route/price rule
+     * from the given origin terminal in Caracal (filters out disconnected pairs).
+     */
+    public List<StationOption> getConnectedDestinations(
+            String tenantCode,
+            String originSiteCode,
+            List<StationOption> allStations) {
+
+        if (allStations == null || allStations.isEmpty() || originSiteCode == null || originSiteCode.isBlank()) {
+            return List.of();
+        }
+
+        String normalizedTenant = normalizeCode(tenantCode);
+        String normalizedOrigin = normalizeCode(originSiteCode);
+
+        Optional<List<CaracalCatalogDtos.RateAssignmentSummary>> rateTableOpt =
+                caracalApiClient.fetchRateTable(
+                        new CaracalCatalogDtos.RateTableGetRequest(normalizedTenant, "RT-" + normalizedOrigin));
+
+        Set<String> soldAtOrigin = new LinkedHashSet<>();
+        if (rateTableOpt != null && rateTableOpt.isPresent()) {
+            for (CaracalCatalogDtos.RateAssignmentSummary assignment : rateTableOpt.get()) {
+                if (assignment.productCode() != null
+                        && !assignment.productCode().isBlank()
+                        && "VALUE".equalsIgnoreCase(assignment.cellType())) {
+                    soldAtOrigin.add(normalizeCode(assignment.productCode()));
+                }
+            }
+        }
+
+        if (soldAtOrigin.isEmpty()) {
+            return List.of();
+        }
+
+        List<StationOption> connected = new ArrayList<>();
+        for (StationOption candidate : allStations) {
+            if (candidate.code().equalsIgnoreCase(normalizedOrigin)) {
+                continue;
+            }
+            boolean hasConnection = false;
+            for (String productCode : soldAtOrigin) {
+                CaracalSimulationDtos.PriceSimulationResult sim = caracalApiClient.simulatePrice(
+                        new CaracalSimulationDtos.PriceSimulateRequest(
+                                normalizedTenant,
+                                productCode,
+                                normalizedOrigin,
+                                Map.of("DEST", candidate.code()),
+                                null));
+                if (!"NA".equals(classifyStatus(sim))) {
+                    hasConnection = true;
+                    break;
+                }
+            }
+            if (hasConnection) {
+                connected.add(candidate);
+            }
+        }
+        return connected;
+    }
+
     public ProductAvailabilityView getProductAvailability(Tenant tenant, String siteCode, String routeCode) {
+        return getProductAvailability(tenant, siteCode, routeCode, LocalDate.now());
+    }
+
+    public ProductAvailabilityView getProductAvailability(
+            Tenant tenant,
+            String siteCode,
+            String routeCode,
+            LocalDate effectiveDate) {
+
         String normalizedTenant = normalizeCode(tenant.getCode());
         String normalizedSite = normalizeCode(siteCode);
         String normalizedRoute = normalizeRouteCode(routeCode);
+        LocalDate targetDate = effectiveDate != null ? effectiveDate : LocalDate.now();
 
         List<CaracalCatalogDtos.ProductSummary> liveProducts = caracalApiClient.fetchProducts(normalizedTenant);
         LinkedHashSet<String> orderedProducts = new LinkedHashSet<>();
@@ -96,7 +167,6 @@ public class AvailabilityService {
                 String code = normalizeCode(p.code());
                 orderedProducts.add(code);
                 productNames.put(code, (p.name() != null && !p.name().isBlank()) ? p.name().trim() : code);
-                // Default to false until verified against Caracal rate-table / price-simulate (matches FareGrid)
                 toggles.put(code, false);
                 caracalStatuses.put(code, "NOT_SOLD");
             }
@@ -139,9 +209,39 @@ public class AvailabilityService {
                 .findByTenantCodeAndSiteCodeAndRouteCode(normalizedTenant, normalizedSite, normalizedRoute);
         applyDbOverlay(routeRules, orderedProducts, productNames, toggles, phasedOut, caracalStatuses, savedInDb, conditions, true);
 
+        // Apply selected date against each product's TemporalCondition (day-of-week & promo date window)
+        for (String code : orderedProducts) {
+            if (Boolean.TRUE.equals(phasedOut.get(code))) {
+                toggles.put(code, false);
+                caracalStatuses.put(code, "PHASED_OUT");
+                continue;
+            }
+            TemporalCondition tc = conditions.get(code);
+            if (tc != null && Boolean.TRUE.equals(toggles.get(code)) && !isConditionActiveOnDate(tc, targetDate)) {
+                toggles.put(code, false);
+                caracalStatuses.put(code, "OUTSIDE_WINDOW");
+            }
+        }
+
+        // Sort products so items available on targetDate appear first, preserving catalog order within each group
+        List<String> sortedProducts = new ArrayList<>(orderedProducts);
+        sortedProducts.sort((a, b) -> {
+            boolean availA = Boolean.TRUE.equals(toggles.get(a));
+            boolean availB = Boolean.TRUE.equals(toggles.get(b));
+            if (availA != availB) {
+                return availA ? -1 : 1;
+            }
+            boolean phasedA = Boolean.TRUE.equals(phasedOut.get(a));
+            boolean phasedB = Boolean.TRUE.equals(phasedOut.get(b));
+            if (phasedA != phasedB) {
+                return phasedA ? 1 : -1;
+            }
+            return 0;
+        });
+
         ProductAvailabilityView view = new ProductAvailabilityView(
                 normalizedSite,
-                new ArrayList<>(orderedProducts),
+                sortedProducts,
                 toggles,
                 conditions);
         view.setRouteCode(normalizedRoute);
@@ -150,6 +250,24 @@ public class AvailabilityService {
         view.setCaracalStatuses(caracalStatuses);
         view.setSavedInDb(savedInDb);
         return view;
+    }
+
+    private boolean isConditionActiveOnDate(TemporalCondition tc, LocalDate date) {
+        if ("TEMPORARY_PROMO".equals(tc.getConditionType())) {
+            if (tc.getStartDate() != null && date.isBefore(tc.getStartDate())) {
+                return false;
+            }
+            if (tc.getEndDate() != null && date.isAfter(tc.getEndDate())) {
+                return false;
+            }
+        }
+        if (tc.getDaysOfWeek() != null && !tc.getDaysOfWeek().isEmpty()) {
+            int dayValue = date.getDayOfWeek().getValue();
+            if (!tc.getDaysOfWeek().contains(dayValue)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void populateOdAvailability(
@@ -191,7 +309,6 @@ public class AvailabilityService {
                 continue;
             }
 
-            // Specific O-D route: evaluate with price-simulate (exact same call & classification as FareService)
             CaracalSimulationDtos.PriceSimulationResult sim = caracalApiClient.simulatePrice(
                     new CaracalSimulationDtos.PriceSimulateRequest(
                             tenantCode, productCode, originSiteCode, Map.of("DEST", destSiteCode), null));

@@ -33,6 +33,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -84,7 +85,8 @@ class AvailabilityControllerMockMvcTests {
 
         when(caracalApiClient.fetchSites(TENANT)).thenReturn(List.of(
                 new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown / W. 39th St", ZoneId.of("America/New_York")),
-                new CaracalCatalogDtos.SiteSummary("PAULSHK", "Paulus Hook", ZoneId.of("America/New_York"))
+                new CaracalCatalogDtos.SiteSummary("PAULSHK", "Paulus Hook", ZoneId.of("America/New_York")),
+                new CaracalCatalogDtos.SiteSummary("UNSERVED", "Disconnected Pier", ZoneId.of("America/New_York"))
         ));
         when(caracalApiClient.fetchProducts(TENANT)).thenReturn(List.of(
                 new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true),
@@ -100,6 +102,10 @@ class AvailabilityControllerMockMvcTests {
                         new CaracalSimulationDtos.PriceSimulateResponse(
                                 new CaracalSimulationDtos.PricingDetail("OD-ADULT_ONEWAY", new BigDecimal("13.25"), new BigDecimal("13.25"))),
                         null));
+        when(caracalApiClient.simulatePrice(argThat(req ->
+                req != null && req.dimensions() != null && "UNSERVED".equals(req.dimensions().get("DEST")))))
+                .thenReturn(new CaracalSimulationDtos.PriceSimulationResult(
+                        null, "no PriceRule matched the resolved dimension context"));
 
         availabilityRuleRepository.deleteAll();
         session = new MockHttpSession();
@@ -131,13 +137,13 @@ class AvailabilityControllerMockMvcTests {
     }
 
     @Test
-    void selectedTenantRendersCanonicalProductsAndPersistsChanges() throws Exception {
+    void selectedTenantRendersCanonicalProductsFiltersDisconnectedRoutesAndRespectsDate() throws Exception {
         String payload = """
             [
               {
                 "siteCode": "MIDTOWN",
                 "productCode": "ADULT_ONEWAY",
-                "available": false,
+                "available": true,
                 "conditionType": "RECURRING_WEEKLY",
                 "daysOfWeek": [1, 2, 3, 4, 5],
                 "startTime": "06:00:00",
@@ -157,18 +163,33 @@ class AvailabilityControllerMockMvcTests {
             .first()
             .satisfies(rule -> {
                 assertThat(rule.getProductCode()).isEqualTo("ADULT_ONEWAY");
-                assertThat(rule.isAvailable()).isFalse();
+                assertThat(rule.isAvailable()).isTrue();
                 assertThat(rule.getUpdatedBy()).contains("operator@nyw.com");
                 assertThat(rule.getTemporalCondition()).isNotNull();
                 assertThat(rule.getTemporalCondition().getDaysOfWeek()).containsExactly(1, 2, 3, 4, 5);
             });
 
-        mockMvc.perform(inTenant(get("/availability?site=MIDTOWN")))
+        // Weekday (2026-11-26 is Thursday): ADULT_ONEWAY is active; UNSERVED is excluded from #destSelect
+        String html = mockMvc.perform(inTenant(get("/availability?site=MIDTOWN&pricingDate=2026-11-26")))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("ADULT_ONEWAY")))
-            .andExpect(content().string(containsString("Unavailable")))
             .andExpect(content().string(containsString("Mon, Tue, Wed, Thu, Fri (06:00-22:00)")))
-            .andExpect(content().string(containsString("Saved in DB")));
+            .andExpect(content().string(containsString("Saved in DB")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        int destStart = html.indexOf("id=\"destSelect\"");
+        int destEnd = html.indexOf("</select>", destStart);
+        assertThat(destStart).isPositive();
+        String destDropdownHtml = html.substring(destStart, destEnd);
+        assertThat(destDropdownHtml).contains("Paulus Hook (PAULSHK)");
+        assertThat(destDropdownHtml).doesNotContain("Disconnected Pier (UNSERVED)");
+
+        // Weekend (2026-11-28 is Saturday): weekday-only rule is marked Closed on Selected Date
+        mockMvc.perform(inTenant(get("/availability?site=MIDTOWN&pricingDate=2026-11-28")))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("Closed on Selected Date")));
     }
 
     @Test
