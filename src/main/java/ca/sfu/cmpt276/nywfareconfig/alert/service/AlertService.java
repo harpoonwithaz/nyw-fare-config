@@ -58,7 +58,7 @@ public class AlertService {
 
         return alerts.findByTenantCode(tenantCode, Sort.by(Sort.Direction.DESC, "updatedAt")).stream()
                 .filter(a -> status == null || a.getStatus() == status)
-                .filter(a -> route.isEmpty() || a.getRouteKeys().contains(route))
+                .filter(a -> route.isEmpty() || a.getRouteKeys().stream().anyMatch(key -> coversRoute(key, route)))
                 .filter(a -> query.isEmpty() || matchesSearch(a, query))
                 .toList();
     }
@@ -325,20 +325,8 @@ public class AlertService {
         return true;
     }
 
-    // Routes grouped by origin, keyed by the heading shown on the page ("Pier 11 (PIER11)").
-    // Empty when Caracal can't be reached or the tenant has fewer than two sites.
-    public Map<String, List<RouteOption>> routeOptionsByTerminal(String tenantCode) {
-        if (isBlank(tenantCode)) {
-            return new LinkedHashMap<>();
-        }
-        try {
-            return buildRoutes(sites(tenantCode));
-        } catch (CaracalApiException ex) {
-            return new LinkedHashMap<>();
-        }
-    }
-
-    // Routes and tickets for the alert form, with a flag for whether Caracal answered both
+    // Routes (grouped by origin, keyed by the heading shown on the page, e.g. "Pier 11 (PIER11)") and tickets
+    // for the alert form, with a flag for whether Caracal answered both
     public AlertCatalog formCatalog(String tenantCode) {
         if (isBlank(tenantCode)) {
             return new AlertCatalog(new LinkedHashMap<>(), List.of(), false);
@@ -472,6 +460,14 @@ public class AlertService {
             errors.add("Enter a valid start date.");
             return null;
         }
+    }
+
+    // Filter value is either a full route (PIER11:HOB14ST) or one station (PIER11), matching either end
+    private static boolean coversRoute(String key, String filter) {
+        if (filter.contains(":")) {
+            return key.equals(filter);
+        }
+        return key.startsWith(filter + ":") || key.endsWith(":" + filter);
     }
 
     private boolean matchesSearch(ServiceAlert alert, String query) {

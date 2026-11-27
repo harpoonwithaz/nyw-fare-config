@@ -127,7 +127,7 @@ class AlertServiceCatalogTest {
 
     @Test
     void routeOptionsAreGroupedByOriginWithNames() {
-        var options = service.routeOptionsByTerminal(TENANT);
+        var options = service.formCatalog(TENANT).routes();
 
         assertEquals(2, options.size());
         var fromPier = options.get("Pier 11 (PIER11)");

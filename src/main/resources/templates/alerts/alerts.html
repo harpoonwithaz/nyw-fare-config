@@ -66,12 +66,10 @@
                     <div class="col-md-3">
                         <label for="route" class="visually-hidden">Route</label>
                         <select id="route" name="route" class="form-select">
-                            <option value="">All routes</option>
-                            <!-- One group per origin terminal -->
-                            <optgroup th:each="terminal : ${routeOptions}" th:label="${terminal.key}">
-                                <option th:each="option : ${terminal.value}" th:value="${option.key()}"
-                                    th:text="${option.label()}" th:selected="${option.key() == route}">Route</option>
-                            </optgroup>
+                            <option value="">All stations</option>
+                            <!-- Stations that appear in an alert's routes; picking one shows alerts to or from it -->
+                            <option th:each="station : ${usedStations}" th:value="${station}"
+                                th:text="${station}" th:selected="${station == route}">PIER11</option>
                         </select>
                     </div>
                     <div class="col-md-1 d-grid">
@@ -102,9 +100,22 @@
                             <tr th:each="alert : ${alerts}">
                                 <td class="text-truncate" style="max-width: 320px;" th:text="${alert.primaryMessage}">Message</td>
                                 <td>
-                                    <!-- Route keys are ORIGIN:DESTINATION, e.g. PIER11:HOB14ST -->
-                                    <div th:each="key : ${alert.routeKeys}" class="small text-nowrap"
-                                        th:text="${#strings.replace(key, ':', ' → ')}">PIER11 → HOB14ST</div>
+                                    <!-- Route keys are ORIGIN:DESTINATION, e.g. PIER11:HOB14ST.
+                                         First 3 shown; the rest fold into "+N more" so a select-all alert doesn't fill the screen. -->
+                                    <th:block th:each="key, stat : ${alert.routeKeys}">
+                                        <div th:if="${stat.index < 3}" class="small text-nowrap"
+                                            th:text="${#strings.replace(key, ':', ' → ')}">PIER11 → HOB14ST</div>
+                                    </th:block>
+                                    <details th:if="${alert.routeKeys.size() > 3}" class="small">
+                                        <summary class="text-primary" style="cursor: pointer;"
+                                            th:text="${'+' + (alert.routeKeys.size() - 3) + ' more'}">+5 more</summary>
+                                        <div style="max-height: 160px; overflow-y: auto;">
+                                            <th:block th:each="key, stat : ${alert.routeKeys}">
+                                                <div th:if="${stat.index >= 3}" class="text-nowrap"
+                                                    th:text="${#strings.replace(key, ':', ' → ')}">EDGEWTR → PIER11</div>
+                                            </th:block>
+                                        </div>
+                                    </details>
                                 </td>
                                 <td class="small" th:text="${#strings.isEmpty(alert.productCode)} ? 'All tickets' : ${alert.productCode}">All tickets</td>
                                 <td class="small">

@@ -404,6 +404,27 @@ class AlertControllerTests {
         assertEquals(AlertStatus.ARCHIVED, alertRepository.findById(draft.getId()).orElseThrow().getStatus());
     }
 
+    // Oliver, Nov 27: a select-all alert listed every route and filled the screen
+    @Test
+    void longRouteListFoldsAfterThreeAndFilterOnlyListsUsedRoutes() throws Exception {
+        AlertForm form = new AlertForm();
+        form.setRouteKeys(List.of("PIER11:HOB14ST", "PIER11:EDGEWTR", "HOB14ST:PIER11", "HOB14ST:EDGEWTR", "EDGEWTR:PIER11"));
+        form.text("en").setMessage("Many routes");
+        assertTrue(alertService.save(TENANT, null, form, "test", List.of("en", "es")).isEmpty());
+
+        mockMvc.perform(inTenant(get("/fares/alerts"), OPERATOR))
+            .andExpect(content().string(containsString("+2 more")))
+            // Filter lists each station once, not every route pair
+            .andExpect(content().string(containsString("<option value=\"EDGEWTR\">")))
+            .andExpect(content().string(not(containsString("value=\"EDGEWTR:PIER11\""))));
+
+        // Picking a station shows alerts to or from it
+        mockMvc.perform(inTenant(get("/fares/alerts"), OPERATOR).param("route", "EDGEWTR"))
+            .andExpect(content().string(containsString("Many routes")));
+        mockMvc.perform(inTenant(get("/fares/alerts"), OPERATOR).param("route", "MIDTOWN"))
+            .andExpect(content().string(not(containsString("Many routes"))));
+    }
+
     // A form opened for one client and submitted after switching to another in a second tab
     @Test
     void saveIsRefusedWhenClientChangedSinceFormOpened() throws Exception {

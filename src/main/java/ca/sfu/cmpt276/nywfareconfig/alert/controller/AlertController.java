@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.controller;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,14 @@ public class AlertController {
         }
 
         model.addAttribute("alerts", alertService.list(tenantCode, search, parseStatus(status), route));
-        model.addAttribute("routeOptions", alertService.routeOptionsByTerminal(tenantCode));
+        // Route filter is by station (either end of a route), listing only stations some alert covers.
+        // One option per station keeps it short even when an alert covers every route.
+        model.addAttribute("usedStations", alertService.list(tenantCode, null, null, null).stream()
+                .flatMap(alert -> alert.getRouteKeys().stream())
+                .flatMap(key -> Arrays.stream(key.split(":")))
+                .distinct()
+                .sorted()
+                .toList());
         List<String> languages = languages();
         model.addAttribute("languages", languages);
         model.addAttribute("languageNames", languages.stream()
