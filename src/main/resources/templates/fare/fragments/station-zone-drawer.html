@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<body>
+
+  <!-- Read-Only Station-to-Zone Mapping Offcanvas Drawer -->
+  <div th:fragment="stationZoneDrawer" class="offcanvas offcanvas-end" tabindex="-1" id="stationZoneMappingDrawer"
+    aria-labelledby="stationZoneMappingDrawerLabel" style="width: 480px; max-width: 100vw;">
+
+    <!-- Drawer Header -->
+    <div class="offcanvas-header border-bottom bg-light">
+      <div>
+        <h5 class="offcanvas-title fw-bold mb-0" id="stationZoneMappingDrawerLabel">
+          <i class="bi bi-diagram-3 me-2"></i>Station Zone Mapping
+        </h5>
+        <small class="text-muted">
+          <span th:text="${tenantContext.selectedTenant?.displayName}">Tenant</span>
+          <span th:if="${stationZoneMappings != null and !#lists.isEmpty(stationZoneMappings)}"
+            th:text="' · ' + (${#lists.size(stationZoneMappings) == 1 ? '1 station' : #lists.size(stationZoneMappings) + ' stations'})"></span>
+        </small>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <!-- Drawer Body -->
+    <div class="offcanvas-body d-flex flex-column p-3 overflow-hidden">
+
+      <!-- API Error State -->
+      <div th:if="${stationZoneMappingErrorMessage != null}" class="alert alert-danger small mb-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        <span th:text="${stationZoneMappingErrorMessage}">Unable to load station mappings.</span>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        th:if="${stationZoneMappingErrorMessage == null and (stationZoneMappings == null or #lists.isEmpty(stationZoneMappings))}"
+        class="alert alert-warning small mb-0" role="alert">
+        <i class="bi bi-info-circle-fill me-1"></i>
+        No station-to-zone mappings are available for this tenant.
+      </div>
+
+      <!-- Populated Read-Only Views -->
+      <th:block
+        th:if="${stationZoneMappingErrorMessage == null and stationZoneMappings != null and !#lists.isEmpty(stationZoneMappings)}">
+
+        <p class="text-muted small mb-3">
+          Read-only view of each station's currently assigned fare zone.
+        </p>
+
+        <!-- Pure Bootstrap View Switcher Tabs -->
+        <ul class="nav nav-tabs nav-fill mb-3 small" id="stationZoneTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="by-zone-tab" data-bs-toggle="tab"
+              data-bs-target="#by-zone-pane" type="button" role="tab" aria-controls="by-zone-pane" aria-selected="true">
+              By Zone
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="all-stations-tab" data-bs-toggle="tab"
+              data-bs-target="#all-stations-pane" type="button" role="tab" aria-controls="all-stations-pane"
+              aria-selected="false">
+              All Stations (A–Z)
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content flex-grow-1 overflow-hidden" id="stationZoneTabsContent">
+
+          <!-- Tab 1: Grouped by Zone (Pure Bootstrap Accordion) -->
+          <div class="tab-pane fade show active h-100 overflow-y-auto" id="by-zone-pane" role="tabpanel"
+            aria-labelledby="by-zone-tab">
+            <div class="accordion accordion-flush border rounded" id="stationZoneAccordion">
+              <div class="accordion-item" th:each="entry, iter : ${stationZoneGroups}">
+                <h2 class="accordion-header" th:id="'zoneHeading-' + ${iter.index}">
+                  <button class="accordion-button collapsed py-2 px-3 small" type="button" data-bs-toggle="collapse"
+                    th:attr="data-bs-target='#zoneCollapse-' + ${iter.index}, aria-controls='zoneCollapse-' + ${iter.index}"
+                    aria-expanded="false">
+                    <span class="fw-semibold flex-grow-1 text-truncate me-2" style="min-width: 0;"
+                      th:text="${entry.key.displayName}">Zone A</span>
+                    <span
+                      class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle flex-shrink-0 me-3 text-center"
+                      style="min-width: 5.5rem;"
+                      th:text="${#lists.size(entry.value) == 1 ? '1 station' : #lists.size(entry.value) + ' stations'}">0
+                      stations</span>
+                  </button>
+                </h2>
+                <div th:id="'zoneCollapse-' + ${iter.index}" class="accordion-collapse collapse"
+                  th:attr="aria-labelledby='zoneHeading-' + ${iter.index}" data-bs-parent="#stationZoneAccordion">
+                  <div class="accordion-body p-0">
+                    <div th:if="${#lists.isEmpty(entry.value)}" class="text-muted small fst-italic px-3 py-2">
+                      No stations assigned to this zone.
+                    </div>
+                    <table th:if="${!#lists.isEmpty(entry.value)}"
+                      class="table table-sm table-hover align-middle mb-0 small">
+                      <thead class="table-light">
+                        <tr>
+                          <th class="ps-3 text-secondary text-uppercase">Station</th>
+                          <th class="pe-3 text-end text-secondary text-uppercase">Code</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr th:each="station : ${entry.value}">
+                          <td class="ps-3 fw-medium text-dark" th:text="${station.stationName}">Station Name</td>
+                          <td class="pe-3 text-end font-monospace text-muted" th:text="${station.siteCode}">ST051</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Alphabetical Table of All Stations + Client-Side Search -->
+          <div class="tab-pane fade h-100" id="all-stations-pane" role="tabpanel" aria-labelledby="all-stations-tab">
+            <div class="d-flex flex-column h-100">
+
+              <!-- Search Input (Pinned Above Scrollable Table) -->
+              <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text bg-white text-muted">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input type="search" id="stationZoneSearchInput" class="form-control"
+                  placeholder="Search by station name, code, or zone..."
+                  aria-label="Search stations by name, code, or zone" autocomplete="off">
+              </div>
+
+              <!-- Scrollable Station List -->
+              <div class="table-responsive border rounded flex-grow-1 overflow-y-auto">
+                <table class="table table-sm table-hover align-middle mb-0 small" id="allStationsTable">
+                  <thead class="table-light sticky-top">
+                    <tr>
+                      <th class="ps-3 text-secondary text-uppercase">Station</th>
+                      <th class="text-secondary text-uppercase">Code</th>
+                      <th class="pe-3 text-end text-secondary text-uppercase">Zone</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr th:each="station : ${stationZoneMappings}" class="station-mapping-row"
+                      th:attr="data-search=${#strings.toLowerCase(station.stationName + ' ' + station.siteCode + ' ' + station.zoneDisplayName)}">
+                      <td class="ps-3 fw-medium text-dark" th:text="${station.stationName}">Station Name</td>
+                      <td class="font-monospace text-muted" th:text="${station.siteCode}">ST051</td>
+                      <td class="pe-3 text-end">
+                        <span th:if="${station.zoneCode != null}"
+                          class="badge bg-primary-subtle text-primary border border-primary-subtle"
+                          th:text="${station.zoneDisplayName}">Zone A</span>
+                        <span th:if="${station.zoneCode == null}"
+                          class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                          Unassigned
+                        </span>
+                      </td>
+                    </tr>
+                    <tr id="stationZoneNoMatchesRow" class="d-none">
+                      <td colspan="3" class="text-center text-muted fst-italic py-3">
+                        No stations match your search.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </th:block>
+
+    </div>
+
+    <!-- Drawer Footer -->
+    <div class="offcanvas-footer border-top bg-light px-3 py-2 d-flex justify-content-end">
+      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="offcanvas">Close</button>
+    </div>
+
+    <script>
+      (() => {
+        const searchInput = document.getElementById("stationZoneSearchInput");
+        const table = document.getElementById("allStationsTable");
+        const noMatchesRow = document.getElementById("stationZoneNoMatchesRow");
+        if (!searchInput || !table) {
+          return;
+        }
+
+        const rows = Array.from(table.querySelectorAll("tbody tr.station-mapping-row"));
+
+        searchInput.addEventListener("input", () => {
+          const query = searchInput.value.trim().toLowerCase();
+          let visibleCount = 0;
+
+          for (const row of rows) {
+            const matches = !query || (row.dataset.search || "").includes(query);
+            row.classList.toggle("d-none", !matches);
+            if (matches) {
+              visibleCount++;
+            }
+          }
+
+          if (noMatchesRow) {
+            noMatchesRow.classList.toggle("d-none", visibleCount > 0);
+          }
+        });
+      })();
+    </script>
+
+  </div>
+
+</body>
+
+</html>

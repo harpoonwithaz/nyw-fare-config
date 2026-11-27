@@ -2,6 +2,7 @@ package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.StationZoneMappingView;
 import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareDraftBatchRequest;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import jakarta.validation.Valid;
 
 @Controller
@@ -94,6 +97,20 @@ public class FareController {
                     tenantContext.setSelectedDate(null);
                     model.addAttribute("caracalGridErrorMessage", ex.getMessage());
                     return "fare/fare";
+                }
+            }
+
+            if (currentTenant.getGridMode() == GridMode.ZONAL
+                    && activeFilter != null && !activeFilter.isBlank()) {
+                try {
+                    List<StationZoneMappingView> mappings =
+                            fareService.getStationZoneMappings(currentTenant.getCode());
+                    model.addAttribute("stationZoneMappings", mappings);
+                    model.addAttribute("stationZoneGroups",
+                            fareService.groupStationZoneMappings(currentTenant.getCode(), mappings));
+                } catch (CaracalApiException ex) {
+                    log.warn("Unable to load station zone mappings from Caracal API: {}", ex.getMessage(), ex);
+                    model.addAttribute("stationZoneMappingErrorMessage", ex.getMessage());
                 }
             }
         }

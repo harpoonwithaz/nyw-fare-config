@@ -3,6 +3,6 @@ package ca.sfu.cmpt276.nywfareconfig.fare.dto;
 public record StationZoneMappingView(
         String siteCode,
         String stationName,
-        String baselineZone,
-        String effectiveZone,
-        boolean hasPendingDraft) {}
+        String zoneCode,
+        String zoneDisplayName) {
+}

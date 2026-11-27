@@ -1,5 +1,6 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.service;
 
+import java.util.Comparator;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -30,10 +31,7 @@ import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalCatalogDtos.RateTableGetR
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalZonalDtos;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareGrid;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareRule;
-import ca.sfu.cmpt276.nywfareconfig.fare.dto.FareStatus;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.*;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.DraftStatus;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareCell;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
@@ -574,6 +572,99 @@ public class FareService {
             return List.of();
         }
         return toCatalogOptions(caracalApiClient.fetchFareClasses(normalizeCode(tenantCode)));
+    }
+
+    /**
+     * Hydrates read-only station-to-zone mappings by joining live Caracal sites
+     * with zone bindings and zone display labels, sorted alphabetically by station name.
+     */
+    public List<StationZoneMappingView> getStationZoneMappings(String tenantCode) {
+        if (isBlank(tenantCode)) {
+            return List.of();
+        }
+
+        String normalizedTenant = normalizeCode(tenantCode);
+        List<CaracalCatalogDtos.SiteSummary> sites = caracalApiClient.fetchSites(normalizedTenant);
+        if (sites == null || sites.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, String> zoneCodeBySite = new HashMap<>();
+        List<CaracalZonalDtos.SiteDimensionBinding> bindings =
+                caracalApiClient.fetchStationZoneBindings(normalizedTenant);
+        if (bindings != null) {
+            for (CaracalZonalDtos.SiteDimensionBinding binding : bindings) {
+                if (binding == null || isBlank(binding.siteCode()) || isBlank(binding.valueKey())) {
+                    continue;
+                }
+                if (!isBlank(binding.dimensionKey()) && !"ORIGIN_ZONE".equalsIgnoreCase(binding.dimensionKey().trim())) {
+                    continue;
+                }
+                zoneCodeBySite.put(normalizeCode(binding.siteCode()), normalizeCode(binding.valueKey()));
+            }
+        }
+
+        Map<String, String> zoneNameByCode = new HashMap<>();
+        for (CatalogOption zone : getZones(normalizedTenant)) {
+            zoneNameByCode.put(zone.code(), zone.displayName());
+        }
+
+        List<StationZoneMappingView> mappings = new ArrayList<>();
+        for (CaracalCatalogDtos.SiteSummary site : sites) {
+            if (site == null || isBlank(site.siteCode())) {
+                continue;
+            }
+            String siteCode = normalizeCode(site.siteCode());
+            String stationName = isBlank(site.name()) ? siteCode : site.name().trim();
+            String zoneCode = zoneCodeBySite.get(siteCode);
+            String zoneDisplayName = zoneCode != null
+                    ? zoneNameByCode.getOrDefault(zoneCode, zoneCode)
+                    : "Unassigned";
+
+            mappings.add(new StationZoneMappingView(siteCode, stationName, zoneCode, zoneDisplayName));
+        }
+
+        mappings.sort(Comparator
+                .comparing(StationZoneMappingView::stationName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(StationZoneMappingView::siteCode));
+        return mappings;
+    }
+
+    /**
+     * Groups hydrated station mappings in zone order (e.g., Zone A - Zone J) for
+     * pure-Thymeleaf accordion rendering, appending an Unassigned group only if needed.
+     */
+    public Map<CatalogOption, List<StationZoneMappingView>> groupStationZoneMappings(
+            String tenantCode,
+            List<StationZoneMappingView> mappings) {
+        if (isBlank(tenantCode) || mappings == null || mappings.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, CatalogOption> zoneOptionsByCode = new LinkedHashMap<>();
+        Map<CatalogOption, List<StationZoneMappingView>> grouped = new LinkedHashMap<>();
+        for (CatalogOption zone : getZones(normalizeCode(tenantCode))) {
+            zoneOptionsByCode.put(zone.code(), zone);
+            grouped.put(zone, new ArrayList<>());
+        }
+
+        List<StationZoneMappingView> unassigned = new ArrayList<>();
+        for (StationZoneMappingView mapping : mappings) {
+            if (isBlank(mapping.zoneCode())) {
+                unassigned.add(mapping);
+                continue;
+            }
+            CatalogOption zoneOption = zoneOptionsByCode.computeIfAbsent(
+                    mapping.zoneCode(),
+                    code -> new CatalogOption(code, mapping.zoneDisplayName()));
+            grouped.computeIfAbsent(zoneOption, key -> new ArrayList<>()).add(mapping);
+        }
+
+        if (!unassigned.isEmpty()) {
+            grouped.put(new CatalogOption("UNASSIGNED", "Unassigned"), unassigned);
+        }
+
+        return grouped;
     }
 
     // =========================================================================
