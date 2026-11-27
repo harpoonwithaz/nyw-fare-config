@@ -1,5 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
+import org.springframework.test.context.ActiveProfiles;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +39,7 @@ import ca.sfu.cmpt276.nywfareconfig.security.controller.GlobalUserModelAdvice;
 )
 @Import(SecurityConfig.class)
 @WithMockUser(username = "testoperator", roles = {"OPERATOR"})
+@ActiveProfiles("test")
 class PublishingApiControllerTest {
 
     @Autowired

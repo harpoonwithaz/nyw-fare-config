@@ -4,10 +4,15 @@ import java.util.List;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
@@ -18,6 +23,7 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.service.*;
 public class TenantContextController {
 
     private static final String DEFAULT_RETURN_URL = "/fares";
+    private static final Logger log = LoggerFactory.getLogger(TenantContextController.class);
 
     private static final List<String> ALLOWED_PATH_PREFIXES = List.of(
             "/fares",
@@ -41,7 +47,8 @@ public class TenantContextController {
     @PostMapping("/tenant")
     public String switchTenant(
             @RequestParam(name = "tenant", required = false) String tenantCode,
-            @RequestParam(name = "returnUrl", required = false) String returnUrl) {
+            @RequestParam(name = "returnUrl", required = false) String returnUrl,
+            RedirectAttributes redirect) {
 
         if (tenantCode == null || tenantCode.isBlank()) {
             tenantContext.setSelectedTenant(null);
@@ -52,7 +59,16 @@ public class TenantContextController {
                     !tenantContext.getSelectedTenant().getCode().equalsIgnoreCase(tenantCode);
 
             if (isNewTenant) {
-                Tenant resolvedTenant = tenantService.getTenantByCode(tenantCode);
+                Tenant resolvedTenant;
+                try {
+                    resolvedTenant = tenantService.getTenantByCode(tenantCode);
+                } catch (CaracalApiException ex) {
+                    // Caracal down or rejected tenant-get: keep the current tenant and say why in the navbar banner
+                    log.warn("Could not switch to tenant {}", tenantCode, ex);
+                    redirect.addFlashAttribute("caracalTenantErrorMessage",
+                            "Could not switch to " + tenantCode + ". " + ex.getMessage());
+                    return "redirect:" + resolveSafeReturnUrl(returnUrl);
+                }
                 tenantContext.setSelectedTenant(resolvedTenant);
 
                 // Clear secondary filter and selectedDate state when switching tenants

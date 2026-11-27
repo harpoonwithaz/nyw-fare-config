@@ -1,11 +1,14 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.dto;
 
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertText;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 public class AlertForm {
@@ -14,12 +17,8 @@ public class AlertForm {
     private TriggerType triggerType = TriggerType.WEEKENDS;
     private String startDate;
     private String productCode;
-    private String messageEn;
-    private String messageEs;
-    private String confirmLabelEn;
-    private String confirmLabelEs;
-    private String dismissLabelEn;
-    private String dismissLabelEs;
+    // Wording per language code, posted as texts[es].message, texts[es].confirmLabel, ...
+    private Map<String, AlertText> texts = new LinkedHashMap<>();
     private AlertStatus status = AlertStatus.DRAFT;
 
     public static AlertForm from(ServiceAlert alert) {
@@ -28,14 +27,24 @@ public class AlertForm {
         form.triggerType = alert.getTriggerType();
         form.startDate = alert.getStartDate() == null ? null : alert.getStartDate().toString();
         form.productCode = alert.getProductCode();
-        form.messageEn = alert.getMessageEn();
-        form.messageEs = alert.getMessageEs();
-        form.confirmLabelEn = alert.getConfirmLabelEn();
-        form.confirmLabelEs = alert.getConfirmLabelEs();
-        form.dismissLabelEn = alert.getDismissLabelEn();
-        form.dismissLabelEs = alert.getDismissLabelEs();
+        alert.getTexts().forEach((language, text) -> form.texts.put(language,
+                new AlertText(text.getMessage(), text.getConfirmLabel(), text.getDismissLabel())));
+        // Alerts saved before per-language wording only have the English message column
+        if (form.texts.isEmpty() && alert.getPrimaryMessage() != null) {
+            form.texts.put("en", new AlertText(alert.getPrimaryMessage(), null, null));
+        }
         form.status = alert.getStatus();
         return form;
+    }
+
+    // Makes sure every tenant language has a field group to render
+    public void ensureLanguages(List<String> languages) {
+        languages.forEach(language -> texts.computeIfAbsent(language, key -> new AlertText()));
+    }
+
+    // Shortcut for code and tests that set one language at a time
+    public AlertText text(String language) {
+        return texts.computeIfAbsent(language, key -> new AlertText());
     }
 
     public List<String> getRouteKeys() {
@@ -70,52 +79,12 @@ public class AlertForm {
         this.productCode = productCode;
     }
 
-    public String getMessageEn() {
-        return messageEn;
+    public Map<String, AlertText> getTexts() {
+        return texts;
     }
 
-    public void setMessageEn(String messageEn) {
-        this.messageEn = messageEn;
-    }
-
-    public String getMessageEs() {
-        return messageEs;
-    }
-
-    public void setMessageEs(String messageEs) {
-        this.messageEs = messageEs;
-    }
-
-    public String getConfirmLabelEn() {
-        return confirmLabelEn;
-    }
-
-    public void setConfirmLabelEn(String confirmLabelEn) {
-        this.confirmLabelEn = confirmLabelEn;
-    }
-
-    public String getConfirmLabelEs() {
-        return confirmLabelEs;
-    }
-
-    public void setConfirmLabelEs(String confirmLabelEs) {
-        this.confirmLabelEs = confirmLabelEs;
-    }
-
-    public String getDismissLabelEn() {
-        return dismissLabelEn;
-    }
-
-    public void setDismissLabelEn(String dismissLabelEn) {
-        this.dismissLabelEn = dismissLabelEn;
-    }
-
-    public String getDismissLabelEs() {
-        return dismissLabelEs;
-    }
-
-    public void setDismissLabelEs(String dismissLabelEs) {
-        this.dismissLabelEs = dismissLabelEs;
+    public void setTexts(Map<String, AlertText> texts) {
+        this.texts = texts == null ? new LinkedHashMap<>() : texts;
     }
 
     public AlertStatus getStatus() {

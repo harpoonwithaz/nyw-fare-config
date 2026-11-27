@@ -1,8 +1,11 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.controller;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertCatalog;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
@@ -21,6 +25,7 @@ import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertLimits;
 import ca.sfu.cmpt276.nywfareconfig.alert.service.AlertService;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
+import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 
 @Controller
@@ -49,7 +54,18 @@ public class AlertController {
         }
 
         model.addAttribute("alerts", alertService.list(tenantCode, search, parseStatus(status), route));
-        model.addAttribute("routeOptions", alertService.routeOptionsByTerminal(tenantCode));
+        // Route filter is by station (either end of a route), listing only stations some alert covers.
+        // One option per station keeps it short even when an alert covers every route.
+        model.addAttribute("usedStations", alertService.list(tenantCode, null, null, null).stream()
+                .flatMap(alert -> alert.getRouteKeys().stream())
+                .flatMap(key -> Arrays.stream(key.split(":")))
+                .distinct()
+                .sorted()
+                .toList());
+        List<String> languages = languages();
+        model.addAttribute("languages", languages);
+        model.addAttribute("languageNames", languages.stream()
+                .collect(Collectors.toMap(language -> language, AlertLimits::displayName)));
 
         // Keep the filter values so the form shows what was searched
         model.addAttribute("search", search);
@@ -98,13 +114,20 @@ public class AlertController {
     @PostMapping({ "/fares/alerts", "/fares/alerts/{id}" })
     public String save(@PathVariable(required = false) Long id,
             @ModelAttribute("form") AlertForm form,
+            @RequestParam(name = "tenantCode", required = false) String formTenant,
             @AuthenticationPrincipal AppUserDetails user,
             Model model, RedirectAttributes redirect) {
         String tenantCode = tenantCode();
         if (tenantCode == null) {
             return LIST;
         }
-        List<String> errors = alertService.save(tenantCode, id, form, user.getEmail());
+        // The form was opened for another client (switched in another tab): don't save it under this one
+        if (!tenantCode.equals(formTenant)) {
+            redirect.addFlashAttribute("error",
+                    "The client changed after this form was opened, so nothing was saved. Open the alert again and redo the change.");
+            return LIST;
+        }
+        List<String> errors = alertService.save(tenantCode, id, form, user.getEmail(), languages());
         if (!errors.isEmpty()) {
             ServiceAlert alert = id == null ? null : alertService.get(tenantCode, id).orElse(null);
             return showForm(model, tenantCode, alert, form, errors);
@@ -149,7 +172,7 @@ public class AlertController {
             RedirectAttributes redirect) {
         String tenantCode = tenantCode();
         if (tenantCode != null && alertService.archive(tenantCode, id, user.getEmail())) {
-            redirect.addFlashAttribute("success", "Alert archived. Riders will no longer see it.");
+            redirect.addFlashAttribute("success", "Alert archived. Riders will no longer see it, and any unpublished edits to it were discarded.");
         } else {
             redirect.addFlashAttribute("error", "Only active alerts can be archived.");
         }
@@ -158,15 +181,51 @@ public class AlertController {
 
     private String showForm(Model model, String tenantCode, ServiceAlert alert, AlertForm form,
             List<String> errors) {
-        Map<String, ?> routeOptions = alertService.routeOptionsByTerminal(tenantCode);
+        // Sites and tickets come live from Caracal through FareService
+        AlertCatalog catalog = alertService.formCatalog(tenantCode);
+        model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("alert", alert);
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
-        model.addAttribute("routeOptions", routeOptions);
+        model.addAttribute("routeOptions", catalog.routes());
+        model.addAttribute("productOptions", catalog.products());
+        model.addAttribute("catalogMissing", !catalog.loaded());
+        model.addAttribute("noRoutes", catalog.loaded() && catalog.routes().isEmpty());
+        // One field group per tenant language; saved wording in other languages rides along as hidden fields
+        List<String> languages = languages();
+        form.ensureLanguages(languages);
+        Map<String, String> names = new LinkedHashMap<>();
+        Map<String, String> confirmDefaults = new LinkedHashMap<>();
+        Map<String, String> dismissDefaults = new LinkedHashMap<>();
+        for (String language : form.getTexts().keySet()) {
+            names.put(language, AlertLimits.displayName(language));
+            confirmDefaults.put(language, AlertLimits.defaultConfirm(language));
+            dismissDefaults.put(language, AlertLimits.defaultDismiss(language));
+        }
+        Map<String, Map<String, String>> suggestions = new LinkedHashMap<>();
+        for (TriggerType trigger : TriggerType.values()) {
+            suggestions.put(trigger.name(), trigger.getSuggestedConfirm());
+        }
+        model.addAttribute("languages", languages);
+        model.addAttribute("hiddenLanguages", form.getTexts().keySet().stream()
+                .filter(language -> !languages.contains(language)).toList());
+        model.addAttribute("languageNames", names);
+        model.addAttribute("defaultConfirm", confirmDefaults);
+        model.addAttribute("defaultDismiss", dismissDefaults);
+        model.addAttribute("suggestions", suggestions);
         model.addAttribute("triggerTypes", TriggerType.values());
         model.addAttribute("messageMax", AlertLimits.MESSAGE_MAX_LENGTH);
         model.addAttribute("labelMax", AlertLimits.LABEL_MAX_LENGTH);
+        model.addAttribute("maxRoutes", AlertLimits.MAX_ROUTES);
         return "alerts/form";
+    }
+
+    // Alert languages follow the selected tenant's locales from Caracal's tenant-get, main language first
+    private List<String> languages() {
+        Tenant tenant = tenantContext.getSelectedTenant();
+        return tenant == null
+                ? AlertLimits.languagesFor(null, null)
+                : AlertLimits.languagesFor(tenant.getDefaultLocale(), tenant.getSupportedLocales());
     }
 
     private String tenantCode() {

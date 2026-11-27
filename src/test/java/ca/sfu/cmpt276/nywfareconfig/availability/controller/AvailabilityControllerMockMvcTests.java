@@ -1,5 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
+import org.springframework.test.context.ActiveProfiles;
+
 import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.security.AppUserDetails;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
     "spring.session.jdbc.initialize-schema=embedded"
 })
+@ActiveProfiles("test")
 class AvailabilityControllerMockMvcTests {
 
     private static final String TENANT = "NYW_SANDBOX";

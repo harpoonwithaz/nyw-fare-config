@@ -27,8 +27,8 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         this.caracalRestClient = caracalRestClient;
     }
 
-    // TODO: Remove the X-Actor: system header from each api request except
-    // fetchTenants()
+    // Reads (tenant, sites, products, rate tables, price-simulate) go out as X-Actor: system.
+    // Live Caracal answers 403 to operator:<email> on these; operator is for writes (Epic 5 publishing).
 
     // ==============================================================================
     // Catalog Discovery
@@ -61,7 +61,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
 
         CaracalCatalogDtos.TenantDetail response = get(
                 "/tenant-get?tenantCode={tenantCode}",
-                false,
+                true,
                 CaracalCatalogDtos.TenantDetail.class,
                 "loading details for tenant " + tenantCode,
                 tenantCode);
@@ -129,7 +129,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 CaracalCatalogDtos.RateTableGetResponse response = caracalRestClient
                         .post()
                         .uri("/rate-table-get")
-                        .attribute("useSystemActor", false)
+                        .attribute("useSystemActor", true)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(requestPayload)
                         .retrieve()
@@ -180,7 +180,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
                 CaracalSimulationDtos.PriceSimulateResponse response = caracalRestClient
                         .post()
                         .uri("/price-simulate")
-                        .attribute("useSystemActor", false)
+                        .attribute("useSystemActor", true)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(requestPayload)
                         .retrieve()
@@ -217,8 +217,7 @@ public class HttpCaracalApiClient implements CaracalApiClient {
         return execute(actionDescription, () -> caracalRestClient
                 .get()
                 .uri(uri, uriVars)
-                // If using CaracalActorInterceptor, pass the flag as an attribute;
-                // otherwise set .header("X-Actor", ...) directly here.
+                // CaracalActorInterceptor reads this to pick the X-Actor header
                 .attribute("useSystemActor", useSystemActor)
                 .retrieve()
                 .body(responseType));

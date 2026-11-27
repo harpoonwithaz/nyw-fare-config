@@ -1,5 +1,7 @@
 package ca.sfu.cmpt276.nywfareconfig.fare.controller;
 
+import org.springframework.test.context.ActiveProfiles;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +46,7 @@ import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
         "spring.session.jdbc.initialize-schema=embedded"
 })
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class FareControllerMockMvcTests {
 
     private static final AppUserDetails OPERATOR_USER = new AppUserDetails(

@@ -1,13 +1,19 @@
 package ca.sfu.cmpt276.nywfareconfig.alert.service;
 
+import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertCatalog;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertChange;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.AlertForm;
 import ca.sfu.cmpt276.nywfareconfig.alert.dto.RouteOption;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertStatus;
+import ca.sfu.cmpt276.nywfareconfig.alert.model.AlertText;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.ServiceAlert;
 import ca.sfu.cmpt276.nywfareconfig.alert.model.TriggerType;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.RouteScheduleRepository;
 import ca.sfu.cmpt276.nywfareconfig.alert.repository.ServiceAlertRepository;
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
+import ca.sfu.cmpt276.nywfareconfig.fare.dto.CatalogOption;
+import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
+import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +22,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,15 +35,18 @@ import java.util.regex.Pattern;
 @Service
 public class AlertService {
 
-    private static final Pattern ROUTE_KEY = Pattern.compile("^[A-Z0-9]+:[A-Z0-9]+$");
-    private static final Pattern PRODUCT_CODE = Pattern.compile("^[A-Z0-9_]{1,40}$");
+    private static final Pattern ROUTE_KEY = Pattern.compile("^[A-Z0-9_-]+:[A-Z0-9_-]+$");
+    // A suggestion like "Buy for [Day]" that still has its bracketed placeholder in it
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\[[^\\]]*\\]");
 
     private final ServiceAlertRepository alerts;
     private final RouteScheduleRepository schedules;
+    private final FareService fares;
 
-    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules) {
+    public AlertService(ServiceAlertRepository alerts, RouteScheduleRepository schedules, FareService fares) {
         this.alerts = alerts;
         this.schedules = schedules;
+        this.fares = fares;
     }
 
     public List<ServiceAlert> list(String tenantCode, String search, AlertStatus status, String routeKey) {
@@ -47,7 +58,7 @@ public class AlertService {
 
         return alerts.findByTenantCode(tenantCode, Sort.by(Sort.Direction.DESC, "updatedAt")).stream()
                 .filter(a -> status == null || a.getStatus() == status)
-                .filter(a -> route.isEmpty() || a.getRouteKeys().contains(route))
+                .filter(a -> route.isEmpty() || a.getRouteKeys().stream().anyMatch(key -> coversRoute(key, route)))
                 .filter(a -> query.isEmpty() || matchesSearch(a, query))
                 .toList();
     }
@@ -84,8 +95,9 @@ public class AlertService {
         return alert != null && alert.getStatus() == AlertStatus.DRAFT;
     }
 
+    // languages: the tenant's alert languages (AlertLimits.languagesFor), main language first
     @Transactional
-    public List<String> save(String tenantCode, Long id, AlertForm form, String actor) {
+    public List<String> save(String tenantCode, Long id, AlertForm form, String actor, List<String> languages) {
         List<String> errors = new ArrayList<>();
 
         if (isBlank(tenantCode)) {
@@ -99,7 +111,8 @@ public class AlertService {
 
         ServiceAlert existing = null;
         if (id != null) {
-            existing = alerts.findByIdAndTenantCode(id, tenantCode).orElse(null);
+            // Locked so two saves on the same live alert can't each create a draft copy
+            existing = alerts.lockByIdAndTenantCode(id, tenantCode).orElse(null);
             if (existing == null) {
                 errors.add("That alert no longer exists.");
                 return errors;
@@ -123,38 +136,68 @@ public class AlertService {
         }
 
         String productCode = clean(form.getProductCode());
-        if (productCode != null) {
-            productCode = productCode.toUpperCase();
-            if (!PRODUCT_CODE.matcher(productCode).matches()) {
-                errors.add("The ticket code may only contain letters, numbers and underscores, up to "
-                        + AlertLimits.PRODUCT_CODE_MAX_LENGTH + " characters.");
-            }
+        if (productCode != null && productCode.length() > AlertLimits.PRODUCT_CODE_MAX_LENGTH) {
+            errors.add("The ticket code must be " + AlertLimits.PRODUCT_CODE_MAX_LENGTH + " characters or fewer.");
         }
 
-        String messageEn = clean(form.getMessageEn());
-        if (messageEn == null) {
-            errors.add("English message is required.");
+        // Wording per language. The tenant's first language must have a message; languages the tenant
+        // no longer lists are kept as posted (the form sends them back as hidden fields).
+        List<String> langs = languages == null || languages.isEmpty()
+                ? List.of(AlertLimits.FALLBACK_LANGUAGE) : languages;
+        String primaryLanguage = langs.get(0);
+        Map<String, AlertText> texts = new LinkedHashMap<>();
+        for (Map.Entry<String, AlertText> entry : form.getTexts().entrySet()) {
+            AlertText posted = entry.getValue() == null ? new AlertText() : entry.getValue();
+            texts.put(entry.getKey(), new AlertText(clean(posted.getMessage()),
+                    clean(posted.getConfirmLabel()), clean(posted.getDismissLabel())));
         }
-        String messageEs = clean(form.getMessageEs());
-        String confirmEn = clean(form.getConfirmLabelEn());
-        String confirmEs = clean(form.getConfirmLabelEs());
-        String dismissEn = clean(form.getDismissLabelEn());
-        String dismissEs = clean(form.getDismissLabelEs());
-
-        if (tooLong(messageEn, AlertLimits.MESSAGE_MAX_LENGTH)) {
+        String primaryMessage = texts.containsKey(primaryLanguage) ? texts.get(primaryLanguage).getMessage() : null;
+        if (primaryMessage == null) {
+            errors.add("Message in " + AlertLimits.displayName(primaryLanguage) + " is required.");
+        }
+        boolean messageTooLong = false;
+        boolean labelTooLong = false;
+        boolean placeholderLeft = false;
+        for (AlertText text : texts.values()) {
+            messageTooLong |= tooLong(text.getMessage(), AlertLimits.MESSAGE_MAX_LENGTH);
+            labelTooLong |= tooLong(text.getConfirmLabel(), AlertLimits.LABEL_MAX_LENGTH)
+                    || tooLong(text.getDismissLabel(), AlertLimits.LABEL_MAX_LENGTH);
+            placeholderLeft |= hasPlaceholder(text.getConfirmLabel()) || hasPlaceholder(text.getDismissLabel());
+        }
+        if (messageTooLong) {
             errors.add("Message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
         }
-        if (tooLong(messageEs, AlertLimits.MESSAGE_MAX_LENGTH)) {
-            errors.add("Spanish message must be " + AlertLimits.MESSAGE_MAX_LENGTH + " characters or fewer.");
-        }
-        if (tooLong(confirmEn, AlertLimits.LABEL_MAX_LENGTH) || tooLong(confirmEs, AlertLimits.LABEL_MAX_LENGTH)
-                || tooLong(dismissEn, AlertLimits.LABEL_MAX_LENGTH)
-                || tooLong(dismissEs, AlertLimits.LABEL_MAX_LENGTH)) {
+        if (labelTooLong) {
             errors.add("Label must be " + AlertLimits.LABEL_MAX_LENGTH + " characters or fewer.");
+        }
+        if (placeholderLeft) {
+            errors.add("Replace the placeholder in brackets, like [Day], in the button label before saving.");
+        }
+
+        // A ticket that has since been retired stays allowed when it is the one already saved on this alert
+        String savedProduct = existing == null ? null : existing.getProductCode();
+        if (!routeKeys.isEmpty() || productCode != null) {
+            try {
+                productCode = checkCatalog(tenantCode, routeKeys, productCode, savedProduct, errors);
+            } catch (CaracalApiException ex) {
+                errors.add("The Caracal catalog is not available right now. Try again in a moment.");
+            }
         }
 
         if (!errors.isEmpty()) {
             return errors;
+        }
+
+        // Blank labels fall back to the defaults so the popup never shows an empty button
+        // Blank labels get the default for each tenant language so the popup never shows an empty button
+        for (String language : langs) {
+            AlertText text = texts.computeIfAbsent(language, key -> new AlertText());
+            if (text.getConfirmLabel() == null) {
+                text.setConfirmLabel(AlertLimits.defaultConfirm(language));
+            }
+            if (text.getDismissLabel() == null) {
+                text.setDismissLabel(AlertLimits.defaultDismiss(language));
+            }
         }
 
         ServiceAlert target;
@@ -178,12 +221,8 @@ public class AlertService {
         target.setTriggerType(trigger);
         target.setStartDate(startDate);
         target.setProductCode(productCode);
-        target.setMessageEn(messageEn);
-        target.setMessageEs(messageEs);
-        target.setConfirmLabelEn(confirmEn);
-        target.setConfirmLabelEs(confirmEs);
-        target.setDismissLabelEn(dismissEn);
-        target.setDismissLabelEs(dismissEs);
+        target.setPrimaryMessage(primaryMessage);
+        target.setTexts(texts);
         target.setStatus(AlertStatus.DRAFT);
         target.setUpdatedBy(actor);
 
@@ -204,17 +243,32 @@ public class AlertService {
             return errors;
         }
 
+        // Drafts are locked, so a second "Make active" on the same draft waits and then sees it is no longer a draft.
+        // ponytail: publish locks draft then live alert, archive locks live alert then draft; Postgres aborts one
+        // if both hit the same alert in the same instant. Lock in one fixed order if that ever shows up.
         List<ServiceAlert> drafts = new ArrayList<>();
+        Map<Long, ServiceAlert> replaced = new LinkedHashMap<>();
         for (Long alertId : new LinkedHashSet<>(ids)) {
             Optional<ServiceAlert> found = alertId == null
                     ? Optional.empty()
-                    : alerts.findByIdAndTenantCode(alertId, tenantCode);
+                    : alerts.lockByIdAndTenantCode(alertId, tenantCode);
             if (found.isEmpty()) {
                 errors.add("Alert " + alertId + " was not found.");
             } else if (found.get().getStatus() != AlertStatus.DRAFT) {
                 errors.add("Alert " + alertId + " is not a draft.");
             } else {
-                drafts.add(found.get());
+                ServiceAlert draft = found.get();
+                if (draft.getReplacesAlertId() != null) {
+                    ServiceAlert old = alerts.lockByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
+                            .filter(a -> a.getStatus() == AlertStatus.ACTIVE)
+                            .orElse(null);
+                    if (old == null) {
+                        errors.add("Alert " + alertId + " edits a live alert that is no longer active. Delete this draft.");
+                        continue;
+                    }
+                    replaced.put(draft.getId(), old);
+                }
+                drafts.add(draft);
             }
         }
         if (!errors.isEmpty()) {
@@ -223,15 +277,12 @@ public class AlertService {
 
         Instant now = Instant.now();
         for (ServiceAlert draft : drafts) {
-            if (draft.getReplacesAlertId() != null) {
-                alerts.findByIdAndTenantCode(draft.getReplacesAlertId(), tenantCode)
-                        .filter(old -> old.getStatus() == AlertStatus.ACTIVE)
-                        .ifPresent(old -> {
-                            old.setStatus(AlertStatus.ARCHIVED);
-                            old.setArchivedBy(actor);
-                            old.setArchivedAt(now);
-                            alerts.save(old);
-                        });
+            ServiceAlert old = replaced.get(draft.getId());
+            if (old != null) {
+                old.setStatus(AlertStatus.ARCHIVED);
+                old.setArchivedBy(actor);
+                old.setArchivedAt(now);
+                alerts.save(old);
             }
             draft.setStatus(AlertStatus.ACTIVE);
             draft.setPublishedBy(actor);
@@ -246,7 +297,7 @@ public class AlertService {
         if (isBlank(tenantCode) || id == null) {
             return false;
         }
-        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        Optional<ServiceAlert> found = alerts.lockByIdAndTenantCode(id, tenantCode);
         if (found.isEmpty() || found.get().getStatus() != AlertStatus.ACTIVE) {
             return false;
         }
@@ -255,6 +306,9 @@ public class AlertService {
         alert.setArchivedBy(actor);
         alert.setArchivedAt(Instant.now());
         alerts.save(alert);
+        // Unpublished edits of an archived alert have nothing left to replace, so they go too
+        alerts.findFirstByReplacesAlertIdAndTenantCodeAndStatus(id, tenantCode, AlertStatus.DRAFT)
+                .ifPresent(alerts::delete);
         return true;
     }
 
@@ -263,7 +317,7 @@ public class AlertService {
         if (isBlank(tenantCode) || id == null) {
             return false;
         }
-        Optional<ServiceAlert> found = alerts.findByIdAndTenantCode(id, tenantCode);
+        Optional<ServiceAlert> found = alerts.lockByIdAndTenantCode(id, tenantCode);
         if (found.isEmpty() || !isDeletable(found.get())) {
             return false;
         }
@@ -271,11 +325,94 @@ public class AlertService {
         return true;
     }
 
-    public Map<String, List<RouteOption>> routeOptionsByTerminal(String tenantCode) {
+    // Routes (grouped by origin, keyed by the heading shown on the page, e.g. "Pier 11 (PIER11)") and tickets
+    // for the alert form, with a flag for whether Caracal answered both
+    public AlertCatalog formCatalog(String tenantCode) {
+        if (isBlank(tenantCode)) {
+            return new AlertCatalog(new LinkedHashMap<>(), List.of(), false);
+        }
+        boolean loaded = true;
+        Map<String, List<RouteOption>> routes = new LinkedHashMap<>();
+        List<CatalogOption> products = List.of();
+        try {
+            routes = buildRoutes(sites(tenantCode));
+        } catch (CaracalApiException ex) {
+            loaded = false;
+        }
+        try {
+            products = fares.getOdProducts(tenantCode);
+        } catch (CaracalApiException ex) {
+            loaded = false;
+        }
+        return new AlertCatalog(routes, products, loaded);
+    }
+
+    private List<CatalogOption> sites(String tenantCode) {
+        return fares.getSecondaryFilterOptions(tenantCode, GridMode.OD);
+    }
+
+    // ponytail: every pair of sites, not only routes Caracal actually serves; swap in a served-routes lookup when one exists
+    private static Map<String, List<RouteOption>> buildRoutes(List<CatalogOption> siteList) {
+        List<CatalogOption> sorted = siteList.stream()
+                .sorted(Comparator.comparing(AlertService::nameOf, String.CASE_INSENSITIVE_ORDER))
+                .toList();
         Map<String, List<RouteOption>> options = new LinkedHashMap<>();
-        options.put("PIER11", List.of(new RouteOption("PIER11", "HOB14ST", "PIER11 to HOB14ST")));
-        options.put("HOB14ST", List.of(new RouteOption("HOB14ST", "PIER11", "HOB14ST to PIER11")));
+        for (CatalogOption origin : sorted) {
+            List<RouteOption> routes = new ArrayList<>();
+            for (CatalogOption destination : sorted) {
+                if (!origin.code().equals(destination.code())) {
+                    routes.add(new RouteOption(origin.code(), destination.code(),
+                            nameOf(origin) + " to " + nameOf(destination)));
+                }
+            }
+            if (!routes.isEmpty()) {
+                options.put(nameOf(origin) + " (" + origin.code() + ")", routes);
+            }
+        }
         return options;
+    }
+
+    private static String nameOf(CatalogOption option) {
+        return isBlank(option.displayName()) ? option.code() : option.displayName();
+    }
+
+    private String checkCatalog(String tenantCode, Set<String> routeKeys, String productCode, String savedProduct,
+            List<String> errors) {
+        if (!routeKeys.isEmpty()) {
+            Set<String> siteCodes = new HashSet<>();
+            for (CatalogOption site : sites(tenantCode)) {
+                siteCodes.add(site.code());
+            }
+            Set<String> unknownSites = new LinkedHashSet<>();
+            for (String key : routeKeys) {
+                String[] parts = key.split(":");
+                if (parts.length != 2) {
+                    continue;
+                }
+                for (String part : parts) {
+                    if (!siteCodes.contains(part)) {
+                        unknownSites.add(part);
+                    }
+                }
+            }
+            for (String code : unknownSites) {
+                errors.add("Unknown site code: " + code + ".");
+            }
+        }
+
+        if (productCode == null || productCode.length() > AlertLimits.PRODUCT_CODE_MAX_LENGTH) {
+            return productCode;
+        }
+        if (productCode.equalsIgnoreCase(savedProduct)) {
+            return savedProduct;
+        }
+        for (CatalogOption product : fares.getOdProducts(tenantCode)) {
+            if (product.code().equalsIgnoreCase(productCode)) {
+                return product.code();
+            }
+        }
+        errors.add("Unknown ticket: " + productCode + ".");
+        return productCode;
     }
 
     private Set<String> cleanRouteKeys(List<String> raw, List<String> errors) {
@@ -325,15 +462,27 @@ public class AlertService {
         }
     }
 
+    // Filter value is either a full route (PIER11:HOB14ST) or one station (PIER11), matching either end
+    private static boolean coversRoute(String key, String filter) {
+        if (filter.contains(":")) {
+            return key.equals(filter);
+        }
+        return key.startsWith(filter + ":") || key.endsWith(":" + filter);
+    }
+
     private boolean matchesSearch(ServiceAlert alert, String query) {
-        return contains(alert.getMessageEn(), query)
-                || contains(alert.getMessageEs(), query)
+        return contains(alert.getPrimaryMessage(), query)
+                || alert.getTexts().values().stream().anyMatch(text -> contains(text.getMessage(), query))
                 || contains(alert.getProductCode(), query)
                 || alert.getRouteKeys().stream().anyMatch(key -> contains(key, query));
     }
 
     private static boolean contains(String value, String query) {
         return value != null && value.toLowerCase().contains(query);
+    }
+
+    private static boolean hasPlaceholder(String value) {
+        return value != null && PLACEHOLDER.matcher(value).find();
     }
 
     private static boolean tooLong(String value, int max) {

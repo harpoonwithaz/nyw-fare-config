@@ -23,6 +23,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.TenantContext;
 import ca.sfu.cmpt276.nywfareconfig.tenant.service.TenantService;
@@ -50,6 +51,23 @@ class TenantContextControllerTest {
         tenant.setDisplayName(displayName);
         tenant.setActive(true);
         return tenant;
+    }
+
+    @Test
+    void switchTenant_CaracalErrorKeepsCurrentTenantAndShowsBanner() throws Exception {
+        Tenant current = createTenant("NYW_SANDBOX", "New York Waterway");
+        tenantContext.setSelectedTenant(current);
+        when(tenantService.getTenantByCode("METRA"))
+                .thenThrow(new CaracalApiException("Caracal API error (403) while loading details for tenant METRA."));
+
+        mockMvc.perform(post("/context/tenant").param("tenant", "METRA").param("returnUrl", "/fares/alerts"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/fares/alerts"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("caracalTenantErrorMessage",
+                                "Could not switch to METRA. Caracal API error (403) while loading details for tenant METRA."));
+
+        assertSame(current, tenantContext.getSelectedTenant());
     }
 
     @Test
@@ -106,7 +124,7 @@ class TenantContextControllerTest {
         tenantContext.setSelectedTenant(nyw);
         tenantContext.setSecondaryFilter("EDGEWTR");
 
-        String view = controller.switchTenant(blankTenant, "/fares");
+        String view = controller.switchTenant(blankTenant, "/fares", new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap());
 
         assertEquals("redirect:/fares", view);
         assertNull(tenantContext.getSelectedTenant());
@@ -166,7 +184,7 @@ class TenantContextControllerTest {
         "http://[::1"
     })
     void switchTenant_WithUnsafeOrDisallowedReturnUrl_FallsBackToDefaultFaresUrl(String unsafeUrl) {
-        String result = controller.switchTenant(null, unsafeUrl);
+        String result = controller.switchTenant(null, unsafeUrl, new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap());
         assertEquals("redirect:/fares", result);
     }
 }
