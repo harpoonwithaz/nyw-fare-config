@@ -31,6 +31,7 @@ import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.repository.FareDraftRepository;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.ConfigurationChangeTracker;
 
 @ExtendWith(MockitoExtension.class)
 class FareDraftServiceTests {
@@ -49,7 +50,7 @@ class FareDraftServiceTests {
 
     @BeforeEach
     void setUp() {
-        fareDraftService = new FareDraftService(fareDraftRepository, fareService, actorService);
+        fareDraftService = new FareDraftService(fareDraftRepository, fareService, actorService, new ConfigurationChangeTracker());
         nywTenant = new Tenant("NYW_SANDBOX", "NY Waterway", "USD", "en-US", GridMode.OD, true, List.of());
         lenient().when(actorService.currentActorHeader()).thenReturn("operator:operator@nyw.com");
     }

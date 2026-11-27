@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AvailabilityRuleRepository extends JpaRepository<AvailabilityRule, Long> {
-    List<AvailabilityRule> findByTenantCodeAndSiteCode(String tenantCode, String siteCode);
-    Optional<AvailabilityRule> findByTenantCodeAndSiteCodeAndProductCode(String tenantCode, String siteCode, String productCode);
     List<AvailabilityRule> findByTenantCode(String tenantCode);
+    List<AvailabilityRule> findByTenantCodeAndPendingPublishTrue(String tenantCode);
+    List<AvailabilityRule> findByTenantCodeAndSiteCode(String tenantCode, String siteCode);
+    List<AvailabilityRule> findByTenantCodeAndSiteCodeAndRouteCode(String tenantCode, String siteCode, String routeCode);
+    Optional<AvailabilityRule> findByTenantCodeAndSiteCodeAndRouteCodeAndProductCode(
+            String tenantCode, String siteCode, String routeCode, String productCode);
 }

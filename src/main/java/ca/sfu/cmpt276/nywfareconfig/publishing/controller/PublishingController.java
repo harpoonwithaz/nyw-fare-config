@@ -5,7 +5,9 @@ import java.util.List;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.Authentication;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
@@ -26,9 +28,12 @@ public class PublishingController {
     }
 
     @GetMapping("/publishing/review")
-    public String showReviewPage(Model model) {
+    public String showReviewPage(
+            Model model,
+            Authentication authentication) {
 
-        Tenant selectedTenant = tenantContext.getSelectedTenant();
+        Tenant selectedTenant =
+                tenantContext.getSelectedTenant();
 
         String tenantCode = selectedTenant != null
                 ? selectedTenant.getCode()
@@ -37,18 +42,38 @@ public class PublishingController {
         List<ConfigurationChangeView> fareChanges =
                 stagingService.getConfigurationChanges(tenantCode);
 
-        long pendingCount = fareChanges.size();
+        List<AvailabilityRule> availabilityChanges =
+                stagingService.getPendingAvailabilityChanges(tenantCode);
+
+        long totalCount =
+                fareChanges.size() + availabilityChanges.size();
+
+        long changedCount = fareChanges.stream()
+                .filter(ConfigurationChangeView::isChanged)
+                .count();
+
+        long unchangedCount =
+                fareChanges.size() - changedCount;
 
         model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("pendingChanges", fareChanges);
+        model.addAttribute("availabilityChanges", availabilityChanges);
+        model.addAttribute("availabilityCount", availabilityChanges.size());
+        model.addAttribute("totalCount", totalCount);
+        model.addAttribute("changedCount", changedCount);
+        model.addAttribute("unchangedCount", unchangedCount);
 
-        model.addAttribute("totalCount", pendingCount);
-        model.addAttribute("changedCount", pendingCount);
-        model.addAttribute("unchangedCount", 0);
+        boolean canPublish = authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                        .anyMatch(authority ->
+                                "ROLE_CLIENT_SERVICES".equals(
+                                        authority.getAuthority()));
+
+        model.addAttribute("canPublish", canPublish);
 
         return "publishing/review";
     }
 }
-
 
 

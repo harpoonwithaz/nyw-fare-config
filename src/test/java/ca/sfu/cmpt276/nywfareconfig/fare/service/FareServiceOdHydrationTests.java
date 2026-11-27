@@ -126,10 +126,10 @@ class FareServiceOdHydrationTests {
         // WEEKEND_TICKET has both a NOT_SOLD fallback and a VALUE assignment -> should be simulated
         when(caracalApiClient.fetchRateTable(new RateTableGetRequest("NYW_SANDBOX", "RT-MIDTOWN")))
                 .thenReturn(Optional.of(List.of(
-                        new RateAssignmentSummary("ADULT_ONEWAY", "VALUE", "PRS_ADULT"),
-                        new RateAssignmentSummary("SENIOR_ONEWAY", "NOT_SOLD", null),
-                        new RateAssignmentSummary("WEEKEND_TICKET", "NOT_SOLD", null),
-                        new RateAssignmentSummary("WEEKEND_TICKET", "VALUE", "PRS_WEEKEND"))));
+                        new RateAssignmentSummary("assignment-1", "ADULT_ONEWAY", "VALUE", "PRS_ADULT"),
+                        new RateAssignmentSummary("assignment-2", "SENIOR_ONEWAY", "NOT_SOLD", null),
+                        new RateAssignmentSummary("assignment-3", "WEEKEND_TICKET", "NOT_SOLD", null),
+                        new RateAssignmentSummary("assignment-4", "WEEKEND_TICKET", "VALUE", "PRS_WEEKEND"))));
 
         String expectedAt = "2026-10-20T10:00:00-04:00";
 
@@ -219,7 +219,7 @@ class FareServiceOdHydrationTests {
                 new SiteSummary("EDGEWTR", "Edgewater", NY_ZONE)));
         when(caracalApiClient.fetchRateTable(new RateTableGetRequest("NYW_SANDBOX", "RT-MIDTOWN")))
                 .thenReturn(Optional.of(List.of(
-                        new RateAssignmentSummary("ADULT_ONEWAY", "VALUE", "PRS_ADULT"))));
+                        new RateAssignmentSummary("assignment-1", "ADULT_ONEWAY", "VALUE", "PRS_ADULT"))));
         when(caracalApiClient.simulatePrice(any())).thenReturn(new PriceSimulationResult(
                 new PriceSimulateResponse(new PricingDetail("PRS_ADULT", new BigDecimal("13.25"), new BigDecimal("13.25"))),
                 null));

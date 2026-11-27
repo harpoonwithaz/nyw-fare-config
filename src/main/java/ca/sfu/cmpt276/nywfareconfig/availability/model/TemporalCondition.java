@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -21,7 +22,7 @@ public class TemporalCondition {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "temporal_condition_days", joinColumns = @JoinColumn(name = "condition_id"))
     @Column(name = "day_of_week")
-    private List<Integer> daysOfWeek; // 1 = Mon, 7 = Sun
+    private List<Integer> daysOfWeek = new ArrayList<>(); // 1 = Mon, 7 = Sun
 
     private LocalTime startTime;
     private LocalTime endTime;
@@ -51,7 +52,6 @@ public class TemporalCondition {
         return true;
     }
 
-    // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -62,7 +62,9 @@ public class TemporalCondition {
     public void setConditionType(String conditionType) { this.conditionType = conditionType; }
 
     public List<Integer> getDaysOfWeek() { return daysOfWeek; }
-    public void setDaysOfWeek(List<Integer> daysOfWeek) { this.daysOfWeek = daysOfWeek; }
+    public void setDaysOfWeek(List<Integer> daysOfWeek) {
+        this.daysOfWeek = daysOfWeek != null ? new ArrayList<>(daysOfWeek) : new ArrayList<>();
+    }
 
     public LocalTime getStartTime() { return startTime; }
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
