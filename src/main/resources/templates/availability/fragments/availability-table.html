@@ -3,32 +3,47 @@
 <body>
 
 <div th:fragment="availabilityTable" class="table-responsive">
-    <table class="table table-bordered align-middle mb-0 text-center availability-table" id="availabilityTable">
+    <table class="table table-bordered align-middle mb-0 text-center availability-table"
+           id="availabilityTable"
+           th:data-site="${siteCode}"
+           th:data-dest="${destCode}"
+           th:data-route="${routeCode}">
         <thead class="table-light">
             <tr>
                 <th scope="col" class="text-secondary small text-uppercase text-start ps-3"
-                    style="min-width: 180px;">
-                    Product Category
+                    style="min-width: 210px;">
+                    Ticket Product
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 150px;">
                     Offering Status
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
-                    Disabled Days / Constraints
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 180px;">
+                    Active Window / Constraints
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 140px;">
                     Staging Status
                 </th>
-                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 130px;">
+                <th scope="col" class="text-secondary small text-uppercase" style="min-width: 120px;">
                     Actions
                 </th>
             </tr>
         </thead>
         <tbody>
-            <tr th:each="prod : ${availabilityView.ticketProducts}" th:data-product="${prod}" th:data-site="${siteCode}">
+            <tr th:each="prod : ${availabilityView.ticketProducts}"
+                th:data-product="${prod}"
+                th:data-site="${siteCode}"
+                th:data-route="${routeCode}"
+                th:data-condition-type="${availabilityView.getConditionType(prod)}"
+                th:data-days="${availabilityView.getDaysCsv(prod)}"
+                th:data-start-time="${availabilityView.getStartTimeValue(prod)}"
+                th:data-end-time="${availabilityView.getEndTimeValue(prod)}"
+                th:data-start-date="${availabilityView.getStartDateValue(prod)}"
+                th:data-end-date="${availabilityView.getEndDateValue(prod)}">
+
                 <td class="table-light text-secondary fw-semibold text-start ps-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <span th:text="${prod}">ADULT_ONEWAY</span>
+                    <div class="d-flex flex-column">
+                        <span class="text-dark" th:text="${availabilityView.getProductDisplayName(prod)}">Adult One-Way</span>
+                        <small class="text-muted font-monospace" th:text="${prod}">ADULT_ONEWAY</small>
                     </div>
                 </td>
 
@@ -46,6 +61,11 @@
                             Available
                         </label>
                     </div>
+                    <div th:if="${availabilityView.getCaracalStatus(prod) == 'OUTSIDE_WINDOW'}" class="mt-1">
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                            Closed on Selected Date
+                        </span>
+                    </div>
                 </td>
 
                 <td class="py-2 px-3">
@@ -59,13 +79,19 @@
                 </td>
 
                 <td class="py-2 px-3">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
+                    <span th:if="${availabilityView.isSavedInDb(prod)}"
+                          class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1 staged-badge">
+                        <i class="bi bi-database-check me-1"></i>Saved in DB
+                    </span>
+                    <span th:unless="${availabilityView.isSavedInDb(prod)}"
+                          class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 staged-badge">
                         <i class="bi bi-check-circle-fill me-1"></i>Live/Synced
                     </span>
                 </td>
 
                 <td class="py-2 px-3">
-                    <button class="btn btn-sm btn-outline-secondary btn-configure-rule"
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary btn-configure-rule"
                             th:data-product="${prod}"
                             data-bs-toggle="modal"
                             data-bs-target="#conditionBuilderModal"
