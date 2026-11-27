@@ -3,18 +3,21 @@ package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos.PriceSimulateRequest;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -23,6 +26,7 @@ public class ValidationService {
 
     private final ObjectMapper objectMapper;
     private final CaracalApiClient caracalApiClient;
+    private final String referenceSheetPath;
 
     private static final String WEEKDAY =
             "2026-10-20T12:00:00-04:00";
@@ -71,10 +75,13 @@ public class ValidationService {
 
     public ValidationService(
             ObjectMapper objectMapper,
-            CaracalApiClient caracalApiClient) {
+            CaracalApiClient caracalApiClient,
+            @Value("${caracal.api.nyw-sheet-path}")
+            String referenceSheetPath) {
 
         this.objectMapper = objectMapper;
         this.caracalApiClient = caracalApiClient;
+        this.referenceSheetPath = referenceSheetPath;
     }
 
     // ============================================================
@@ -108,14 +115,15 @@ public class ValidationService {
 
     public JsonNode loadReferenceSheet() {
 
-        try (InputStream input =
-                getClass().getResourceAsStream(
-                        "/data/nyw-sheet-2026-09-25.json")) {
+        Path path = Path.of(referenceSheetPath);
 
-            if (input == null) {
-                throw new IllegalStateException(
-                        "NYW reference sheet not found.");
-            }
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalStateException(
+                    "NYW reference sheet not found at: "
+                            + path.toAbsolutePath());
+        }
+
+        try (InputStream input = Files.newInputStream(path)) {
 
             JsonNode sheet = objectMapper.readTree(input);
 
@@ -128,9 +136,10 @@ public class ValidationService {
 
             return sheet;
 
-        } catch (IOException e) {
+        } catch (IOException | JacksonException e) {
             throw new IllegalStateException(
-                    "Failed to load NYW reference sheet.", e);
+                    "Failed to load NYW reference sheet from: "
+                            + path.toAbsolutePath(), e);
         }
     }
 
@@ -310,16 +319,17 @@ public class ValidationService {
         }
 
         if (!result.isSuccess()) {
-                Integer status = result.statusCode();
 
-                if (status != null &&
-                        (status == 404 || status == 409 || status == 422)) {
-                    return null;
-                }
+            Integer status = result.statusCode();
 
-                throw new IllegalStateException(
-                        "Unexpected Caracal simulation error: "
-                        + result.errorMessage());
+            if (status != null &&
+                    (status == 404 || status == 409 || status == 422)) {
+                return null;
+            }
+
+            throw new IllegalStateException(
+                    "Unexpected Caracal simulation error: "
+                    + result.errorMessage());
         }
 
         BigDecimal total = result.response().pricing().total();

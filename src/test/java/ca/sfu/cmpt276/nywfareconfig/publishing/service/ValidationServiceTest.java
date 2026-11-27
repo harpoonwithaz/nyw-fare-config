@@ -4,11 +4,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.caracal.dto.CaracalSimulationDtos;
@@ -20,14 +24,48 @@ class ValidationServiceTest {
 
     private CaracalApiClient caracalApiClient;
     private ValidationService validationService;
+    private Path referenceSheetPath;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
+
         caracalApiClient = mock(CaracalApiClient.class);
+
+        referenceSheetPath = tempDir.resolve("test-nyw-sheet.json");
+
+        // Synthetic reference data for automated testing.
+        // Does not depend on the employer-provided spreadsheet.
+        Files.writeString(referenceSheetPath, """
+                {
+                    "machines": [
+                        {
+                            "originSiteCode": "EDGEWTR",
+                            "routes": [
+                                {
+                                    "destSiteCode": "MIDTOWN",
+                                    "fares": {
+                                        "ADULT": 10.00,
+                                        "CHILD": 5.00,
+                                        "SENIOR": null,
+                                        "BIKE": null,
+                                        "TEN_TRIP": 90.00,
+                                        "MONTHLY": 300.00,
+                                        "WEEKEND": 8.00
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+                """);
 
         validationService = new ValidationService(
                 new ObjectMapper(),
-                caracalApiClient
+                caracalApiClient,
+                referenceSheetPath.toString()
         );
 
         // Default: Caracal reports that a fare is unavailable.
@@ -73,10 +111,55 @@ class ValidationServiceTest {
     }
 
     @Test
+    void missingReferenceSheetShouldThrowException() throws IOException {
+
+        Files.delete(referenceSheetPath);
+
+        var exception = assertThrows(
+                IllegalStateException.class,
+                () -> validationService.loadReferenceSheet()
+        );
+
+        assertTrue(exception.getMessage().contains(
+                "NYW reference sheet not found"
+        ));
+    }
+
+    @Test
+    void malformedReferenceSheetShouldThrowException() throws IOException {
+
+        Files.writeString(referenceSheetPath, "{ invalid json");
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> validationService.loadReferenceSheet()
+        );
+    }
+
+    @Test
+    void invalidReferenceSheetShouldThrowException() throws IOException {
+
+        Files.writeString(referenceSheetPath, """
+                {
+                    "invalid": []
+                }
+                """);
+
+        var exception = assertThrows(
+                IllegalStateException.class,
+                () -> validationService.loadReferenceSheet()
+        );
+
+        assertTrue(exception.getMessage().contains(
+                "Invalid NYW reference sheet"
+        ));
+    }
+
+    @Test
     void matchingFaresShouldHaveNoDiscrepancies() {
         List<ValidationService.Discrepancy> result =
                 validationService.compareFare(
-                        "EDGEWTR→MIDTOWN",
+                        "EDGEWTR\u2192MIDTOWN",
                         "ADULT",
                         new BigDecimal("13.25"),
                         new BigDecimal("13.25")
@@ -88,7 +171,7 @@ class ValidationServiceTest {
     @Test
     void differentPricesShouldProducePriceDiscrepancy() {
         var result = validationService.compareFare(
-                "EDGEWTR→MIDTOWN",
+                "EDGEWTR\u2192MIDTOWN",
                 "ADULT",
                 new BigDecimal("13.25"),
                 new BigDecimal("14.00")
@@ -103,7 +186,7 @@ class ValidationServiceTest {
     @Test
     void platformSellingUnavailableTicketShouldBeDetected() {
         var result = validationService.compareFare(
-                "PORTIMP→MIDTOWN",
+                "PORTIMP\u2192MIDTOWN",
                 "SENIOR",
                 null,
                 new BigDecimal("5.40")
@@ -119,7 +202,7 @@ class ValidationServiceTest {
     @Test
     void platformMissingExpectedTicketShouldBeDetected() {
         var result = validationService.compareFare(
-                "PAULSHK→BELFORD",
+                "PAULSHK\u2192BELFORD",
                 "ADULT",
                 new BigDecimal("23.00"),
                 null
@@ -135,7 +218,7 @@ class ValidationServiceTest {
     @Test
     void bothUnavailableShouldHaveNoDiscrepancies() {
         var result = validationService.compareFare(
-                "EDGEWTR→MIDTOWN",
+                "EDGEWTR\u2192MIDTOWN",
                 "BIKE",
                 null,
                 null
@@ -149,7 +232,7 @@ class ValidationServiceTest {
         var routes = validationService.getGroupedReferenceRoutes();
 
         assertFalse(routes.isEmpty());
-        assertTrue(routes.containsKey("EDGEWTR→MIDTOWN"));
+        assertTrue(routes.containsKey("EDGEWTR\u2192MIDTOWN"));
     }
 
     @Test
@@ -192,7 +275,7 @@ class ValidationServiceTest {
                 discrepancy ->
                         discrepancy.category().equals("SALE WINDOW DIFFERS")
                         && discrepancy.ticketType().equals("MONTHLY")
-                        && discrepancy.route().equals("EDGEWTR→MIDTOWN")
+                        && discrepancy.route().equals("EDGEWTR\u2192MIDTOWN")
         ));
     }
 }
