@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 import ca.sfu.cmpt276.nywfareconfig.caracal.exception.CaracalApiException;
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 
-// Sets X-Actor on every Caracal call. Requests marked with the useSystemActor attribute
-// (like tenant-list, which runs before anyone picks a tenant) go out as "system";
-// everything else is sent as the signed-in operator.
+// Sets X-Actor on every Caracal call. Requests marked with the useSystemActor attribute (all the
+// read calls in HttpCaracalApiClient) go out as "system"; everything else, i.e. writes such as
+// publishing, is sent as the signed-in operator.
 @Component
 public class CaracalActorInterceptor implements ClientHttpRequestInterceptor {
 
