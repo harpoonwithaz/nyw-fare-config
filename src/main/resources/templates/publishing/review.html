@@ -100,20 +100,49 @@
                         <!-- Pending Change Counters -->
                         <div class="row g-3 mb-4">
 
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="card shadow-sm h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted">Total Pending Changes</h6>
-                                        <h2 id="totalItemsCount" class="mb-0">&mdash;</h2>
+                                        <h6 class="text-muted">
+                                            Total Pending Changes
+                                        </h6>
+
+                                        <h2 id="totalItemsCount"
+                                            class="mb-0"
+                                            th:attr="data-availability-count=${availabilityCount}">
+                                            &mdash;
+                                        </h2>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="card shadow-sm h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted">Fare Changes</h6>
-                                        <h2 id="changedItemsCount" class="text-warning mb-0">&mdash;</h2>
+                                        <h6 class="text-muted">
+                                            Fare Changes
+                                        </h6>
+
+                                        <h2 id="changedItemsCount"
+                                            class="text-warning mb-0">
+                                            &mdash;
+                                        </h2>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="card shadow-sm h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">
+                                            Availability Changes
+                                        </h6>
+
+                                        <h2 id="availabilityItemsCount"
+                                            class="text-warning mb-0"
+                                            th:text="${availabilityCount}">
+                                            0
+                                        </h2>
                                     </div>
                                 </div>
                             </div>
@@ -160,8 +189,127 @@
                             </div>
                         </div>
 
+                        <!-- Availability Changes -->
+                        <div class="card shadow-sm mb-4">
+
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    Availability Changes
+                                </h5>
+                            </div>
+
+                            <div class="card-body">
+
+                                <p class="text-muted">
+                                    Review saved availability drafts before
+                                    publishing them to the Caracal sandbox.
+                                </p>
+
+                                <div class="table-responsive">
+
+                                    <table class="table table-bordered table-hover align-middle">
+
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Tenant</th>
+                                                <th>Terminal</th>
+                                                <th>Route</th>
+                                                <th>Product</th>
+                                                <th>Staged Availability</th>
+                                                <th>Constraints</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+
+                                            <tr th:if="${#lists.isEmpty(availabilityChanges)}">
+                                                <td colspan="7"
+                                                    class="text-center text-muted py-3">
+                                                    No pending availability changes.
+                                                </td>
+                                            </tr>
+
+                                            <tr th:each="rule : ${availabilityChanges}">
+
+                                                <td th:text="${rule.tenantCode}">
+                                                </td>
+
+                                                <td th:text="${rule.siteCode}">
+                                                </td>
+
+                                                <td th:text="${rule.routeCode == 'ALL'
+                                                    ? 'All Destinations'
+                                                    : rule.routeCode}">
+                                                </td>
+
+                                                <td th:text="${rule.productCode}">
+                                                </td>
+
+                                                <td class="table-warning"
+                                                    th:text="${rule.available
+                                                        ? 'Available'
+                                                        : 'Unavailable'}">
+                                                </td>
+
+                                                <td>
+
+                                                    <span th:if="${rule.temporalCondition != null}">
+                                                        Temporal condition
+                                                    </span>
+
+                                                    <span th:if="${rule.phasedOut}">
+                                                        Phased out
+                                                    </span>
+
+                                                    <span th:if="${rule.temporalCondition == null
+                                                        and !rule.phasedOut}">
+                                                        None
+                                                    </span>
+
+                                                </td>
+
+                                                <td>
+
+                                                    <span th:if="${rule.routeCode == 'ALL'
+                                                        and rule.temporalCondition == null
+                                                        and !rule.phasedOut}"
+                                                        class="badge bg-warning text-dark">
+                                                        Pending Publication
+                                                    </span>
+
+                                                    <span th:unless="${rule.routeCode == 'ALL'
+                                                        and rule.temporalCondition == null
+                                                        and !rule.phasedOut}"
+                                                        class="badge bg-danger">
+                                                        Unsupported
+                                                    </span>
+
+                                                </td>
+
+                                            </tr>
+
+                                        </tbody>
+
+                                    </table>
+
+                                </div>
+
+                                <p class="text-muted small mb-0">
+                                    Publication currently supports terminal-wide
+                                    availability changes without temporal
+                                    conditions or product phase-outs.
+                                    Remote assignment compatibility is checked
+                                    during publication.
+                                </p>
+
+                            </div>
+
+                        </div>
+
                         <!-- FARE CONFIGURATION VALIDATION -->
-                        <section id="validationSection" class="card shadow-sm mb-4">
+                        <section id="validationSection"
+                                 class="card shadow-sm mb-4">
 
                             <div class="card-header bg-white">
                                 <h5 class="mb-0">
@@ -192,7 +340,9 @@
                                    aria-live="polite">
                                 </p>
 
-                                <div id="validationResults" class="mt-3" hidden>
+                                <div id="validationResults"
+                                     class="mt-3"
+                                     hidden>
 
                                     <h6>Validation Results</h6>
 
@@ -225,7 +375,8 @@
                                                 </tr>
                                             </thead>
 
-                                            <tbody id="validationTableBody"></tbody>
+                                            <tbody id="validationTableBody">
+                                            </tbody>
 
                                         </table>
 
@@ -235,18 +386,18 @@
                             </div>
                         </section>
 
-                        <!-- Schedule & Availability -->
+                        <!-- Schedule Changes -->
                         <div class="card shadow-sm mb-4">
 
                             <div class="card-header bg-white">
                                 <h5 class="mb-0">
-                                    Schedule &amp; Availability Changes
+                                    Schedule Changes
                                 </h5>
                             </div>
 
                             <div class="card-body">
                                 <p class="text-muted text-center mb-0 py-3">
-                                    Schedule and availability draft review is not yet available.
+                                    Schedule publication is not yet supported.
                                 </p>
                             </div>
 
@@ -265,9 +416,11 @@
                             <div class="card-body">
 
                                 <p class="text-muted">
-                                    Review the staged fare changes above before publishing.
-                                    Publication applies pending fare changes to the
-                                    Caracal sandbox and publishes the updated catalog.
+                                    Review the staged fare and availability
+                                    changes above before publishing.
+                                    Publication applies supported pending
+                                    changes to the Caracal sandbox and
+                                    publishes the updated catalog.
                                 </p>
 
                                 <div class="alert alert-info">
@@ -293,10 +446,11 @@
                         </div>
 
                         <p class="text-muted small">
-                            Pending fare changes are retrieved from saved drafts
-                            in PostgreSQL. Successfully published fare drafts
-                            are marked as committed. Schedule and availability
-                            publication is not yet integrated.
+                            Pending fare and availability changes are
+                            retrieved from saved drafts in PostgreSQL.
+                            Successfully published changes are finalized
+                            after catalog publication is verified.
+                            Schedule publication is not yet supported.
                         </p>
 
                     </div>

@@ -1,3 +1,4 @@
+
 package ca.sfu.cmpt276.nywfareconfig.publishing.controller;
 
 import static org.mockito.Mockito.*;
@@ -45,6 +46,7 @@ import ca.sfu.cmpt276.nywfareconfig.fare.service.FareService;
 
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.PublishingService;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.FarePublicationService;
+import ca.sfu.cmpt276.nywfareconfig.publishing.service.AvailabilityPublicationService;
 
 import ca.sfu.cmpt276.nywfareconfig.security.ActorService;
 import ca.sfu.cmpt276.nywfareconfig.security.config.SecurityConfig;
@@ -123,6 +125,9 @@ class PublicationIntegrationTest {
     private FareService fareService;
 
     @MockitoBean
+    private AvailabilityPublicationService availabilityPublicationService;
+
+    @MockitoBean
     private TenantContext tenantContext;
 
     @MockitoBean
@@ -174,6 +179,11 @@ class PublicationIntegrationTest {
 
         when(actorService.currentActorHeader())
                 .thenReturn(ACTOR);
+
+        // Existing integration tests focus on fare publication.
+        when(availabilityPublicationService
+                .applyPendingAvailabilityChanges(tenant))
+                .thenReturn(List.of());
 
         draft = mock(FareDraft.class);
 
@@ -337,6 +347,7 @@ class PublicationIntegrationTest {
         );
 
         verifyNoInteractions(fareDraftService);
+        verifyNoInteractions(availabilityPublicationService);
     }
 
     @Test
@@ -366,6 +377,9 @@ class PublicationIntegrationTest {
 
         verify(fareDraftService, never())
                 .commitPublishedDrafts(anyList());
+
+        verify(availabilityPublicationService, never())
+                .commitPublishedRules(anyList());
     }
 
     @Test
@@ -395,6 +409,9 @@ class PublicationIntegrationTest {
 
         verify(fareDraftService, never())
                 .commitPublishedDrafts(anyList());
+
+        verify(availabilityPublicationService, never())
+                .commitPublishedRules(anyList());
     }
 
     @Test
@@ -431,6 +448,9 @@ class PublicationIntegrationTest {
 
         verify(fareDraftService, never())
                 .commitPublishedDrafts(anyList());
+
+        verify(availabilityPublicationService, never())
+                .commitPublishedRules(anyList());
     }
 
     @Test
@@ -462,5 +482,8 @@ class PublicationIntegrationTest {
 
         verify(fareDraftService, never())
                 .commitPublishedDrafts(anyList());
+
+        verify(availabilityPublicationService, never())
+                .commitPublishedRules(anyList());
     }
 }

@@ -1,3 +1,4 @@
+
 package ca.sfu.cmpt276.nywfareconfig.publishing.service;
 
 import java.util.HashSet;
@@ -7,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.caracal.CaracalApiClient;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
@@ -20,6 +22,7 @@ public class PublishingService {
 
     private final CaracalApiClient caracalApiClient;
     private final FarePublicationService farePublicationService;
+    private final AvailabilityPublicationService availabilityPublicationService;
 
     private final AtomicBoolean publishing = new AtomicBoolean(false);
 
@@ -27,10 +30,12 @@ public class PublishingService {
 
     public PublishingService(
             CaracalApiClient caracalApiClient,
-            FarePublicationService farePublicationService) {
+            FarePublicationService farePublicationService,
+            AvailabilityPublicationService availabilityPublicationService) {
 
         this.caracalApiClient = caracalApiClient;
         this.farePublicationService = farePublicationService;
+        this.availabilityPublicationService = availabilityPublicationService;
     }
 
     public JsonNode publish(Tenant tenant) {
@@ -63,13 +68,19 @@ public class PublishingService {
             List<FareDraft> appliedDrafts =
                     farePublicationService.applyPendingFareChanges(tenant);
 
-            if (appliedDrafts.isEmpty()) {
+            // Apply staged PostgreSQL availability changes to Caracal.
+            List<AvailabilityRule> appliedAvailabilityRules =
+                    availabilityPublicationService
+                            .applyPendingAvailabilityChanges(tenant);
+
+            if (appliedDrafts.isEmpty()
+                    && appliedAvailabilityRules.isEmpty()) {
+
                 throw new IllegalStateException(
-                        "No pending fare changes to publish.");
+                        "No pending configuration changes to publish.");
             }
 
-            // Schedule and availability publication will be
-            // integrated here once their staging services are ready.
+            // Schedule publication will be integrated separately.
 
             // Publish the updated Caracal catalog.
             publicationOutcomeUncertain = true;
@@ -113,8 +124,18 @@ public class PublishingService {
                         && "CATALOG".equals(
                                 publication.path("kind").asText())) {
 
-                    // Finalize PostgreSQL drafts only after publication is verified.
-                    farePublicationService.commitPublishedDrafts(appliedDrafts);
+                    // Finalize PostgreSQL changes only after verification.
+                    if (!appliedDrafts.isEmpty()) {
+                        farePublicationService
+                                .commitPublishedDrafts(appliedDrafts);
+                    }
+
+                    if (!appliedAvailabilityRules.isEmpty()) {
+                        availabilityPublicationService
+                                .commitPublishedRules(
+                                        appliedAvailabilityRules);
+                    }
+
                     publicationOutcomeUncertain = false;
 
                     return publication;
@@ -155,4 +176,5 @@ public class PublishingService {
         return ids;
     }
 }
+
 

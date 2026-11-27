@@ -7,6 +7,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.security.core.Authentication;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
 import ca.sfu.cmpt276.nywfareconfig.publishing.dto.ConfigurationChangeView;
 import ca.sfu.cmpt276.nywfareconfig.publishing.service.StagingService;
 import ca.sfu.cmpt276.nywfareconfig.tenant.model.Tenant;
@@ -31,7 +32,8 @@ public class PublishingController {
             Model model,
             Authentication authentication) {
 
-        Tenant selectedTenant = tenantContext.getSelectedTenant();
+        Tenant selectedTenant =
+                tenantContext.getSelectedTenant();
 
         String tenantCode = selectedTenant != null
                 ? selectedTenant.getCode()
@@ -40,16 +42,23 @@ public class PublishingController {
         List<ConfigurationChangeView> fareChanges =
                 stagingService.getConfigurationChanges(tenantCode);
 
-        long totalCount = fareChanges.size();
+        List<AvailabilityRule> availabilityChanges =
+                stagingService.getPendingAvailabilityChanges(tenantCode);
+
+        long totalCount =
+                fareChanges.size() + availabilityChanges.size();
 
         long changedCount = fareChanges.stream()
                 .filter(ConfigurationChangeView::isChanged)
                 .count();
 
-        long unchangedCount = totalCount - changedCount;
+        long unchangedCount =
+                fareChanges.size() - changedCount;
 
         model.addAttribute("tenantCode", tenantCode);
         model.addAttribute("pendingChanges", fareChanges);
+        model.addAttribute("availabilityChanges", availabilityChanges);
+        model.addAttribute("availabilityCount", availabilityChanges.size());
         model.addAttribute("totalCount", totalCount);
         model.addAttribute("changedCount", changedCount);
         model.addAttribute("unchangedCount", unchangedCount);
@@ -66,6 +75,5 @@ public class PublishingController {
         return "publishing/review";
     }
 }
-
 
 

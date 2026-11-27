@@ -39,7 +39,11 @@ Retrieves configuration comparisons from Spring Boot.
             change => change.changed === true
         ).length;
 
-        const total = changedFares;
+        const availabilityCount = Number(
+            totalCountElement?.dataset.availabilityCount ?? 0
+        );
+
+        const total = changedFares + availabilityCount;
 
         if (totalCountElement) {
             totalCountElement.textContent = total;

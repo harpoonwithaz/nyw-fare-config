@@ -120,18 +120,6 @@ public class FarePublicationService {
                                 + draft.getDestIdentifier());
             }
 
-            System.out.println(
-                    "Publication target: "
-                            + draft.getOriginIdentifier()
-                            + " -> "
-                            + draft.getDestIdentifier()
-                            + " | Product: "
-                            + draft.getProductCode()
-                            + " | Rule set: "
-                            + priceRuleSetName
-                            + " | New price: "
-                            + newPrice);
-
             // The requested price is already present on Caracal.
             if (baseline.getPrice().compareTo(newPrice) == 0) {
                 continue;
@@ -190,11 +178,6 @@ public class FarePublicationService {
                                 + draft.getId());
             }
 
-            System.out.println(
-                    "Fare update verified for draft "
-                            + draft.getId()
-                            + " | Updated price: "
-                            + updatedBaseline.getPrice());
         }
 
         return List.copyOf(drafts);

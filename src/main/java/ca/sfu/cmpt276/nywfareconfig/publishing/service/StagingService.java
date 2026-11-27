@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
+import ca.sfu.cmpt276.nywfareconfig.availability.repository.AvailabilityRuleRepository;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.FareDraft;
 import ca.sfu.cmpt276.nywfareconfig.fare.model.GridMode;
 import ca.sfu.cmpt276.nywfareconfig.fare.service.FareDraftService;
@@ -15,16 +17,20 @@ public class StagingService {
 
     private final FareDraftService fareDraftService;
     private final FareBaselineProvider fareBaselineProvider;
+    private final AvailabilityRuleRepository availabilityRuleRepository;
 
-    public StagingService(FareDraftService fareDraftService,
-        FareBaselineProvider fareBaselineProvider) {
+    public StagingService(
+            FareDraftService fareDraftService,
+            FareBaselineProvider fareBaselineProvider,
+            AvailabilityRuleRepository availabilityRuleRepository) {
+
         this.fareDraftService = fareDraftService;
         this.fareBaselineProvider = fareBaselineProvider;
+        this.availabilityRuleRepository = availabilityRuleRepository;
     }
 
     /**
      * Retrieve pending fare changes for the selected tenant.
-     * Only actual changes are included in the review.
      */
     public List<ConfigurationChangeView> getConfigurationChanges(
             String tenantCode) {
@@ -33,12 +39,9 @@ public class StagingService {
             return List.of();
         }
 
-        //retreive postgresql pending drafts
         List<FareDraft> drafts =
                 fareDraftService.getPendingDrafts(tenantCode);
-        
-        //convert each draft into a configuration change view
-        //and filter out non-changed entries
+
         return drafts.stream()
                 .map(this::toConfigurationChangeView)
                 .filter(ConfigurationChangeView::isChanged)
@@ -46,8 +49,21 @@ public class StagingService {
     }
 
     /**
+     * Retrieve pending availability drafts for the selected tenant.
+     */
+    public List<AvailabilityRule> getPendingAvailabilityChanges(
+            String tenantCode) {
+
+        if (tenantCode == null || tenantCode.isBlank()) {
+            return List.of();
+        }
+
+        return availabilityRuleRepository
+                .findByTenantCodeAndPendingPublishTrue(tenantCode);
+    }
+
+    /**
      * Convert a saved fare draft into a review DTO.
-     * Supports both O-D and zonal configurations.
      */
     private ConfigurationChangeView toConfigurationChangeView(
             FareDraft draft) {

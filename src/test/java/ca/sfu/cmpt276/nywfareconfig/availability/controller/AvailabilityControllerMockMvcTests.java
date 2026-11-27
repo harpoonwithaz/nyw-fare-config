@@ -1,3 +1,4 @@
+
 package ca.sfu.cmpt276.nywfareconfig.availability.controller;
 
 import ca.sfu.cmpt276.nywfareconfig.availability.model.AvailabilityRule;
@@ -86,15 +87,18 @@ class AvailabilityControllerMockMvcTests {
                 new CaracalCatalogDtos.SiteSummary("MIDTOWN", "Midtown / W. 39th St", ZoneId.of("America/New_York")),
                 new CaracalCatalogDtos.SiteSummary("PAULSHK", "Paulus Hook", ZoneId.of("America/New_York"))
         ));
+
         when(caracalApiClient.fetchProducts(TENANT)).thenReturn(List.of(
                 new CaracalCatalogDtos.ProductSummary("ADULT_ONEWAY", "Adult One-Way", true),
                 new CaracalCatalogDtos.ProductSummary("FULL_MONTHLY", "Full Monthly Pass", true)
         ));
+
         when(caracalApiClient.fetchRateTable(new CaracalCatalogDtos.RateTableGetRequest(TENANT, "RT-MIDTOWN")))
                 .thenReturn(Optional.of(List.of(
-                        new CaracalCatalogDtos.RateAssignmentSummary("ADULT_ONEWAY", "VALUE", "OD-ADULT_ONEWAY"),
-                        new CaracalCatalogDtos.RateAssignmentSummary("FULL_MONTHLY", "NOT_SOLD", "OD-FULL_MONTHLY")
+                        new CaracalCatalogDtos.RateAssignmentSummary("assignment-1", "ADULT_ONEWAY", "VALUE", "OD-ADULT_ONEWAY"),
+                        new CaracalCatalogDtos.RateAssignmentSummary("assignment-2", "FULL_MONTHLY", "NOT_SOLD", "OD-FULL_MONTHLY")
                 )));
+
         when(caracalApiClient.simulatePrice(any())).thenReturn(
                 new CaracalSimulationDtos.PriceSimulationResult(
                         new CaracalSimulationDtos.PriceSimulateResponse(
@@ -222,6 +226,7 @@ class AvailabilityControllerMockMvcTests {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(reactivatePayload);
+
         if (adminCookie != null) {
             adminPost.cookie(adminCookie);
         }
